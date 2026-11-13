@@ -109,6 +109,82 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
   schemas: {
+    /** BoolCell */
+    BoolCell: {
+      /**
+       * Status
+       * @description confirmed=공고에서 확인, estimated=추정(원문과 대조되지 않음), user_input=사용자가 확인 화면에서 입력·수정, missing=공고에 없음
+       * @default missing
+       * @enum {string}
+       */
+      status: 'confirmed' | 'estimated' | 'user_input' | 'missing';
+      /**
+       * Source Text
+       * @description 근거가 된 원문 조각
+       */
+      source_text?: string | null;
+      /** Value */
+      value?: boolean | null;
+    };
+    /**
+     * ComparisonRow
+     * @description 비교표 한 행 = 공고 1건.
+     */
+    ComparisonRow: {
+      /**
+       * Id
+       * @description 행 구분용 ID (posting-1, posting-2 …)
+       */
+      id: string;
+      /** @description 회사명 */
+      company?: components['schemas']['TextCell'];
+      /** @description 직무 */
+      job_title?: components['schemas']['TextCell'];
+      /** @description 고용형태 */
+      employment_type?: components['schemas']['TextCell'];
+      /** @description 채용 구분 (신입 / 경력 / 무관) */
+      hiring_track?: components['schemas']['TextCell'];
+      /** @description 근무지 */
+      location?: components['schemas']['LocationCell'];
+      /** @description 연봉 종류 */
+      salary_type?: components['schemas']['SalaryTypeCell'];
+      /** @description 세전 연봉(원) */
+      annual_salary_krw?: components['schemas']['MoneyCell'];
+      /** @description 세전 월급(원). salary_type이 monthly일 때 */
+      monthly_salary_krw?: components['schemas']['MoneyCell'];
+      /** @description 현금으로 주는 식대 월액(원) */
+      meal_allowance_monthly_krw?: components['schemas']['MoneyCell'];
+      /** @description 식대가 연봉 금액 안에 포함되는지 */
+      meal_allowance_in_salary?: components['schemas']['BoolCell'];
+      /** @description 회사가 식사를 현물로 제공하는지 */
+      meals_provided?: components['schemas']['BoolCell'];
+      /** @description 주거지원비 월액(원) */
+      housing_allowance_monthly_krw?: components['schemas']['MoneyCell'];
+      /** @description 주거지원비 지원 개월 수 */
+      housing_allowance_months?: components['schemas']['IntCell'];
+      /** @description 사택·기숙사 제공 */
+      company_housing?: components['schemas']['BoolCell'];
+      /** @description 통근버스 운행 */
+      shuttle_bus?: components['schemas']['BoolCell'];
+      /** @description 교통비 월액(원) */
+      transport_allowance_monthly_krw?: components['schemas']['MoneyCell'];
+      /**
+       * Other Allowances
+       * @description 기타 월 수당 (통신비 등)
+       */
+      other_allowances?: components['schemas']['OtherAllowance'][];
+      /** @description 수습 개월 수 */
+      probation_months?: components['schemas']['IntCell'];
+      /** @description 수습 기간 급여 비율 */
+      probation_pay_rate?: components['schemas']['RateCell'];
+      /** @description 연장·야간근무 관련 메모 */
+      overtime?: components['schemas']['TextCell'];
+      /**
+       * Questions To Ask
+       * @description 계산에 필요한데 공고에 없어 사용자에게 물어볼 것 (코드가 빈칸을 보고 만든다)
+       */
+      questions_to_ask?: string[];
+    };
     /**
      * ConfirmRequest
      * @description 비교표 확인 요청.
@@ -123,13 +199,9 @@ export interface components {
       approved: boolean;
       /**
        * Table
-       * @description 사용자가 비교표를 고쳤을 때만 보낸다
+       * @description 사용자가 비교표를 고쳤을 때만 보낸다. 고친 칸은 status를 user_input으로
        */
-      table?:
-        | {
-            [key: string]: unknown;
-          }[]
-        | null;
+      table?: components['schemas']['ComparisonRow'][] | null;
     };
     /**
      * ErrorCode
@@ -139,6 +211,7 @@ export interface components {
     ErrorCode:
       | 'SESSION_NOT_FOUND'
       | 'SESSION_NOT_AWAITING_CONFIRMATION'
+      | 'NORMALIZE_FAILED'
       | 'VALIDATION_ERROR'
       | 'NOT_FOUND'
       | 'METHOD_NOT_ALLOWED'
@@ -179,6 +252,68 @@ export interface components {
        */
       message: string;
     };
+    /** IntCell */
+    IntCell: {
+      /**
+       * Status
+       * @description confirmed=공고에서 확인, estimated=추정(원문과 대조되지 않음), user_input=사용자가 확인 화면에서 입력·수정, missing=공고에 없음
+       * @default missing
+       * @enum {string}
+       */
+      status: 'confirmed' | 'estimated' | 'user_input' | 'missing';
+      /**
+       * Source Text
+       * @description 근거가 된 원문 조각
+       */
+      source_text?: string | null;
+      /**
+       * Value
+       * @description 개월 수
+       */
+      value?: number | null;
+    };
+    /**
+     * Location
+     * @description 근무지. sido·sigungu·lawd_cd는 코드가 data/lawd_codes.csv에서 찾아 채운다.
+     */
+    Location: {
+      /**
+       * Raw
+       * @description 공고에 적힌 근무지 원문
+       */
+      raw: string;
+      /**
+       * Sido
+       * @description 코드표 기준 시도명
+       */
+      sido?: string | null;
+      /**
+       * Sigungu
+       * @description 코드표 기준 시군구명
+       */
+      sigungu?: string | null;
+      /**
+       * Lawd Cd
+       * @description 법정동 시군구 코드 5자리
+       */
+      lawd_cd?: string | null;
+    };
+    /** LocationCell */
+    LocationCell: {
+      /**
+       * Status
+       * @description confirmed=공고에서 확인, estimated=추정(원문과 대조되지 않음), user_input=사용자가 확인 화면에서 입력·수정, missing=공고에 없음
+       * @default missing
+       * @enum {string}
+       */
+      status: 'confirmed' | 'estimated' | 'user_input' | 'missing';
+      /**
+       * Source Text
+       * @description 근거가 된 원문 조각
+       */
+      source_text?: string | null;
+      value?: components['schemas']['Location'] | null;
+    };
     /**
      * MessageRequest
      * @description 세션 시작·메시지 보내기 요청. 예: {"message": "판교 백엔드 신입 연봉 3,600만원"}
@@ -189,6 +324,35 @@ export interface components {
        * @description 사용자가 보낸 문장 (공고 내용, 조건 등)
        */
       message: string;
+    };
+    /** MoneyCell */
+    MoneyCell: {
+      /**
+       * Status
+       * @description confirmed=공고에서 확인, estimated=추정(원문과 대조되지 않음), user_input=사용자가 확인 화면에서 입력·수정, missing=공고에 없음
+       * @default missing
+       * @enum {string}
+       */
+      status: 'confirmed' | 'estimated' | 'user_input' | 'missing';
+      /**
+       * Source Text
+       * @description 근거가 된 원문 조각
+       */
+      source_text?: string | null;
+      /**
+       * Value
+       * @description 금액(원)
+       */
+      value?: number | null;
+    };
+    /**
+     * OtherAllowance
+     * @description 기타 월 수당 (통신비 등).
+     */
+    OtherAllowance: {
+      /** Name */
+      name: string;
+      monthly_krw: components['schemas']['MoneyCell'];
     };
     /**
      * PendingQuestion
@@ -204,6 +368,43 @@ export interface components {
       payload: {
         [key: string]: unknown;
       };
+    };
+    /** RateCell */
+    RateCell: {
+      /**
+       * Status
+       * @description confirmed=공고에서 확인, estimated=추정(원문과 대조되지 않음), user_input=사용자가 확인 화면에서 입력·수정, missing=공고에 없음
+       * @default missing
+       * @enum {string}
+       */
+      status: 'confirmed' | 'estimated' | 'user_input' | 'missing';
+      /**
+       * Source Text
+       * @description 근거가 된 원문 조각
+       */
+      source_text?: string | null;
+      /**
+       * Value
+       * @description 비율. 90%면 0.9
+       */
+      value?: number | null;
+    };
+    /** SalaryTypeCell */
+    SalaryTypeCell: {
+      /**
+       * Status
+       * @description confirmed=공고에서 확인, estimated=추정(원문과 대조되지 않음), user_input=사용자가 확인 화면에서 입력·수정, missing=공고에 없음
+       * @default missing
+       * @enum {string}
+       */
+      status: 'confirmed' | 'estimated' | 'user_input' | 'missing';
+      /**
+       * Source Text
+       * @description 근거가 된 원문 조각
+       */
+      source_text?: string | null;
+      /** Value */
+      value?: ('annual' | 'monthly' | 'undisclosed' | 'to_propose') | null;
     };
     /**
      * SessionResponse
@@ -221,11 +422,9 @@ export interface components {
       pending?: components['schemas']['PendingQuestion'] | null;
       /**
        * Table
-       * @description 비교표
+       * @description 비교표 (공고 1건 = 1행)
        */
-      table?: {
-        [key: string]: unknown;
-      }[];
+      table?: components['schemas']['ComparisonRow'][];
       /**
        * Table Confirmed
        * @default false
@@ -237,6 +436,23 @@ export interface components {
       } | null;
       /** Report */
       report?: string | null;
+    };
+    /** TextCell */
+    TextCell: {
+      /**
+       * Status
+       * @description confirmed=공고에서 확인, estimated=추정(원문과 대조되지 않음), user_input=사용자가 확인 화면에서 입력·수정, missing=공고에 없음
+       * @default missing
+       * @enum {string}
+       */
+      status: 'confirmed' | 'estimated' | 'user_input' | 'missing';
+      /**
+       * Source Text
+       * @description 근거가 된 원문 조각
+       */
+      source_text?: string | null;
+      /** Value */
+      value?: string | null;
     };
   };
   responses: never;
@@ -309,6 +525,15 @@ export interface operations {
           'application/json': components['schemas']['ErrorResponse'];
         };
       };
+      /** @description Bad Gateway */
+      502: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
     };
   };
   send_message_sessions__session_id__messages_post: {
@@ -355,6 +580,15 @@ export interface operations {
       };
       /** @description Internal Server Error */
       500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Bad Gateway */
+      502: {
         headers: {
           [name: string]: unknown;
         };
