@@ -41,6 +41,28 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/sessions/uploads': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Start Session With Files
+     * @description 파일(이미지·PDF·엑셀·CSV)과 붙여 넣은 글로 세션을 만든다. 비교표 확인 단계에서 멈춘다.
+     *
+     *     파일은 그래프에 넣기 전에 글로 바꾼다 (backend/inputs/read.py). 원본은 저장하지 않는다.
+     */
+    post: operations['start_session_with_files_sessions_uploads_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/sessions/{session_id}/messages': {
     parameters: {
       query?: never;
@@ -109,6 +131,20 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
   schemas: {
+    /** Body_start_session_with_files_sessions_uploads_post */
+    Body_start_session_with_files_sessions_uploads_post: {
+      /**
+       * Files
+       * @description 공고 파일 (최대 5개)
+       */
+      files?: string[] | null;
+      /**
+       * Message
+       * @description 함께 붙여 넣은 공고 글 (선택)
+       * @default
+       */
+      message: string;
+    };
     /** BoolCell */
     BoolCell: {
       /**
@@ -123,6 +159,12 @@ export interface components {
        * @description 근거가 된 원문 조각
        */
       source_text?: string | null;
+      /**
+       * From Image
+       * @description 근거(source_text)가 이미지에서 옮겨 적은 글에만 있음. AI가 옮겨 적은 글과 맞는다는 뜻이라, 원본 이미지와 한 번 더 비교해야 한다
+       * @default false
+       */
+      from_image: boolean;
       /** Value */
       value?: boolean | null;
     };
@@ -212,6 +254,18 @@ export interface components {
       | 'SESSION_NOT_FOUND'
       | 'SESSION_NOT_AWAITING_CONFIRMATION'
       | 'NORMALIZE_FAILED'
+      | 'FILE_MISSING'
+      | 'FILE_TOO_MANY'
+      | 'FILE_TOO_LARGE'
+      | 'FILE_EMPTY'
+      | 'FILE_TYPE_UNSUPPORTED'
+      | 'FILE_UNREADABLE'
+      | 'FILE_TOO_LONG'
+      | 'FILE_NO_TEXT'
+      | 'DEMO_FILE_ONLY'
+      | 'LENGTH_REQUIRED'
+      | 'READ_FAILED'
+      | 'VISION_DAILY_LIMIT'
       | 'VALIDATION_ERROR'
       | 'NOT_FOUND'
       | 'METHOD_NOT_ALLOWED'
@@ -252,6 +306,56 @@ export interface components {
        */
       message: string;
     };
+    /**
+     * InputSummary
+     * @description 올린 파일 하나를 어떻게 읽었는지. 원본 파일은 서버에 저장하지 않는다.
+     */
+    InputSummary: {
+      /**
+       * Index
+       * @description 올린 순서 (1부터). 글 속 "--- 파일 N ---"의 N
+       */
+      index: number;
+      /**
+       * Name
+       * @description 파일 이름 (화면 표시용, 글에는 넣지 않는다)
+       */
+      name: string;
+      /**
+       * Kind
+       * @enum {string}
+       */
+      kind: 'pdf' | 'sheet' | 'image';
+      /**
+       * Method
+       * @description text=글자를 그대로 꺼냄(0원), vision=AI가 이미지 글자를 옮겨 적음, ocr=스캔 PDF에 숨은 기계 인식 글자, mixed=쪽마다 다름
+       * @enum {string}
+       */
+      method: 'text' | 'vision' | 'ocr' | 'mixed';
+      /**
+       * Pages
+       * @description PDF 쪽 수
+       */
+      pages?: number | null;
+      /**
+       * Vision Pages
+       * @description 이미지 인식으로 읽은 장 수
+       * @default 0
+       */
+      vision_pages: number;
+      /**
+       * Unreadable
+       * @description 옮겨 적다가 [읽을 수 없음]으로 남긴 곳 수
+       * @default 0
+       */
+      unreadable: number;
+      /**
+       * Ignored Images
+       * @description PDF 글자 쪽 안에서 읽지 않은 큰 그림 수 (표를 캡처해 붙인 경우 등)
+       * @default 0
+       */
+      ignored_images: number;
+    };
     /** IntCell */
     IntCell: {
       /**
@@ -266,6 +370,12 @@ export interface components {
        * @description 근거가 된 원문 조각
        */
       source_text?: string | null;
+      /**
+       * From Image
+       * @description 근거(source_text)가 이미지에서 옮겨 적은 글에만 있음. AI가 옮겨 적은 글과 맞는다는 뜻이라, 원본 이미지와 한 번 더 비교해야 한다
+       * @default false
+       */
+      from_image: boolean;
       /**
        * Value
        * @description 개월 수
@@ -312,6 +422,12 @@ export interface components {
        * @description 근거가 된 원문 조각
        */
       source_text?: string | null;
+      /**
+       * From Image
+       * @description 근거(source_text)가 이미지에서 옮겨 적은 글에만 있음. AI가 옮겨 적은 글과 맞는다는 뜻이라, 원본 이미지와 한 번 더 비교해야 한다
+       * @default false
+       */
+      from_image: boolean;
       value?: components['schemas']['Location'] | null;
     };
     /**
@@ -339,6 +455,12 @@ export interface components {
        * @description 근거가 된 원문 조각
        */
       source_text?: string | null;
+      /**
+       * From Image
+       * @description 근거(source_text)가 이미지에서 옮겨 적은 글에만 있음. AI가 옮겨 적은 글과 맞는다는 뜻이라, 원본 이미지와 한 번 더 비교해야 한다
+       * @default false
+       */
+      from_image: boolean;
       /**
        * Value
        * @description 금액(원)
@@ -384,6 +506,12 @@ export interface components {
        */
       source_text?: string | null;
       /**
+       * From Image
+       * @description 근거(source_text)가 이미지에서 옮겨 적은 글에만 있음. AI가 옮겨 적은 글과 맞는다는 뜻이라, 원본 이미지와 한 번 더 비교해야 한다
+       * @default false
+       */
+      from_image: boolean;
+      /**
        * Value
        * @description 비율. 90%면 0.9
        */
@@ -403,6 +531,12 @@ export interface components {
        * @description 근거가 된 원문 조각
        */
       source_text?: string | null;
+      /**
+       * From Image
+       * @description 근거(source_text)가 이미지에서 옮겨 적은 글에만 있음. AI가 옮겨 적은 글과 맞는다는 뜻이라, 원본 이미지와 한 번 더 비교해야 한다
+       * @default false
+       */
+      from_image: boolean;
       /** Value */
       value?: ('annual' | 'monthly' | 'undisclosed' | 'to_propose') | null;
     };
@@ -430,6 +564,17 @@ export interface components {
        * @default false
        */
       table_confirmed: boolean;
+      /**
+       * Inputs
+       * @description 올린 파일 요약
+       */
+      inputs?: components['schemas']['InputSummary'][];
+      /**
+       * Input Text
+       * @description 비교표를 만들 때 쓴 글 전체 (붙여 넣은 글 + 파일에서 읽은 글). 확인을 마친 세션을 다시 고칠 때 이 글로 새 세션을 만든다
+       * @default
+       */
+      input_text: string;
       /** Result */
       result?: {
         [key: string]: unknown;
@@ -451,6 +596,12 @@ export interface components {
        * @description 근거가 된 원문 조각
        */
       source_text?: string | null;
+      /**
+       * From Image
+       * @description 근거(source_text)가 이미지에서 옮겨 적은 글에만 있음. AI가 옮겨 적은 글과 맞는다는 뜻이라, 원본 이미지와 한 번 더 비교해야 한다
+       * @default false
+       */
+      from_image: boolean;
       /** Value */
       value?: string | null;
     };
@@ -527,6 +678,75 @@ export interface operations {
       };
       /** @description Bad Gateway */
       502: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  start_session_with_files_sessions_uploads_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'multipart/form-data': components['schemas']['Body_start_session_with_files_sessions_uploads_post'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SessionResponse'];
+        };
+      };
+      /** @description Length Required */
+      411: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Unprocessable Content */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Internal Server Error */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Bad Gateway */
+      502: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Service Unavailable */
+      503: {
         headers: {
           [name: string]: unknown;
         };
