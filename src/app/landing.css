@@ -1,0 +1,739 @@
+main.site-shell:has(> .landing) {
+  width: 100%;
+}
+.landing {
+  --motion: cubic-bezier(0.22, 1, 0.36, 1);
+}
+.landing p {
+  text-wrap: pretty;
+  word-break: keep-all;
+}
+.landing h1,
+.landing h2 {
+  text-wrap: balance;
+  word-break: keep-all;
+  letter-spacing: -0.02em;
+}
+.map-field {
+  overflow: clip;
+  background: var(--accent);
+}
+.map-hero {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  align-content: center;
+  min-height: clamp(24rem, 42vw, 31rem);
+  padding-block: 2.5rem;
+}
+.map-intro {
+  position: relative;
+  z-index: 1;
+  width: 52%;
+}
+/* 히어로 제목: 두 줄. 에스코어 드림은 Bold 한 굵기뿐이라(라이선스상 파일 변형 불가) 얇은 외곽선으로 조금 더 굵게 보이게 한다. */
+.map-intro h1 {
+  font-size: clamp(2.3rem, 4.2vw, 3.4rem);
+  line-height: 1.25;
+  -webkit-text-stroke: 0.022em currentColor;
+}
+.hero-line {
+  display: block;
+}
+.money-left {
+  font-style: normal;
+  color: var(--positive);
+}
+@media (min-width: 64rem) {
+  .hero-line {
+    white-space: nowrap;
+  }
+}
+.map-intro p {
+  margin-top: 1.5rem;
+  max-width: 30rem;
+  font-size: 1.125rem;
+  line-height: 1.75;
+}
+.map-intro .start-posting {
+  margin-top: 2rem;
+}
+/* 제목 바로 아래 사례 한 줄: 서비스가 하는 일을 실제 숫자로. '남으려면' 뒤에서만 끊는다 */
+.map-intro .hero-lead {
+  max-width: 30rem;
+  margin-top: 1.25rem;
+  font-size: 1.125rem;
+  line-height: 1.55;
+  font-weight: 600;
+  color: var(--foreground);
+}
+.hero-lead .stat-line {
+  display: inline-block;
+}
+/* 버튼 아래 근거 통계: 상자 없이 큰 한 줄("청년 절반 이상은") + 아래 설명 + 각주 출처 */
+.map-intro .hero-stat {
+  max-width: 30rem;
+  margin-top: 1.75rem;
+  color: var(--foreground);
+}
+/* 통계 줄은 본문 글꼴(SUIT)로: 제목 글꼴은 h1만 쓴다 */
+.hero-stat strong {
+  display: block;
+  font-weight: 700;
+  font-size: 1.125rem;
+  line-height: 1.4;
+}
+/* 형광펜: 글자 아래 절반에만 반투명 코발트 띠 */
+.hero-stat mark {
+  padding-inline: 0.12em;
+  background: linear-gradient(
+    transparent 52%,
+    rgb(0 58 155 / 0.22) 52%,
+    rgb(0 58 155 / 0.22) 92%,
+    transparent 92%
+  );
+  color: inherit;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+.hero-stat span {
+  display: block;
+  margin-top: 0.3rem;
+  font-size: 1rem;
+  line-height: 1.55;
+  font-weight: 400;
+  color: var(--body);
+}
+/* 통계 설명: 한 줄에 다 들어가면 한 줄, 줄을 바꿔야 하면 화면 폭과 상관없이 '맞으면'에서만 끊는다(뜻 단위) */
+.hero-stat .stat-line {
+  display: inline-block;
+  margin: 0;
+}
+.hero-stat small {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--muted-foreground);
+}
+.map-art {
+  position: absolute;
+  inset: 0 -1rem 0 auto;
+  width: 69%;
+  pointer-events: none;
+  /* 히어로 그림은 배경이 있는 정사각형이라, 배경색에 섞고 가장자리를 부드럽게 지운다. */
+  mix-blend-mode: multiply;
+  mask-image:
+    /* 글씨가 끝나는 곳(그림 폭의 약 26%)까지는 완전히 비우고, 그 뒤에 서서히 드러낸다. */
+    linear-gradient(
+      to right,
+      transparent 0%,
+      transparent 26%,
+      rgb(0 0 0 / 0.35) 38%,
+      #000 56%,
+      #000 91%,
+      transparent 100%
+    ),
+    linear-gradient(to bottom, transparent, #000 13%, #000 82%, transparent 100%);
+  mask-composite: intersect;
+}
+.map-art img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 54%;
+}
+.offer-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  text-align: start;
+  color: var(--foreground);
+}
+/* 비교표: 채운 머리줄 대신 굵은 선 하나, 행은 가는 선으로만 나눈다. 글자는 제목과 같은 왼쪽 선에 맞춘다. */
+.offer-table th,
+.offer-table td {
+  text-align: start;
+  padding: 0.9rem 1.25rem;
+  vertical-align: baseline;
+}
+.offer-table :is(th, td):first-child {
+  padding-inline-start: 0;
+}
+.offer-table :is(th, td):last-child {
+  padding-inline-end: 0;
+}
+.offer-table thead th {
+  padding-block: 0 0.85rem;
+  border-block-end: 2px solid var(--foreground);
+  font-size: 1.125rem;
+  font-weight: 700;
+  vertical-align: bottom;
+}
+.offer-table thead th:first-child {
+  width: 22%;
+}
+.offer-table thead small {
+  display: block;
+  margin-block-start: 0.2rem;
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--muted-foreground);
+}
+.offer-table tbody tr {
+  border-block-end: 1px solid var(--border);
+}
+.offer-table tbody th {
+  font-size: 0.875rem;
+  color: var(--muted-foreground);
+  font-weight: 600;
+}
+.offer-table .offer-salary td {
+  font-size: 1.25rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+/* 공고에 없는 연봉 대신 계산한 최소 연봉: 제목의 녹색 숫자와 같은 값이라 같은 색 */
+.cell-value.is-target {
+  color: var(--positive);
+}
+.offer-badge {
+  display: inline-block;
+  margin-inline-start: 0.5rem;
+  padding: 0.125rem 0.45rem;
+  border-radius: 0.25rem;
+  background: var(--secondary);
+  color: var(--body);
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+  vertical-align: 0.1em;
+}
+/* '공고 넣어 보기' 화살표: 마우스를 올리면 살짝 앞으로 */
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .start-posting:hover svg {
+    transform: translateX(4px);
+  }
+}
+@media (max-width: 47.99rem) {
+  .map-intro p {
+    margin-top: 1rem;
+    font-size: 1rem;
+  }
+  .map-intro .start-posting {
+    margin-top: 1.25rem;
+  }
+}
+@media (max-width: 39.99rem) {
+  /* 좁은 화면: 제목 → 그림 → 사례 → 버튼 → 통계 한 줄씩 */
+  .map-hero {
+    min-height: 0;
+    padding-block: 2rem 2.5rem;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .map-intro {
+    display: contents;
+  }
+  .map-intro h1 {
+    font-size: clamp(2rem, 9vw, 3rem);
+    line-height: 1.2;
+    grid-row: 1;
+  }
+  .map-art {
+    position: relative;
+    inset: auto;
+    grid-row: 2;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 3 / 2;
+    margin-block: 0.5rem -0.5rem;
+    mask-image:
+      linear-gradient(to right, transparent, #000 12%, #000 88%, transparent),
+      linear-gradient(to bottom, transparent, #000 14%, #000 80%, transparent);
+  }
+  .map-intro .hero-lead {
+    grid-row: 3;
+    margin-top: 0.5rem;
+  }
+  .map-intro .start-posting {
+    grid-row: 4;
+    justify-self: start;
+  }
+  .map-intro .hero-stat {
+    grid-row: 5;
+  }
+}
+
+/* ── 공통 구역 머리 ── */
+.story-section,
+.compare-section {
+  padding-block: clamp(2.5rem, 5vw, 4rem) 0;
+}
+.compare-section {
+  padding-block-end: clamp(2.5rem, 5vw, 4rem);
+}
+.story-section h2,
+.compare-section h2 {
+  font-size: clamp(1.6rem, 2.8vw, 2.25rem);
+  line-height: 1.25;
+}
+/* 상담 구역: 설명 줄 없이 제목 바로 아래 탭 */
+.story-section h2 {
+  margin-block-end: 1.25rem;
+}
+.section-lead {
+  margin-block: 0.5rem 1.5rem;
+  color: var(--muted-foreground);
+}
+
+/* ── AI 상담 타임라인 ── */
+.story-tabs.cn-tabs-list {
+  display: flex;
+  width: 100%;
+  height: auto;
+  gap: 0;
+  padding: 0;
+  border-block-end: 1px solid var(--border);
+  background: transparent;
+  border-radius: 0;
+}
+/* 탭 = 진행 막대: 원 위, 이름·날짜 아래. 원 사이를 선으로 잇고, 지나온 구간은 실선, 남은 구간은 점선 */
+.story-tab.cn-tabs-trigger {
+  position: relative;
+  flex: 1 1 0;
+  display: grid;
+  grid-template-rows: auto auto auto;
+  justify-items: start;
+  justify-content: start;
+  align-content: start;
+  row-gap: 0.15rem;
+  min-height: 0;
+  height: auto;
+  padding: 0.5rem 0.25rem 0.9rem;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted-foreground);
+  text-align: start;
+  white-space: normal;
+}
+.story-tab.cn-tabs-trigger::after {
+  content: none;
+}
+.story-tab:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  inset-block-start: calc(0.5rem + 0.8rem - 1px);
+  inset-inline: calc(0.25rem + 1.6rem + 0.5rem) 0.5rem;
+  border-block-start: 2px dashed var(--input);
+}
+/* 마지막 단계는 이어 줄 선이 없으니 내용만큼만 차지해서, 진행 막대가 오른쪽 끝까지 꽉 차게 */
+.story-tab.cn-tabs-trigger:last-child {
+  flex: 0 0 auto;
+  padding-inline-end: 0;
+}
+.story-tab.cn-tabs-trigger[data-active] {
+  color: var(--foreground);
+  background: transparent;
+}
+.story-tab-num {
+  position: relative;
+  z-index: 1;
+  display: inline-grid;
+  place-items: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  margin-block-end: 0.35rem;
+  border-radius: 50%;
+  border: 2px solid var(--input);
+  background: var(--background);
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.story-tab:has(~ .story-tab[data-active]) .story-tab-num {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+.story-tab[data-active] .story-tab-num {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+.story-tab-label {
+  font-weight: 700;
+  font-size: 1rem;
+}
+.story-tab-time {
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--muted-foreground);
+}
+.story-panel {
+  display: grid;
+  gap: 1.25rem;
+  padding-block: 1.5rem 0.5rem;
+}
+/* 그림마다 원래 비율 그대로(고정 비율 칸에 넣으면 납작한 그림 위아래가 빈다) */
+.story-art {
+  width: min(100%, 26rem);
+  margin-inline: auto;
+}
+.story-art img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 17rem;
+  object-fit: contain;
+}
+/* 좁은 화면: 장면 그림을 낮춰 대화가 한 화면에 더 들어오게 */
+@media (max-width: 47.99rem) {
+  .story-art img {
+    max-height: 10.5rem;
+  }
+}
+.story-chat {
+  display: grid;
+  gap: 0.75rem;
+  align-content: start;
+}
+.bubble {
+  max-width: 36rem;
+  padding: 0.85rem 1rem;
+  border-radius: 0.875rem;
+  line-height: 1.6;
+  word-break: keep-all;
+}
+/* 말풍선: 줄은 꽉 채우되 단어 중간에서 끊지 않고(keep-all), 마지막 줄에 한 단어만 남지 않게 */
+.bubble p {
+  font-size: 1rem;
+  text-wrap: pretty;
+}
+@media (min-width: 48rem) {
+  .bubble p {
+    font-size: 1.125rem;
+  }
+}
+.bubble.is-user {
+  justify-self: end;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border-end-end-radius: 0.25rem;
+}
+.bubble.is-agent {
+  justify-self: start;
+  background: var(--accent);
+  color: var(--foreground);
+  border-end-start-radius: 0.25rem;
+}
+.bubble-who {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-block-end: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  opacity: 0.85;
+}
+.bubble-who svg {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+.bubble-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-block-start: 0.6rem;
+}
+.bubble-files li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 0.25rem;
+  background: rgb(255 255 255 / 0.16);
+  font-size: 0.75rem;
+}
+.bubble-files svg {
+  width: 0.8rem;
+  height: 0.8rem;
+}
+@media (min-width: 48rem) {
+  /* 그림은 작게, 대화는 넓고 크게. 장면마다 높이는 같게 고정하고, 그림과 대화를 세로 가운데에 맞춰 남는 공간이 아래로 몰리지 않게 */
+  .story-panel {
+    grid-template-columns: minmax(0, 0.75fr) minmax(0, 1.25fr);
+    align-items: center;
+    gap: 2.5rem;
+    min-height: 19rem;
+  }
+}
+
+/* ── 합친 비교표 ── */
+/* 금액은 오른쪽 정렬해 자릿수를 세로로 맞춘다 (DESIGN.md). 항목 이름 열만 왼쪽. */
+.compare-table td,
+.compare-table thead th:not(:first-child) {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+.compare-table .cell-value {
+  font-weight: 600;
+}
+.compare-table .cell-note {
+  display: block;
+  margin-block-start: 0.15rem;
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}
+.compare-table tbody tr.compare-result {
+  border-block: 2px solid var(--foreground);
+}
+.compare-table .compare-result th,
+.compare-table .compare-result td {
+  padding-block: 1.1rem;
+  font-weight: 700;
+  color: var(--foreground);
+}
+.compare-table .compare-result .cell-value {
+  font-family: var(--font-score-dream);
+  font-size: 1.5rem;
+  color: var(--positive);
+}
+/* 표 아래 캡션: 예시라는 안내 한 문장 */
+.compare-caption {
+  caption-side: bottom;
+  padding-block: 0.85rem 0;
+  margin-block-end: 1.75rem;
+  text-align: start;
+  font-size: 0.75rem;
+  line-height: 1.6;
+  color: var(--muted-foreground);
+}
+/* 좁은 화면: 3열 표 대신 회사를 골라 보는 한 열짜리 명세 */
+.compare-mobile {
+  display: none;
+}
+@media (max-width: 39.99rem) {
+  .compare-table {
+    display: none;
+  }
+  .compare-mobile {
+    display: flex;
+  }
+  .compare-switch {
+    margin-block-end: 0.75rem;
+  }
+  .compare-company {
+    font-size: 0.75rem;
+    color: var(--muted-foreground);
+  }
+  .compare-list {
+    margin-block-start: 0.25rem;
+  }
+  .compare-list > div {
+    display: grid;
+    grid-template-columns: 5.5rem minmax(0, 1fr);
+    align-items: baseline;
+    gap: 0.75rem;
+    padding-block: 0.8rem;
+    border-block-end: 1px solid var(--border);
+  }
+  .compare-list dt {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--muted-foreground);
+  }
+  .compare-list dd {
+    text-align: end;
+    color: var(--foreground);
+  }
+  .compare-list .cell-value {
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .compare-list .cell-note,
+  .compare-list .offer-badge {
+    display: block;
+    margin-block-start: 0.2rem;
+    font-size: 0.75rem;
+    color: var(--muted-foreground);
+  }
+  .compare-list .offer-badge {
+    display: inline-block;
+    margin-inline-start: 0;
+  }
+  .compare-list .compare-result {
+    border-block: 2px solid var(--foreground);
+    padding-block: 1rem;
+  }
+  .compare-list .compare-result dt {
+    color: var(--foreground);
+    font-weight: 700;
+  }
+  .compare-list .compare-result .cell-value {
+    font-family: var(--font-score-dream);
+    font-size: 1.5rem;
+    color: var(--positive);
+  }
+}
+
+/* AI가 계산해 채운 대구 열: 연한 배경 한 줄기. 배경이 생기니 오른쪽 끝 열이어도 안쪽 여백을 준다 */
+.compare-table :is(th, td).is-computed {
+  background: var(--accent);
+  padding-inline-end: 1.25rem;
+}
+/* 연한 배경 위에서도 배지가 보이게 흰 바탕 */
+.compare-table .is-computed .offer-badge {
+  background: var(--background);
+}
+.compare-table thead .is-computed {
+  padding-block-start: 0.85rem;
+  border-start-start-radius: 0.5rem;
+  border-start-end-radius: 0.5rem;
+}
+/* 비교 구역: 위 구역과 같은 왼쪽 선에서 시작하고 표는 구역 폭을 다 쓴다. 금액 열 둘이 나머지를 나눠 가진다 */
+.compare-table thead th:not(:first-child) {
+  width: 39%;
+}
+
+/* 넓은 표: 항목 이름과 금액 사이가 멀어서, 마우스를 올린 줄을 연하게 칠해 따라 읽기 쉽게 */
+@media (hover: hover) {
+  .compare-table tbody tr :is(th, td) {
+    transition: background-color 150ms ease-out;
+  }
+  .compare-table tbody tr:hover :is(th, td) {
+    background-color: color-mix(in oklab, var(--accent) 55%, var(--background));
+  }
+  .compare-table tbody tr:hover :is(th, td).is-computed {
+    background-color: color-mix(in oklab, var(--accent), var(--primary) 7%);
+  }
+}
+
+/* ══ 움직임 ══
+   이징은 위의 --motion(강한 ease-out) 하나만 쓴다. 등장은 opacity + transform만 움직인다.
+   움직임 줄이기 설정이면 위치 이동 없이 흐려졌다 나타나기만 한다. */
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+@keyframes settle-in {
+  from {
+    opacity: 0;
+    transform: scale(1.03);
+  }
+}
+@keyframes bubble-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.97);
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* 첫 화면: 방문할 때 한 번. 제목 두 줄 → 사례 한 줄 → 버튼 → 통계가 차례로 올라오고, 지도는 살짝 큰 상태에서 제자리를 찾는다 */
+@media (prefers-reduced-motion: no-preference) {
+  .map-intro :is(.hero-line, .hero-lead, .hero-stat, .start-posting) {
+    animation: rise-in 0.6s var(--motion) both;
+  }
+  .map-intro .hero-line + .hero-line {
+    animation-delay: 70ms;
+  }
+  .map-intro .hero-lead {
+    animation-delay: 140ms;
+  }
+  .map-intro .start-posting {
+    animation-delay: 210ms;
+  }
+  .map-intro .hero-stat {
+    animation-delay: 280ms;
+  }
+  .map-art img {
+    animation: settle-in 0.9s var(--motion) 80ms both;
+  }
+  .start-posting svg {
+    transition: transform 0.3s var(--motion);
+  }
+}
+
+/* 상담 장면: 처음 보일 때와 탭을 바꿀 때. 그림이 먼저 자리 잡고, 말풍선은 대화 순서대로 하나씩 뜬다.
+   두 번째 말풍선은 '답이 오는' 간격만큼 늦게 뜬다 */
+@media (prefers-reduced-motion: no-preference) {
+  /* 화면 밖에 있을 때만 숨긴다(use-reveal의 'armed'). 스크립트가 없거나 늦으면 그냥 보인다 */
+  .story[data-reveal='armed'] .story-panel :is(.story-art, .bubble) {
+    opacity: 0;
+  }
+  .story:is([data-reveal='shown'], [data-tabbed]) .story-panel:not([hidden]) .story-art {
+    animation: settle-in 0.5s var(--motion) both;
+  }
+  .story:is([data-reveal='shown'], [data-tabbed]) .story-panel:not([hidden]) .bubble {
+    animation: bubble-in 0.32s var(--motion) 120ms both;
+  }
+  .story:is([data-reveal='shown'], [data-tabbed]) .story-panel:not([hidden]) .bubble:nth-child(2) {
+    animation-delay: 420ms;
+  }
+  .bubble.is-user {
+    transform-origin: bottom right;
+  }
+  .bubble.is-agent {
+    transform-origin: bottom left;
+  }
+}
+
+/* 진행 막대: 지나온 구간은 실선이 왼쪽에서 오른쪽으로 채워진다(점선 위에 덮는 선) */
+.story-tab.cn-tabs-trigger:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  inset-block: calc(0.5rem + 0.8rem - 1px) auto;
+  inset-inline: calc(0.25rem + 1.6rem + 0.5rem) 0.5rem;
+  height: 0;
+  border-block-start: 2px solid var(--primary);
+  background: none;
+  opacity: 1;
+  transform: scaleX(0);
+  transform-origin: left center;
+}
+.story-tab:has(~ .story-tab[data-active])::after {
+  transform: scaleX(1);
+}
+.story-tab-num {
+  transition:
+    background-color 200ms ease,
+    border-color 200ms ease,
+    color 200ms ease;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .story-tab.cn-tabs-trigger::after {
+    transition: transform 0.35s var(--motion);
+  }
+}
+
+/* 비교표: 처음 보일 때 위에서부터 한 줄씩 떠올라 '매달 남는 돈'에서 끝난다. 모바일 탭을 바꿀 때는 더 짧게 */
+@media (prefers-reduced-motion: no-preference) {
+  .compare-view[data-reveal='armed'] :is(.compare-table tbody tr > *, .compare-list > div) {
+    opacity: 0;
+  }
+  .compare-view[data-reveal='shown'] .compare-table tbody tr > * {
+    animation: rise-in 0.45s var(--motion) both;
+    animation-delay: calc(var(--row, 0) * 50ms + 80ms);
+  }
+  .compare-view:is([data-reveal='shown'], [data-tabbed]) .compare-list > div {
+    animation: rise-in 0.3s var(--motion) both;
+    animation-delay: calc(var(--row, 0) * 35ms);
+  }
+}
+
+/* 움직임 줄이기: 위치 이동 없이 흐려졌다 나타나기만. 스크롤 등장 때는 숨기지도 않으므로 탭을 바꿀 때만 흐려졌다 나타난다 */
+@media (prefers-reduced-motion: reduce) {
+  .map-intro :is(.hero-line, .hero-lead, .hero-stat, .start-posting),
+  .map-art img,
+  .story[data-tabbed] .story-panel:not([hidden]) :is(.story-art, .bubble),
+  .compare-view[data-tabbed] .compare-list > div {
+    animation: fade-in 0.25s ease-out both;
+  }
+}
