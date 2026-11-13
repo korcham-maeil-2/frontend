@@ -31,10 +31,10 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: LayoutProps<'/'>) {
   return (
-    <html lang='ko' className={`${suit.variable} ${scoreDream.variable} h-full antialiased`}>
-      <body className='flex min-h-full flex-col bg-background text-body'>
+    <html lang="ko" className={`${suit.variable} ${scoreDream.variable} h-full antialiased`}>
+      <body className="flex min-h-full flex-col bg-background text-body">
         <SiteHeader />
-        <main id='main-content' className='site-shell flex-1'>
+        <main id="main-content" className="site-shell flex-1">
           {children}
         </main>
         <SiteFooter />

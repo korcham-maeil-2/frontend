@@ -47,7 +47,7 @@ export default function NewPosting() {
 
 function ConditionSummary({ values }: { values: string[] }) {
   return (
-    <dl className='condition-summary'>
+    <dl className="condition-summary">
       {fields.map(({ name }, index) => (
         <div key={name}>
           <dt>{name}</dt>
@@ -91,48 +91,48 @@ function PostingForm({
   }
 
   return (
-    <div className='desk-spread'>
-      <div className='desk-intro'>
-        <div className='desk-intro-inner'>
-          <ol className='step-track' aria-label='공고 넣기 진행 단계'>
+    <div className="desk-spread">
+      <div className="desk-intro">
+        <div className="desk-intro-inner">
+          <ol className="step-track" aria-label="공고 넣기 진행 단계">
             <li aria-current={step === 'input' ? 'step' : undefined}>
               {reviewing ? (
                 <button
-                  type='button'
+                  type="button"
                   onClick={() => changeStep('input')}
-                  aria-label='공고 넣기 완료, 공고 넣기로 돌아가기'
+                  aria-label="공고 넣기 완료, 공고 넣기로 돌아가기"
                 >
-                  <span className='step-number'>
+                  <span className="step-number">
                     <Check aria-hidden />
                   </span>
                   공고 넣기
                 </button>
               ) : (
                 <>
-                  <span className='step-number'>1</span>공고 넣기
+                  <span className="step-number">1</span>공고 넣기
                 </>
               )}
             </li>
             <li aria-current={step === 'review' ? 'step' : undefined}>
               {step === 'summary' ? (
                 <button
-                  type='button'
+                  type="button"
                   onClick={() => changeStep('review')}
-                  aria-label='조건 확인 완료, 조건 수정하기'
+                  aria-label="조건 확인 완료, 조건 수정하기"
                 >
-                  <span className='step-number'>
+                  <span className="step-number">
                     <Check aria-hidden />
                   </span>
                   조건 확인
                 </button>
               ) : (
                 <>
-                  <span className='step-number'>2</span>조건 확인
+                  <span className="step-number">2</span>조건 확인
                 </>
               )}
             </li>
           </ol>
-          <h1 ref={heading} tabIndex={-1} className='desk-title outline-none'>
+          <h1 ref={heading} tabIndex={-1} className="desk-title outline-none">
             {step === 'summary' ? (
               '확인한 근무 조건'
             ) : reviewing ? (
@@ -144,7 +144,7 @@ function PostingForm({
               </>
             )}
           </h1>
-          <p className='intro-copy'>
+          <p className="intro-copy">
             {step === 'summary'
               ? '다른 공고를 추가해도 이 공고의 조건은 이 화면에 남아요.'
               : step === 'input'
@@ -155,62 +155,62 @@ function PostingForm({
                     ? '첨부한 공고를 보며 근무 조건을 입력하세요. 공고에 없는 항목은 비워 두세요.'
                     : '공고 원문을 보며 근무 조건을 입력하세요. 공고에 없는 항목은 비워 두세요.'}
           </p>
-          <div className='desk-illustration' aria-hidden='true'>
+          <div className="desk-illustration" aria-hidden="true">
             <Image
               src={reviewing ? reviewArt : noticeArt}
-              alt=''
+              alt=""
               fill
-              sizes='(max-width: 767px) 32vw, (max-width: 1150px) 40vw, 460px'
+              sizes="(max-width: 767px) 32vw, (max-width: 1150px) 40vw, 460px"
             />
           </div>
         </div>
       </div>
       {step === 'summary' ? (
-        <section className='desk-sheet' aria-label='근무 조건 요약'>
-          <h2 className='sheet-heading'>공고 요약</h2>
+        <section className="desk-sheet" aria-label="근무 조건 요약">
+          <h2 className="sheet-heading">공고 요약</h2>
           <ConditionSummary values={values} />
-          <div className='sheet-actions'>
-            <Button variant='outline' className='min-h-11' onClick={() => changeStep('review')}>
+          <div className="sheet-actions">
+            <Button variant="outline" className="min-h-11" onClick={() => changeStep('review')}>
               <ArrowLeft aria-hidden />
               조건 수정
             </Button>
-            <Button className='main-action' onClick={() => addPosting(values)}>
+            <Button className="main-action" onClick={() => addPosting(values)}>
               다른 공고 추가 <ArrowRight aria-hidden />
             </Button>
           </div>
         </section>
       ) : reviewing ? (
-        <section className='desk-sheet sheet-enter' aria-label='공고 조건 확인'>
-          <h2 className='sheet-heading'>회사와 처우</h2>
+        <section className="desk-sheet sheet-enter" aria-label="공고 조건 확인">
+          <h2 className="sheet-heading">회사와 처우</h2>
           {attachments.files.length > 0 && (
-            <div className='mb-5'>
-              <h3 className='mb-2 text-base'>첨부한 원본</h3>
+            <div className="mb-5">
+              <h3 className="mb-2 text-base">첨부한 원본</h3>
               <AttachmentList files={attachments.files} />
             </div>
           )}
           {lastReviewed.trim() && (
-            <details className='mb-5 rounded-md bg-muted px-4'>
-              <summary className='cursor-pointer py-3 text-sm font-semibold'>
-                <span className='when-closed'>원문 펼치기</span>
-                <span className='when-open'>원문 접기</span>
+            <details className="mb-5 rounded-md bg-muted px-4">
+              <summary className="cursor-pointer py-3 text-sm font-semibold">
+                <span className="when-closed">원문 펼치기</span>
+                <span className="when-open">원문 접기</span>
               </summary>
-              <p className='pb-4 text-sm whitespace-pre-wrap wrap-anywhere'>{lastReviewed}</p>
+              <p className="pb-4 text-sm whitespace-pre-wrap wrap-anywhere">{lastReviewed}</p>
             </details>
           )}
           {fields.map(({ name }, index) => (
-            <div key={name} className='condition-field'>
-              <label htmlFor={name} className='font-semibold'>
+            <div key={name} className="condition-field">
+              <label htmlFor={name} className="font-semibold">
                 {name}
               </label>
               <Input
                 id={name}
                 aria-describedby={index === 0 ? 'condition-hint' : undefined}
                 value={values[index]}
-                placeholder='직접 입력'
+                placeholder="직접 입력"
                 onChange={(event) =>
                   setValues(values.map((value, i) => (i === index ? event.target.value : value)))
                 }
-                className='h-11 min-w-0 flex-1 rounded-md border border-input px-3 focus-visible:outline-2 focus-visible:outline-ring'
+                className="h-11 min-w-0 flex-1 rounded-md border border-input px-3 focus-visible:outline-2 focus-visible:outline-ring"
               />
               {values[index].trim() ? (
                 <span
@@ -223,20 +223,20 @@ function PostingForm({
                   {values[index] === originalValues[index] ? '본문 추출' : '직접 입력'}
                 </span>
               ) : (
-                <span className='text-xs text-muted-foreground'>미입력</span>
+                <span className="text-xs text-muted-foreground">미입력</span>
               )}
             </div>
           ))}
-          <p id='condition-hint' role='status' className='form-hint'>
+          <p id="condition-hint" role="status" className="form-hint">
             {showConditionHint &&
               '조건을 하나 이상 입력해 주세요. 공고에 없는 항목은 비워 둬도 돼요.'}
           </p>
-          <div className='sheet-actions'>
-            <Button variant='ghost' className='min-h-11' onClick={() => changeStep('input')}>
+          <div className="sheet-actions">
+            <Button variant="ghost" className="min-h-11" onClick={() => changeStep('input')}>
               <ArrowLeft aria-hidden /> 공고 넣기로
             </Button>
             <Button
-              className='main-action'
+              className="main-action"
               onClick={() => {
                 if (!values.some((value) => value.trim())) {
                   setMissingCondition(true);
@@ -252,7 +252,7 @@ function PostingForm({
         </section>
       ) : (
         <form
-          className='desk-sheet'
+          className="desk-sheet"
           onSubmit={(event) => {
             event.preventDefault();
             if (!hasSource) {
@@ -273,19 +273,19 @@ function PostingForm({
             changeStep('review');
           }}
         >
-          <h2 className='sheet-heading mb-4'>넣는 방법</h2>
+          <h2 className="sheet-heading mb-4">넣는 방법</h2>
           <Tabs value={sourceTab} onValueChange={setSourceTab}>
-            <TabsList aria-label='공고 넣는 방법' className='source-tabs'>
-              <TabsTrigger value='files'>
+            <TabsList aria-label="공고 넣는 방법" className="source-tabs">
+              <TabsTrigger value="files">
                 <Paperclip size={16} aria-hidden />
                 파일 첨부{attachments.files.length > 0 && ` (${attachments.files.length})`}
               </TabsTrigger>
-              <TabsTrigger value='text'>
+              <TabsTrigger value="text">
                 <ClipboardPaste size={16} aria-hidden />
                 본문 붙여넣기
               </TabsTrigger>
             </TabsList>
-            <TabsContent value='files' className='source-panel space-y-3'>
+            <TabsContent value="files" className="source-panel space-y-3">
               <FilePicker
                 add={attachments.add}
                 error={attachments.error}
@@ -293,33 +293,33 @@ function PostingForm({
               />
               <AttachmentList files={attachments.files} remove={attachments.remove} />
             </TabsContent>
-            <TabsContent value='text' className='source-panel'>
-              <label htmlFor='posting-text' className='mb-2 block text-sm font-semibold'>
+            <TabsContent value="text" className="source-panel">
+              <label htmlFor="posting-text" className="mb-2 block text-sm font-semibold">
                 채용 공고 본문
               </label>
               <Textarea
                 ref={textarea}
-                id='posting-text'
-                aria-describedby='source-hint'
+                id="posting-text"
+                aria-describedby="source-hint"
                 aria-invalid={showSourceHint || undefined}
                 value={text}
                 onChange={(event) => setText(event.target.value)}
                 rows={5}
-                placeholder='회사명, 근무지, 연봉이 적힌 부분을 복사해 넣으세요.'
-                className='min-h-36 resize-y rounded-md border border-input p-3 text-base leading-relaxed focus-visible:outline-2 focus-visible:outline-ring'
+                placeholder="회사명, 근무지, 연봉이 적힌 부분을 복사해 넣으세요."
+                className="min-h-36 resize-y rounded-md border border-input p-3 text-base leading-relaxed focus-visible:outline-2 focus-visible:outline-ring"
               />
             </TabsContent>
           </Tabs>
-          <p id='source-hint' role='status' className='form-hint'>
+          <p id="source-hint" role="status" className="form-hint">
             {showSourceHint &&
               '공고 파일을 넣거나 본문을 붙여넣어 주세요. 예시 공고로 먼저 해 봐도 돼요.'}
           </p>
-          <div className='sheet-actions'>
+          <div className="sheet-actions">
             {!text.trim() && (
               <Button
-                type='button'
-                variant='ghost'
-                className='min-h-11 text-foreground'
+                type="button"
+                variant="ghost"
+                className="min-h-11 text-foreground"
                 onClick={() => {
                   setText(example);
                   setSourceTab('text');
@@ -329,15 +329,15 @@ function PostingForm({
                 <FileText aria-hidden /> 예시 공고 넣기
               </Button>
             )}
-            <Button type='submit' className='main-action'>
+            <Button type="submit" className="main-action">
               조건 확인하기 <ArrowRight aria-hidden />
             </Button>
           </div>
         </form>
       )}
       {previous.length > 0 && (
-        <section className='previous-postings' aria-label='앞서 확인한 공고'>
-          <h2 className='font-semibold'>앞서 확인한 공고</h2>
+        <section className="previous-postings" aria-label="앞서 확인한 공고">
+          <h2 className="font-semibold">앞서 확인한 공고</h2>
           {previous.map((item, index) => (
             <details key={index}>
               <summary>

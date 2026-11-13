@@ -99,38 +99,38 @@ export function FilePicker({
         }}
       >
         <input
-          type='file'
+          type="file"
           multiple
           accept={accept}
-          aria-label='공고 파일 선택'
-          aria-describedby='accepted-formats'
-          className='absolute inset-0 size-full cursor-pointer opacity-0'
+          aria-label="공고 파일 선택"
+          aria-describedby="accepted-formats"
+          className="absolute inset-0 size-full cursor-pointer opacity-0"
           onChange={(event) => {
             if (event.target.files) add(event.target.files);
             event.target.value = '';
           }}
         />
-        <span className='file-stack' aria-hidden='true'>
+        <span className="file-stack" aria-hidden="true">
           <FileText />
           <FileImage />
           <FileSpreadsheet />
         </span>
-        <span className='file-choice'>
+        <span className="file-choice">
           <Upload size={15} aria-hidden /> {compact ? '파일 추가' : '파일 선택'}
         </span>
         {!compact && (
-          <span className='hidden text-sm text-body sm:block'>
+          <span className="hidden text-sm text-body sm:block">
             또는 여기에 공고 파일을 끌어다 놓으세요.
           </span>
         )}
-        <span id='accepted-formats' className='text-xs leading-relaxed text-muted-foreground'>
-          <span className='whitespace-nowrap'>JPG, PNG, WEBP, GIF</span> ·{' '}
-          <span className='whitespace-nowrap'>PDF</span> ·{' '}
-          <span className='whitespace-nowrap'>엑셀(XLS, XLSX, CSV)</span>
+        <span id="accepted-formats" className="text-xs leading-relaxed text-muted-foreground">
+          <span className="whitespace-nowrap">JPG, PNG, WEBP, GIF</span> ·{' '}
+          <span className="whitespace-nowrap">PDF</span> ·{' '}
+          <span className="whitespace-nowrap">엑셀(XLS, XLSX, CSV)</span>
         </span>
       </label>
       {error && (
-        <p role='alert' className='mt-2 text-sm wrap-anywhere text-destructive'>
+        <p role="alert" className="mt-2 text-sm wrap-anywhere text-destructive">
           {error}
         </p>
       )}
@@ -147,7 +147,7 @@ export function AttachmentList({
 }) {
   if (!files.length) return null;
   return (
-    <ul aria-label='첨부한 공고 파일' className='divide-y rounded-md border px-3'>
+    <ul aria-label="첨부한 공고 파일" className="divide-y rounded-md border px-3">
       {files.map((attachment) => (
         <AttachmentItem key={attachment.url} attachment={attachment} remove={remove} />
       ))}
@@ -169,17 +169,17 @@ function AttachmentItem({
   const isSheet = mime === formats.xls || mime === formats.xlsx || mime === formats.csv;
   const previewId = `preview-${url.slice(-12)}`;
   return (
-    <li className='min-w-0 py-1.5'>
-      <div className='flex min-h-11 flex-wrap items-center gap-x-3'>
-        <div className='flex size-9 shrink-0 items-center justify-center overflow-hidden rounded bg-secondary text-muted-foreground'>
+    <li className="min-w-0 py-1.5">
+      <div className="flex min-h-11 flex-wrap items-center gap-x-3">
+        <div className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded bg-secondary text-muted-foreground">
           {isImage ? (
             <Image
               unoptimized
               width={36}
               height={36}
               src={url}
-              alt=''
-              className='size-full object-cover'
+              alt=""
+              className="size-full object-cover"
             />
           ) : isSheet ? (
             <FileSpreadsheet size={18} aria-hidden />
@@ -187,9 +187,9 @@ function AttachmentItem({
             <FileText size={18} aria-hidden />
           )}
         </div>
-        <p className='min-w-0 flex-1 basis-40 text-sm'>
-          <span className='font-semibold wrap-anywhere'>{file.name}</span>
-          <span className='ms-2 text-xs whitespace-nowrap text-muted-foreground'>
+        <p className="min-w-0 flex-1 basis-40 text-sm">
+          <span className="font-semibold wrap-anywhere">{file.name}</span>
+          <span className="ms-2 text-xs whitespace-nowrap text-muted-foreground">
             {file.size < 1024 * 1024
               ? `${Math.ceil(file.size / 1024)} KB`
               : `${(file.size / (1024 * 1024)).toFixed(1)} MB`}
@@ -197,21 +197,21 @@ function AttachmentItem({
         </p>
         {remove ? (
           <Button
-            type='button'
-            variant='ghost'
-            className='size-11'
+            type="button"
+            variant="ghost"
+            className="size-11"
             aria-label={file.name + ' 삭제'}
             onClick={() => remove(url)}
           >
             <X aria-hidden />
           </Button>
         ) : (
-          <div className='ms-auto flex shrink-0 items-center gap-1'>
+          <div className="ms-auto flex shrink-0 items-center gap-1">
             {!isSheet && (
               <Button
-                type='button'
-                variant='ghost'
-                className='min-h-11 px-2.5 text-sm'
+                type="button"
+                variant="ghost"
+                className="min-h-11 px-2.5 text-sm"
                 aria-expanded={previewing}
                 aria-controls={previewing ? previewId : undefined}
                 onClick={() => setPreviewing((open) => !open)}
@@ -220,10 +220,10 @@ function AttachmentItem({
               </Button>
             )}
             <a
-              className='inline-flex min-h-11 items-center px-1 text-sm font-semibold text-link underline'
+              className="inline-flex min-h-11 items-center px-1 text-sm font-semibold text-link underline"
               href={url}
               target={isSheet ? undefined : '_blank'}
-              rel='noopener noreferrer'
+              rel="noopener noreferrer"
               download={isSheet ? file.name : undefined}
               aria-label={(isSheet ? '원본 저장: ' : '원본 열기 (새 탭): ') + file.name}
             >
@@ -233,7 +233,7 @@ function AttachmentItem({
         )}
       </div>
       {previewing && (
-        <div id={previewId} className='pt-2 pb-1'>
+        <div id={previewId} className="pt-2 pb-1">
           {isImage ? (
             <Image
               unoptimized
@@ -241,14 +241,14 @@ function AttachmentItem({
               width={720}
               height={480}
               alt={file.name}
-              className='h-auto max-h-96 w-full object-contain'
+              className="h-auto max-h-96 w-full object-contain"
             />
           ) : (
             <object
               data={url}
-              type='application/pdf'
+              type="application/pdf"
               aria-label={file.name}
-              className='h-80 w-full'
+              className="h-80 w-full"
             >
               <p>‘원본 열기’에서 PDF를 확인하세요.</p>
             </object>

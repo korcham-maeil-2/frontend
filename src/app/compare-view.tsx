@@ -100,16 +100,16 @@ export function CompareView() {
   // 모바일에서 탭을 바꾸면 그때부터는 바뀐 명세가 짧게 떠오른다
   const [tabbed, setTabbed] = useState(false);
   return (
-    <div ref={ref} className='compare-view' data-reveal={reveal} data-tabbed={tabbed || undefined}>
-      <table className='offer-table compare-table'>
-        <caption className='compare-caption'>{caption}</caption>
+    <div ref={ref} className="compare-view" data-reveal={reveal} data-tabbed={tabbed || undefined}>
+      <table className="offer-table compare-table">
+        <caption className="compare-caption">{caption}</caption>
         <thead>
           <tr>
-            <th scope='col'>
-              <span className='sr-only'>항목</span>
+            <th scope="col">
+              <span className="sr-only">항목</span>
             </th>
             {places.map((place) => (
-              <th key={place.key} scope='col' className={colClass(place.key)}>
+              <th key={place.key} scope="col" className={colClass(place.key)}>
                 {place.region}
                 <small>{place.company}</small>
               </th>
@@ -119,7 +119,7 @@ export function CompareView() {
         <tbody>
           {rows.map((row, index) => (
             <tr key={row.label} className={rowClass(row.kind)} style={rowOrder(index)}>
-              <th scope='row'>{row.label}</th>
+              <th scope="row">{row.label}</th>
               {places.map((place) => (
                 <td key={place.key} className={colClass(place.key)}>
                   <CellContent cell={row[place.key]} kind={row.kind} />
@@ -129,8 +129,8 @@ export function CompareView() {
           ))}
         </tbody>
       </table>
-      <Tabs defaultValue='daegu' className='compare-mobile' onValueChange={() => setTabbed(true)}>
-        <TabsList aria-label='비교할 회사' className='source-tabs compare-switch'>
+      <Tabs defaultValue="daegu" className="compare-mobile" onValueChange={() => setTabbed(true)}>
+        <TabsList aria-label="비교할 회사" className="source-tabs compare-switch">
           {places.map((place) => (
             <TabsTrigger key={place.key} value={place.key}>
               {place.region}
@@ -139,8 +139,8 @@ export function CompareView() {
         </TabsList>
         {places.map((place) => (
           <TabsContent key={place.key} value={place.key}>
-            <p className='compare-company'>{place.company}</p>
-            <dl className='compare-list'>
+            <p className="compare-company">{place.company}</p>
+            <dl className="compare-list">
               {rows.map((row, index) => (
                 <div key={row.label} className={rowClass(row.kind)} style={rowOrder(index)}>
                   <dt>{row.label}</dt>
@@ -152,7 +152,7 @@ export function CompareView() {
             </dl>
           </TabsContent>
         ))}
-        <p className='compare-caption'>{caption}</p>
+        <p className="compare-caption">{caption}</p>
       </Tabs>
     </div>
   );

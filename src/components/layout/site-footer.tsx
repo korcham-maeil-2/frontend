@@ -1,7 +1,7 @@
 export function SiteFooter() {
   return (
-    <footer className='site-foot'>
-      <div className='site-shell foot-row'>
+    <footer className="site-foot">
+      <div className="site-shell foot-row">
         <p>
           월급지도 <span>· 2026 AI 해커톤 시연용</span>
         </p>

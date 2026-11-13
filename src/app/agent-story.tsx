@@ -86,18 +86,18 @@ export function AgentStory() {
   return (
     <Tabs
       ref={ref}
-      defaultValue='0'
-      className='story'
+      defaultValue="0"
+      className="story"
       data-reveal={reveal}
       data-tabbed={tabbed || undefined}
       onValueChange={() => setTabbed(true)}
     >
-      <TabsList className='story-tabs' aria-label='윤하늘 씨의 상담 장면'>
+      <TabsList className="story-tabs" aria-label="윤하늘 씨의 상담 장면">
         {scenes.map((scene, index) => (
-          <TabsTrigger key={scene.label} value={String(index)} className='story-tab'>
-            <span className='story-tab-num'>{index + 1}</span>
-            <span className='story-tab-label'>{scene.label}</span>
-            <span className='story-tab-time'>{scene.time}</span>
+          <TabsTrigger key={scene.label} value={String(index)} className="story-tab">
+            <span className="story-tab-num">{index + 1}</span>
+            <span className="story-tab-label">{scene.label}</span>
+            <span className="story-tab-time">{scene.time}</span>
           </TabsTrigger>
         ))}
       </TabsList>
@@ -105,17 +105,17 @@ export function AgentStory() {
         <TabsContent
           key={scene.label}
           value={String(index)}
-          className='story-panel'
+          className="story-panel"
           // 숨긴 장면도 DOM에 두어 그림을 미리 받아 둔다(탭을 바꿀 때 그림이 늦게 뜨지 않게)
           keepMounted
         >
-          <div className='story-art'>
-            <Image src={scene.art} alt='' loading='eager' sizes='(max-width: 767px) 90vw, 416px' />
+          <div className="story-art">
+            <Image src={scene.art} alt="" loading="eager" sizes="(max-width: 767px) 90vw, 416px" />
           </div>
-          <ol className='story-chat'>
+          <ol className="story-chat">
             {scene.messages.map((message) => (
               <li key={message.text} className={`bubble is-${message.from}`}>
-                <span className='bubble-who'>
+                <span className="bubble-who">
                   {message.from === 'agent' ? (
                     <>
                       <Bot aria-hidden /> 월급지도 AI
@@ -126,7 +126,7 @@ export function AgentStory() {
                 </span>
                 <p>{message.text}</p>
                 {message.files && (
-                  <ul className='bubble-files' aria-label='첨부한 파일'>
+                  <ul className="bubble-files" aria-label="첨부한 파일">
                     {message.files.map((file) => (
                       <li key={file}>
                         <Paperclip aria-hidden /> {file}
