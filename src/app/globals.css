@@ -367,49 +367,19 @@ main.site-shell:has(> .desk-spread) {
   border-color: var(--primary);
   color: var(--primary-foreground);
 }
-.condition-field,
 .condition-summary > div {
   display: grid;
   align-items: baseline;
+  grid-template-columns: minmax(0, 1fr) auto;
   column-gap: 1rem;
-  row-gap: 0.4rem;
   padding-block: 0.8rem;
   border-bottom: 1px solid var(--border);
-}
-.condition-field {
-  grid-template-columns: minmax(0, 1fr) auto;
-}
-.condition-field input {
-  grid-row: 2;
-  grid-column: 1 / -1;
-}
-.condition-field span {
-  justify-self: end;
-  white-space: nowrap;
-}
-.previous-postings {
-  grid-column: 1 / -1;
-  border-top: 1px solid var(--border);
-  padding: 1.25rem clamp(1.25rem, 3vw, 3rem);
-}
-.previous-postings details {
-  border-bottom: 1px solid var(--border);
-}
-.previous-postings summary {
-  padding: 0.8rem 0;
-  cursor: pointer;
-  overflow-wrap: anywhere;
-}
-.previous-postings small {
-  color: var(--muted-foreground);
-}
-.condition-summary > div {
-  grid-template-columns: 4rem minmax(0, 1fr);
 }
 .condition-summary dd {
   text-align: end;
   color: var(--foreground);
   font-weight: 600;
+  font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
 }
 details:not([open]) > summary .when-open,
@@ -419,20 +389,177 @@ details[open] > summary .when-closed {
 .sheet-actions .main-action {
   margin-inline-start: auto;
 }
+
+/* 조건 확인: 공고 1건 = 카드 하나. 칸마다 이름 · 입력 · 배지, 아래에 공고 원문 조각 */
+.row-card {
+  border: 1px solid var(--input);
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+/* 카드 머리띠: 회색 면 + 번호 원 + 아래 잉크 블루 2px 선. 공고끼리 한눈에 구분된다. */
+.row-card-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  background: var(--secondary);
+  border-bottom: 2px solid var(--foreground);
+}
+.row-card-number {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 50%;
+  background: var(--foreground);
+  color: var(--primary-foreground);
+  font-size: 1rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.row-card-index {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--muted-foreground);
+}
+.row-card-meta {
+  margin-top: 0.25rem;
+  font-size: 0.875rem;
+  color: var(--body);
+  overflow-wrap: anywhere;
+}
+.row-card-body {
+  padding: 0 1.25rem 1.25rem;
+}
+.row-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--foreground);
+  overflow-wrap: anywhere;
+}
+.row-questions {
+  margin-top: 0.75rem;
+  border-radius: 0.5rem;
+  background: var(--muted);
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  color: var(--body);
+}
+.row-questions ul,
+.salary-notice ul {
+  margin-top: 0.25rem;
+  padding-inline-start: 1.1rem;
+  list-style: disc;
+}
+/* '확인이 필요한 것'·연봉 안내에서 해당 칸으로 데려가는 글자 버튼 (터치 높이 44px) */
+.question-link {
+  min-height: 2.75rem;
+  text-align: start;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  color: var(--foreground);
+  cursor: pointer;
+}
+.question-link:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-radius: 0.25rem;
+}
+.salary-notice {
+  margin-top: 1.5rem;
+  border: 1px solid var(--input);
+  border-radius: 0.5rem;
+  background: var(--muted);
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  color: var(--body);
+}
+.demo-notice {
+  margin-bottom: 1rem;
+  border-radius: 0.5rem;
+  background: var(--secondary);
+  padding: 0.6rem 0.9rem;
+  font-size: 0.875rem;
+  color: var(--body);
+}
+.row-group {
+  margin-top: 1.25rem;
+}
+.row-group legend {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--muted-foreground);
+}
+.row-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 0.75rem;
+  row-gap: 0.4rem;
+  padding-block: 0.6rem;
+  border-bottom: 1px solid var(--border);
+}
+.row-field > label {
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: var(--foreground);
+}
+.row-field > :is(input, select, .unit-input) {
+  grid-row: 2;
+  grid-column: 1 / -1;
+}
+.row-field-hint {
+  grid-column: 1 / -1;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--muted-foreground);
+  overflow-wrap: anywhere;
+}
+.row-field-hint:empty {
+  display: none;
+}
+.status-badge {
+  justify-self: end;
+  white-space: nowrap;
+  border-radius: 0.25rem;
+  padding: 0.15rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.unit-input {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.unit-input input {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+.unit-input span {
+  min-width: 2rem;
+  font-size: 0.875rem;
+  color: var(--body);
+}
 @media (min-width: 64rem) {
-  .condition-field {
-    grid-template-columns: 4rem minmax(0, 1fr) minmax(max-content, 5rem);
-    align-items: center;
+  .row-field {
+    grid-template-columns: 8.5rem minmax(0, 1fr) 5.5rem;
   }
-  .condition-field input {
-    grid-column: 2;
+  .row-field > :is(input, select, .unit-input) {
     grid-row: 1;
+    grid-column: 2;
+  }
+  .row-field-hint {
+    grid-column: 2 / -1;
   }
 }
 .desk-sheet {
   min-width: 0;
   align-self: start;
   padding: clamp(1.5rem, 3.3vw, 3rem);
+  /* 한국어는 단어 중간에서 끊지 않는다 (DESIGN.md). 긴 원문 조각은 각 칸에서 따로 끊는다. */
+  word-break: keep-all;
 }
 .source-tabs {
   width: 100%;
