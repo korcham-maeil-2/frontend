@@ -17,10 +17,34 @@ export const statusBadge: Record<Status, { label: string; className: string }> =
   missing: { label: '공고에 없음', className: 'text-muted-foreground' },
 };
 
-/** 칸의 배지. 사용자가 값을 지운 칸은 '입력' 대신 '비움'으로 보여 준다. */
-export function badgeFor(cell: { status: Status; value?: unknown }) {
+/** 비교표 한 칸 ({value, status, source_text, from_image}) */
+export type Cell = {
+  value?: unknown;
+  status: Status;
+  source_text?: string | null;
+  from_image?: boolean;
+};
+
+/** 행의 모든 칸 (기타 수당 칸 포함) */
+export function cellsOf(row: Row): Cell[] {
+  const cells = (Object.values(row) as unknown[]).filter(
+    (v): v is Cell => typeof v === 'object' && v !== null && 'status' in v,
+  );
+  return [...cells, ...(row.other_allowances ?? []).map((a) => a.monthly_krw)];
+}
+
+/** 이미지에서 읽은 값: AI가 옮겨 적은 글과만 맞춰 봤으니 원본과 다시 비교해야 한다. */
+export function isImageRead(cell: Cell) {
+  return cell.status === 'confirmed' && Boolean(cell.from_image);
+}
+
+/** 칸의 배지. 사용자가 값을 지운 칸은 '입력' 대신 '비움', 이미지에서 읽은 값은 '이미지에서 읽음'. */
+export function badgeFor(cell: Cell) {
   if (cell.status === 'user_input' && cell.value == null) {
     return { label: '비움', className: statusBadge.user_input.className };
+  }
+  if (isImageRead(cell)) {
+    return { label: '이미지에서 읽음', className: statusBadge.estimated.className };
   }
   return statusBadge[cell.status];
 }

@@ -9,15 +9,14 @@ import {
   parseCount,
   parseWon,
   salaryText,
+  type Cell,
   type Row,
-  type Status,
 } from './format';
 
 // 비교표 한 행(공고 1건)을 보여 주고 고치는 부품.
 // 칸마다 값 + 배지(확인/추정/입력/공고에 없음) + 공고 원문 조각을 함께 보여 준다.
 // 사용자가 값을 바꾸면 그 칸은 '입력'(user_input)이 되고, 원래 값으로 되돌리면 원래 상태로 돌아온다.
 
-type Cell = { value?: unknown; status: Status; source_text?: string | null };
 type CellKey = {
   [K in keyof Row]-?: NonNullable<Row[K]> extends Cell ? K : never;
 }[keyof Row];
@@ -141,7 +140,7 @@ function cellOf(row: Row, key: CellKey | 'location'): Cell {
 /** 값을 바꾼 새 칸. 원래 값으로 되돌리면 원래 칸(확인·추정 등)을 그대로 쓴다. */
 function changed(original: Cell, value: unknown): Cell {
   const same = JSON.stringify(value ?? null) === JSON.stringify(original.value ?? null);
-  return same ? original : { ...original, value, status: 'user_input' };
+  return same ? original : { ...original, value, status: 'user_input', from_image: false };
 }
 
 /** 칸으로 이동해 커서를 둔다 ('확인이 필요한 것', 연봉 빈칸 안내에서 쓴다) */
@@ -458,7 +457,8 @@ function FieldRow({
         {hint && <span className="text-foreground">{hint}</span>}
         {cell.source_text && (
           <span>
-            {hint ? ' · ' : ''}공고: “{cell.source_text}”
+            {hint ? ' · ' : ''}
+            {cell.from_image ? '이미지에서 옮긴 글' : '공고'}: “{cell.source_text}”
           </span>
         )}
       </p>
