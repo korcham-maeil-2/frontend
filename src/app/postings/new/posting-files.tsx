@@ -12,6 +12,7 @@ const formats: Record<string, string> = {
   pdf: 'application/pdf',
   xls: 'application/vnd.ms-excel',
   xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  csv: 'text/csv',
 };
 const accept = Object.keys(formats)
   .map((ext) => `.${ext}`)
@@ -55,7 +56,7 @@ export function usePostingFiles() {
     if (additions.length) setFiles((previous) => [...previous, ...additions]);
     setError(
       rejected.length
-        ? `${rejected.join(', ')}: 넣을 수 없는 형식이에요. 이미지(JPG·PNG·WEBP·GIF), PDF, 엑셀 파일로 다시 넣어 주세요.`
+        ? `${rejected.join(', ')}: 넣을 수 없는 형식이에요. 이미지(JPG·PNG·WEBP·GIF), PDF, 엑셀·CSV 파일로 다시 넣어 주세요.`
         : '',
     );
   }
@@ -125,7 +126,7 @@ export function FilePicker({
         <span id='accepted-formats' className='text-xs leading-relaxed text-muted-foreground'>
           <span className='whitespace-nowrap'>JPG, PNG, WEBP, GIF</span> ·{' '}
           <span className='whitespace-nowrap'>PDF</span> ·{' '}
-          <span className='whitespace-nowrap'>엑셀(XLS, XLSX)</span>
+          <span className='whitespace-nowrap'>엑셀(XLS, XLSX, CSV)</span>
         </span>
       </label>
       {error && (
@@ -164,7 +165,8 @@ function AttachmentItem({
 }) {
   const [previewing, setPreviewing] = useState(false);
   const isImage = mime.startsWith('image/');
-  const isSheet = mime === formats.xls || mime === formats.xlsx;
+  // CSV도 표 파일로 다룬다: 인코딩(EUC-KR 등)이 제각각이라 화면 미리보기 대신 원본 저장만 둔다
+  const isSheet = mime === formats.xls || mime === formats.xlsx || mime === formats.csv;
   const previewId = `preview-${url.slice(-12)}`;
   return (
     <li className='min-w-0 py-1.5'>

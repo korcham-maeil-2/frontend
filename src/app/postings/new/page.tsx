@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, Check, ClipboardPaste, FileText, Paperclip } from 'lucide-react';
 import Image from 'next/image';
-import noticeArt from '../../../../public/posting-notice.webp';
-import reviewArt from '../../../../public/posting-review.webp';
+import noticeArt from '@public/posting-notice.webp';
+import reviewArt from '@public/posting-review.webp';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';

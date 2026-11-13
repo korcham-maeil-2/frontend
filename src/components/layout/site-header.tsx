@@ -2,7 +2,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import logo from '../../../public/logo.webp';
+import logo from '@public/logo.webp';
 
 export function SiteHeader() {
   const pathname = usePathname();

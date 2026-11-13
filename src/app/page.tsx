@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
-import heroArt from '../../public/salary-map.webp';
+import heroArt from '@public/salary-map.webp';
 import { ArrowRight } from 'lucide-react';
 import { buttonVariants } from '@/components/ui/button';
 import { AgentStory } from './agent-story';

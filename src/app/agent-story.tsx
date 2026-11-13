@@ -5,10 +5,10 @@ import { Bot, Paperclip } from 'lucide-react';
 import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useReveal } from './use-reveal';
-import offersArt from '../../public/scenes/scene-1-offers.webp';
-import weighingArt from '../../public/scenes/scene-2-living.webp';
-import targetArt from '../../public/scenes/scene-3-answer.webp';
-import replyArt from '../../public/scenes/scene-4-decision.webp';
+import offersArt from '@public/scenes/scene-1-offers.webp';
+import weighingArt from '@public/scenes/scene-2-living.webp';
+import targetArt from '@public/scenes/scene-3-answer.webp';
+import replyArt from '@public/scenes/scene-4-decision.webp';
 
 type Message = { from: 'user' | 'agent'; text: string; files?: string[] };
 type Scene = { time: string; label: string; messages: Message[]; art: StaticImageData };
