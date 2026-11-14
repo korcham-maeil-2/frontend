@@ -23,12 +23,16 @@ type CellKey = {
 
 type Field =
   | { key: CellKey; label: string; kind: 'text' }
-  | { key: CellKey; label: string; kind: 'money' }
+  // example: 빈 칸에 보여 줄 입력 예시. 칸마다 금액 규모가 달라(연봉 vs 매달 수당) 꼭 따로 정한다.
+  | { key: CellKey; label: string; kind: 'money'; example: string }
   | { key: CellKey; label: string; kind: 'months' }
   | { key: CellKey; label: string; kind: 'rate' }
   | { key: CellKey; label: string; kind: 'bool'; yes: string; no: string }
   | { key: CellKey; label: string; kind: 'choice'; options: [string, string][] }
   | { key: 'location'; label: string; kind: 'location' };
+
+/** 식대·주거지원비·교통비·기타 수당처럼 매달 받는 금액 칸의 입력 예시. */
+const MONTHLY_EXAMPLE = '10만';
 
 const groups: { title: string; fields: Field[] }[] = [
   {
@@ -69,9 +73,14 @@ const groups: { title: string; fields: Field[] }[] = [
           ['to_propose', '희망 연봉을 알려 달라고 함'],
         ],
       },
-      { key: 'annual_salary_krw', label: '연봉 (세전)', kind: 'money' },
-      { key: 'monthly_salary_krw', label: '월급 (세전)', kind: 'money' },
-      { key: 'meal_allowance_monthly_krw', label: '식대 (매달)', kind: 'money' },
+      { key: 'annual_salary_krw', label: '연봉 (세전)', kind: 'money', example: '3600만' },
+      { key: 'monthly_salary_krw', label: '월급 (세전)', kind: 'money', example: '250만' },
+      {
+        key: 'meal_allowance_monthly_krw',
+        label: '식대 (매달)',
+        kind: 'money',
+        example: MONTHLY_EXAMPLE,
+      },
       {
         key: 'meal_allowance_in_salary',
         label: '식대가 연봉에',
@@ -86,11 +95,21 @@ const groups: { title: string; fields: Field[] }[] = [
   {
     title: '집과 통근',
     fields: [
-      { key: 'housing_allowance_monthly_krw', label: '주거지원비 (매달)', kind: 'money' },
+      {
+        key: 'housing_allowance_monthly_krw',
+        label: '주거지원비 (매달)',
+        kind: 'money',
+        example: MONTHLY_EXAMPLE,
+      },
       { key: 'housing_allowance_months', label: '주거지원 기간', kind: 'months' },
       { key: 'company_housing', label: '사택·기숙사', kind: 'bool', yes: '있음', no: '없음' },
       { key: 'shuttle_bus', label: '통근버스', kind: 'bool', yes: '있음', no: '없음' },
-      { key: 'transport_allowance_monthly_krw', label: '교통비 (매달)', kind: 'money' },
+      {
+        key: 'transport_allowance_monthly_krw',
+        label: '교통비 (매달)',
+        kind: 'money',
+        example: MONTHLY_EXAMPLE,
+      },
     ],
   },
   {
@@ -258,7 +277,12 @@ export function RowEditor({
                 <FieldRow
                   key={`other-${allowance.name}`}
                   id={fieldId(row, `other-${i}`)}
-                  field={{ key: 'company', label: `${allowance.name} (매달)`, kind: 'money' }}
+                  field={{
+                    key: 'company',
+                    label: `${allowance.name} (매달)`,
+                    kind: 'money',
+                    example: MONTHLY_EXAMPLE,
+                  }}
                   cell={allowance.monthly_krw}
                   onChange={(value) =>
                     onChange({
@@ -328,7 +352,7 @@ function FieldRow({
             id={id}
             inputMode="numeric"
             value={value != null ? value.toLocaleString('ko-KR') : ''}
-            placeholder="예: 3600만"
+            placeholder={`예: ${field.example}`}
             onChange={(event) => {
               const next = parseWon(event.target.value);
               if (next != null && next > MAX_KRW) return; // 1조 원이 넘는 값은 받지 않는다
