@@ -1,0 +1,33 @@
+# 월급지도 프론트 배포 구성 (라즈베리파이 홈랩)
+#
+# 실행:  docker compose up -d --build
+# 로그:  docker compose logs -f frontend
+#
+# 구조: 인터넷 → maeil2-frontend.sunghoyaaa.com (가비아 CNAME → DDNS sunghoyaaa.serveirc.com)
+#       → 서버의 Nginx(HTTPS) → frontend 컨테이너(3000)
+# 화면이 부르는 백엔드: https://maeil2-backend.sunghoyaaa.com (브라우저가 직접 호출, 백엔드 CORS에 이 주소 허용)
+
+services:
+  frontend:
+    build:
+      context: .
+      args:
+        # 빌드할 때 화면 코드에 들어가는 백엔드 주소
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-https://maeil2-backend.sunghoyaaa.com}
+    image: maeil2-frontend
+    container_name: maeil2-frontend
+    restart: unless-stopped
+    # 서버 안에서만 열고, 바깥에서는 Nginx를 거쳐서만 들어오게 한다
+    ports:
+      - '127.0.0.1:${FRONTEND_PORT:-3010}:3000'
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
