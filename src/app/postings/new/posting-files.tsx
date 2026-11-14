@@ -2,13 +2,16 @@ import Image from 'next/image';
 import { useEffect, useRef, useState } from 'react';
 import { FileImage, FileSpreadsheet, FileText, Upload, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { MAX_FILE_BYTES, MAX_FILES, MAX_TOTAL_BYTES, MB } from './limits';
 
+// 받는 형식. 서버(backend/inputs/detect.py)도 파일 내용으로 다시 확인한다.
+// GIF·HEIC·HWP는 서버가 읽지 못해서 받지 않는다.
 const formats: Record<string, string> = {
   jpg: 'image/jpeg',
   jpeg: 'image/jpeg',
+  jfif: 'image/jpeg',
   png: 'image/png',
   webp: 'image/webp',
-  gif: 'image/gif',
   pdf: 'application/pdf',
   xls: 'application/vnd.ms-excel',
   xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -18,64 +21,136 @@ const accept = Object.keys(formats)
   .map((ext) => `.${ext}`)
   .join(',');
 
+export const FILE_INPUT_ID = 'posting-file-input';
+
 type Attachment = { file: File; url: string; mime: string };
+
+function formatBytes(bytes: number) {
+  return bytes < MB
+    ? `${Math.max(1, Math.ceil(bytes / 1024))} KB`
+    : `${Number((bytes / MB).toFixed(1))} MB`; // 10.0 MB → 10 MB
+}
+
+/** 같은 파일인지 알아보는 표시 (이름·크기·수정 시각). 새로고침 뒤 '같은 입력'을 알아볼 때 쓴다. */
+export function fileSignature(file: File) {
+  return `${file.name}|${file.size}|${file.lastModified}`;
+}
 
 export function usePostingFiles() {
   const [files, setFiles] = useState<Attachment[]>([]);
   const [error, setError] = useState('');
+  // 화면 읽기 프로그램에 알려 줄 짧은 소식 ('파일 2개를 넣었어요' 등)
+  const [notice, setNotice] = useState('');
   const urls = useRef(new Set<string>());
   useEffect(() => {
     const active = urls.current;
+    // 끌어다 놓기 칸 밖에 파일을 떨어뜨리면 브라우저가 그 파일을 열어 이 페이지를 떠난다. 그걸 막는다.
+    // (글자를 끌어다 놓는 것은 막지 않는다)
+    const guard = (event: DragEvent) => {
+      if (event.dataTransfer?.types.includes('Files')) event.preventDefault();
+    };
+    window.addEventListener('dragover', guard);
+    window.addEventListener('drop', guard);
     return () => {
+      window.removeEventListener('dragover', guard);
+      window.removeEventListener('drop', guard);
       active.forEach((url) => URL.revokeObjectURL(url));
       active.clear();
     };
   }, []);
 
-  function add(incoming: FileList) {
+  function add(incoming: FileList | File[]) {
     const additions: Attachment[] = [];
-    const rejected: string[] = [];
+    const problems: string[] = [];
+    let wrongFormat = false;
+    let total = totalBytes(files);
     for (const file of Array.from(incoming)) {
       const extension = file.name.match(/\.([^.]+)$/)?.[1].toLowerCase() ?? '';
-      if (!Object.hasOwn(formats, extension)) {
-        rejected.push(file.name);
+      const duplicate = [...files, ...additions].some(
+        ({ file: previous }) => fileSignature(previous) === fileSignature(file),
+      );
+      if (duplicate) {
+        // 같은 공고가 비교표에 두 번 들어가지 않게 받지 않는다 (서버도 내용이 같은 파일을 거절한다)
+        problems.push(`${file.name}: 이미 넣은 파일이에요.`);
         continue;
       }
-      const duplicate = [...files, ...additions].some(
-        ({ file: previous }) =>
-          previous.name === file.name &&
-          previous.size === file.size &&
-          previous.lastModified === file.lastModified,
-      );
-      if (duplicate) continue;
+      if (!Object.hasOwn(formats, extension)) {
+        problems.push(
+          ['gif', 'heic', 'heif'].includes(extension)
+            ? `${file.name}: 이 이미지 형식은 읽을 수 없어요. PNG나 JPG로 저장해서 넣어 주세요.`
+            : extension === 'hwp'
+              ? `${file.name}: 한글 파일은 PDF로 저장해서 넣어 주세요.`
+              : `${file.name}: 넣을 수 없는 형식이에요.`,
+        );
+        wrongFormat = true;
+        continue;
+      }
+      if (file.size === 0) {
+        problems.push(`${file.name}: 빈 파일이에요.`);
+        continue;
+      }
+      if (file.size > MAX_FILE_BYTES) {
+        problems.push(
+          `${file.name}: ${formatBytes(file.size)}예요. 파일 하나는 ${formatBytes(MAX_FILE_BYTES)}까지 넣을 수 있어요.`,
+        );
+        continue;
+      }
+      if (files.length + additions.length >= MAX_FILES) {
+        problems.push(`${file.name}: 파일은 한 번에 ${MAX_FILES}개까지 넣을 수 있어요.`);
+        continue;
+      }
+      if (total + file.size > MAX_TOTAL_BYTES) {
+        problems.push(
+          `${file.name}: 파일 크기 합계는 ${formatBytes(MAX_TOTAL_BYTES)}까지예요. 나눠서 넣어 주세요.`,
+        );
+        continue;
+      }
+      total += file.size;
       const mime = formats[extension];
       const url = URL.createObjectURL(file.slice(0, file.size, mime));
       urls.current.add(url);
       additions.push({ file, url, mime });
     }
     if (additions.length) setFiles((previous) => [...previous, ...additions]);
-    setError(
-      rejected.length
-        ? `${rejected.join(', ')}: 넣을 수 없는 형식이에요. 이미지(JPG·PNG·WEBP·GIF), PDF, 엑셀·CSV 파일로 다시 넣어 주세요.`
-        : '',
-    );
+    setNotice(additions.length ? `파일 ${additions.length}개를 넣었어요.` : '');
+    if (wrongFormat) {
+      problems.push('이미지(JPG·PNG·WEBP), PDF, 엑셀(XLSX·XLS)·CSV 파일을 넣을 수 있어요.');
+    }
+    setError(problems.join('\n'));
   }
 
   function remove(url: string) {
+    const removed = files.find((item) => item.url === url);
     setFiles((previous) => previous.filter((item) => item.url !== url));
     URL.revokeObjectURL(url);
     urls.current.delete(url);
     setError('');
+    setNotice(removed ? `${removed.file.name} 파일을 뺐어요.` : '');
   }
 
-  return { files, error, add, remove };
+  function clear() {
+    files.forEach(({ url }) => {
+      URL.revokeObjectURL(url);
+      urls.current.delete(url);
+    });
+    setFiles([]);
+    setError('');
+    setNotice('');
+  }
+
+  return { files, error, notice, add, remove, clear };
+}
+
+function totalBytes(files: Attachment[]) {
+  return files.reduce((sum, { file }) => sum + file.size, 0);
 }
 
 export function FilePicker({
   add,
   error,
+  notice,
   compact = false,
-}: Pick<ReturnType<typeof usePostingFiles>, 'add' | 'error'> & {
+}: Pick<ReturnType<typeof usePostingFiles>, 'add' | 'error' | 'notice'> & {
   /** 파일이 이미 있을 때 한 줄짜리 '추가' 상자로 줄인다. */
   compact?: boolean;
 }) {
@@ -99,11 +174,13 @@ export function FilePicker({
         }}
       >
         <input
+          id={FILE_INPUT_ID}
           type="file"
           multiple
           accept={accept}
           aria-label="공고 파일 선택"
-          aria-describedby="accepted-formats"
+          aria-describedby="accepted-formats file-error source-error"
+          aria-invalid={error ? true : undefined}
           className="absolute inset-0 size-full cursor-pointer opacity-0"
           onChange={(event) => {
             if (event.target.files) add(event.target.files);
@@ -124,16 +201,24 @@ export function FilePicker({
           </span>
         )}
         <span id="accepted-formats" className="text-xs leading-relaxed text-muted-foreground">
-          <span className="whitespace-nowrap">JPG, PNG, WEBP, GIF</span> ·{' '}
+          <span className="whitespace-nowrap">JPG, PNG, WEBP</span> ·{' '}
           <span className="whitespace-nowrap">PDF</span> ·{' '}
-          <span className="whitespace-nowrap">엑셀(XLS, XLSX, CSV)</span>
+          <span className="whitespace-nowrap">엑셀(XLSX, XLS, CSV)</span> ·{' '}
+          <span className="whitespace-nowrap">
+            {MAX_FILES}개, 하나에 {formatBytes(MAX_FILE_BYTES)}까지
+          </span>
         </span>
       </label>
-      {error && (
-        <p role="alert" className="mt-2 text-sm wrap-anywhere text-destructive">
-          {error}
-        </p>
-      )}
+      <p role="status" className="sr-only">
+        {notice}
+      </p>
+      <p
+        id="file-error"
+        role="alert"
+        className="mt-2 text-sm whitespace-pre-line wrap-anywhere text-destructive empty:hidden"
+      >
+        {error}
+      </p>
     </div>
   );
 }
@@ -141,17 +226,41 @@ export function FilePicker({
 export function AttachmentList({
   files,
   remove,
+  showTotal = false,
 }: {
   files: Attachment[];
   remove?: (url: string) => void;
+  /** 파일 수·크기 합계 줄을 보여 준다 (첨부 화면에서만) */
+  showTotal?: boolean;
 }) {
   if (!files.length) return null;
+  // 누른 삭제 버튼이 사라지면 키보드 위치를 잃는다 → 다음 파일의 삭제 버튼(없으면 파일 선택)으로 옮긴다.
+  const removeAndFocus = (index: number) => {
+    remove?.(files[index].url);
+    requestAnimationFrame(() => {
+      const buttons = document.querySelectorAll<HTMLButtonElement>('[data-attachment-remove]');
+      const next = buttons[Math.min(index, buttons.length - 1)];
+      (next ?? document.getElementById(FILE_INPUT_ID))?.focus();
+    });
+  };
   return (
-    <ul aria-label="첨부한 공고 파일" className="divide-y rounded-md border px-3">
-      {files.map((attachment) => (
-        <AttachmentItem key={attachment.url} attachment={attachment} remove={remove} />
-      ))}
-    </ul>
+    <div>
+      <ul aria-label="첨부한 공고 파일" className="divide-y rounded-md border px-3">
+        {files.map((attachment, index) => (
+          <AttachmentItem
+            key={attachment.url}
+            attachment={attachment}
+            remove={remove ? () => removeAndFocus(index) : undefined}
+          />
+        ))}
+      </ul>
+      {showTotal && (
+        <p className="mt-1.5 text-xs text-muted-foreground">
+          {files.length}/{MAX_FILES}개 · 합계 {formatBytes(totalBytes(files))} /{' '}
+          {formatBytes(MAX_TOTAL_BYTES)}
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -161,7 +270,7 @@ function AttachmentItem({
   remove,
 }: {
   attachment: Attachment;
-  remove?: (url: string) => void;
+  remove?: () => void;
 }) {
   const [previewing, setPreviewing] = useState(false);
   const isImage = mime.startsWith('image/');
@@ -190,9 +299,7 @@ function AttachmentItem({
         <p className="min-w-0 flex-1 basis-40 text-sm">
           <span className="font-semibold wrap-anywhere">{file.name}</span>
           <span className="ms-2 text-xs whitespace-nowrap text-muted-foreground">
-            {file.size < 1024 * 1024
-              ? `${Math.ceil(file.size / 1024)} KB`
-              : `${(file.size / (1024 * 1024)).toFixed(1)} MB`}
+            {formatBytes(file.size)}
           </span>
         </p>
         {remove ? (
@@ -200,8 +307,9 @@ function AttachmentItem({
             type="button"
             variant="ghost"
             className="size-11"
-            aria-label={file.name + ' 삭제'}
-            onClick={() => remove(url)}
+            data-attachment-remove
+            aria-label={file.name + ' 빼기'}
+            onClick={remove}
           >
             <X aria-hidden />
           </Button>
