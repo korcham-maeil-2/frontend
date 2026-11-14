@@ -258,6 +258,7 @@ export interface components {
       | 'FILE_TOO_MANY'
       | 'FILE_TOO_LARGE'
       | 'FILE_EMPTY'
+      | 'FILE_DUPLICATE'
       | 'FILE_TYPE_UNSUPPORTED'
       | 'FILE_UNREADABLE'
       | 'FILE_TOO_LONG'
