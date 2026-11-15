@@ -209,7 +209,7 @@ function buildColumn(
       be.net_income_krw != null ? { value: won(be.net_income_krw), note: '그 연봉일 때' } : UNKNOWN;
     remaining = remainingCell(be.monthly_remaining!, {
       // 최저임금으로 올린 경우는 기준보다 많이 남는다
-      note: be.floor === 'minimum_wage' ? '기준보다 많이' : '기준 이상',
+      note: be.floor === 'minimum_wage' ? '기준보다 많이' : '기준과 같은 금액',
       status: be.status,
     });
   } else {
@@ -283,7 +283,13 @@ function companyOf(column: Column, index: number) {
 function Breakdown({ column, index }: { column: Column; index: number }) {
   const { posting, row, housing, transport, breakEven } = column;
   const slip = posting.payslip;
-  const lines: { label: string; value: string; note?: string | null; status?: Status }[] = [];
+  const lines: {
+    label: string;
+    value: string;
+    note?: string | null;
+    status?: Status;
+    total?: boolean; // 마지막 '매달 남는 돈' 줄
+  }[] = [];
   if (slip) {
     lines.push({ label: '세전 월급', value: exact(slip.gross) });
     const deductions: [keyof typeof slip, string][] = [
@@ -321,6 +327,16 @@ function Breakdown({ column, index }: { column: Column; index: number }) {
         status: item.status,
       });
     }
+    // 내역의 끝: 세후 월급에서 위 비용을 뺀 매달 남는 돈 (표의 마지막 줄과 같은 값, 한 원까지)
+    const remaining = column.solved
+      ? breakEven?.monthly_remaining
+      : column.scenario?.monthly_remaining;
+    lines.push({
+      label: '매달 남는 돈',
+      value: remaining == null ? '계산 못 함' : exact(remaining),
+      note: column.solved ? '최소 연봉일 때' : undefined,
+      total: true,
+    });
   }
   const notes = [...posting.notes, ...(breakEven?.notes ?? [])];
   return (
@@ -329,7 +345,7 @@ function Breakdown({ column, index }: { column: Column; index: number }) {
       {lines.length > 0 && (
         <dl className="breakdown">
           {lines.map((line) => (
-            <div key={line.label}>
+            <div key={line.label} className={line.total ? 'breakdown-total' : undefined}>
               <dt>{line.label}</dt>
               <dd>
                 <span className="tabular-nums">{line.value}</span>
@@ -383,7 +399,8 @@ function BreakEvenSummary({ be, column }: { be: BreakEven; column: Column | unde
         </>
       ) : (
         <>
-          {name}: 연봉이 최소 {salary} 이상이면 기준 이상 남아요 ({baseline}).
+          {/* 이슈 backend#14 완료 조건 문구: '최소 ○○만 원 이상이면 같은 금액이 남습니다' */}
+          {name}: 최소 {salary} 이상이면 같은 금액이 남아요 ({baseline}).
         </>
       )}
       {chosen.during_support_annual_salary_krw != null &&
