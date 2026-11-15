@@ -131,6 +131,31 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/sessions/{session_id}/local-support': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Local Support
+     * @description 근무지별 청년 지원을 오늘 날짜로 다시 고른다. 결과 화면이 열릴 때 부른다.
+     *
+     *     확인·다시 계산 때 저장한 목록은 그날 기준이라, 며칠 뒤 다시 열면 '신청 중'이던 정책이
+     *     이미 끝났을 수 있다. 같은 지역은 캐시(하루)라 바로 끝난다. 다시 고른 목록은 저장하지 않는다
+     *     (보기만 한다 — 세션 상태를 바꾸지 않으므로 자물쇠도 필요 없다).
+     *     계산을 마치기 전이거나 온통청년 키가 없으면 null.
+     */
+    get: operations['get_local_support_sessions__session_id__local_support_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/sessions/{session_id}': {
     parameters: {
       query?: never;
@@ -143,6 +168,29 @@ export interface paths {
      * @description 현재 상태와 결과를 조회한다 (그래프는 실행하지 않고 저장된 값만 읽는다).
      */
     get: operations['get_session_sessions__session_id__get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/rent/{lawd_cd}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Rent
+     * @description 시군구 코드(5자리, 예: 12170 나주시)의 원룸급 월세 추정.
+     *
+     *     코드표(data/lawd_codes.csv)에 없거나, 구를 더 골라야 하는 시(예: 성남시 41130)면 404.
+     *     조회 기능이 꺼져 있으면(인증키 없음) status='missing'과 이유를 돌려준다.
+     */
+    get: operations['get_rent_rent__lawd_cd__get'];
     put?: never;
     post?: never;
     delete?: never;
@@ -331,6 +379,11 @@ export interface components {
        * @description 계산하지 못한 부분과 이유
        */
       errors: string[];
+      /**
+       * Rent Estimates
+       * @description 회사 지역별 원룸급 월세 추정 (국토부 실거래가). 이사할 집 월세를 비우면 이 값을 씀
+       */
+      rent_estimates: components['schemas']['RentEstimate'][];
     };
     /**
      * ComparisonRow
@@ -479,6 +532,7 @@ export interface components {
       | 'SESSION_NOT_FOUND'
       | 'SESSION_NOT_AWAITING_CONFIRMATION'
       | 'SESSION_NOT_COMPLETED'
+      | 'REGION_NOT_FOUND'
       | 'NORMALIZE_FAILED'
       | 'FILE_MISSING'
       | 'FILE_TOO_MANY'
@@ -637,6 +691,50 @@ export interface components {
       source: string | null;
     };
     /**
+     * LocalSupport
+     * @description get_local_support 노드의 결과 = 세션 응답의 local_support 칸.
+     */
+    LocalSupport: {
+      /** Regions */
+      regions: components['schemas']['RegionSupport'][];
+      /**
+       * National
+       * @description 전국 정책 (어느 근무지든 같다). 신청할 수 있는 것만
+       */
+      national: components['schemas']['SupportPolicy'][];
+      /**
+       * National Matched
+       * @description 신청할 수 있는 전국 정책 수
+       */
+      national_matched: number;
+      /**
+       * Age
+       * @description 거르는 데 쓴 나이. 없으면 나이로 거르지 않음
+       */
+      age: number | null;
+      /**
+       * Notes
+       * @description 화면에 함께 보여 줄 안내
+       */
+      notes: string[];
+      /**
+       * Source
+       * @description 출처
+       * @default 온통청년 청년정책 (youthcenter.go.kr)
+       */
+      source: string;
+      /**
+       * Source Url
+       * @default https://www.youthcenter.go.kr
+       */
+      source_url: string;
+      /**
+       * Checked On
+       * @description 조회한 날 (YYYY-MM-DD, 한국 시간)
+       */
+      checked_on: string;
+    };
+    /**
      * Location
      * @description 근무지. sido·sigungu·lawd_cd는 코드가 data/lawd_codes.csv에서 찾아 채운다.
      */
@@ -793,6 +891,11 @@ export interface components {
     /**
      * Question
      * @description 물어볼 것 하나. 화면이 문장을 보고 칸을 추측하지 않게, 어느 칸 질문인지 함께 준다.
+     *
+     *     종류(kind)로 화면이 두 묶음으로 나눠 보여 준다:
+     *       check    AI가 추정한 값 → 원문과 맞는지 꼭 봐 주세요 (눈에 띄게)
+     *       optional 공고에 없는 값 → 알면 넣고, 몰라도 계산된다 (if_unknown에 어떻게 계산하는지)
+     *     kind·if_unknown은 기본값이 있어서, 이 칸이 생기기 전에 저장한 세션도 그대로 읽힌다.
      */
     Question: {
       /**
@@ -805,6 +908,18 @@ export interface components {
        * @description 이 질문이 가리키는 칸 이름 (예: annual_salary_krw, location, other_allowances.0). 비어 있으면 칸이 없는 질문 (예: 연장근로 시간)
        */
       fields?: string[];
+      /**
+       * Kind
+       * @description check=AI가 추정한 값(원문과 맞는지 볼 것), optional=몰라도 계산되는 빈 값
+       * @default optional
+       * @enum {string}
+       */
+      kind: 'check' | 'optional';
+      /**
+       * If Unknown
+       * @description 비워 두면 어떻게 계산하는지 (예: '0시간으로 계산해요'). optional일 때
+       */
+      if_unknown?: string | null;
     };
     /** RateCell */
     RateCell: {
@@ -846,6 +961,90 @@ export interface components {
        * @description 비교표를 고쳤을 때만 보낸다 (안 보내면 확인한 표 그대로)
        */
       table?: components['schemas']['ComparisonRow'][] | null;
+    };
+    /**
+     * RegionSupport
+     * @description 지역(시군구) 하나의 지역 정책. 전국 정책은 LocalSupport.national에 한 번만 담는다.
+     */
+    RegionSupport: {
+      /** Lawd Cd */
+      lawd_cd: string;
+      /**
+       * Region
+       * @description 시도 시군구 (예: 서울특별시 강서구)
+       */
+      region: string;
+      /**
+       * Posting Ids
+       * @description 이 지역에 근무지가 있는 공고
+       */
+      posting_ids: string[];
+      /**
+       * Policies
+       * @description 지금·곧 신청할 수 있는 지역 정책
+       */
+      policies: components['schemas']['SupportPolicy'][];
+      /**
+       * Matched
+       * @description 신청할 수 있는 지역 정책 수 (보여 준 것보다 많을 수 있음)
+       */
+      matched: number;
+      /**
+       * Error
+       * @description 조회하지 못한 이유 (해요체)
+       */
+      error: string | null;
+    };
+    /**
+     * RentEstimate
+     * @description 지역 하나의 원룸급 월세 추정. 결과 화면과 계산(이사 경우 주거비)에 쓴다.
+     */
+    RentEstimate: {
+      /** Lawd Cd */
+      lawd_cd: string;
+      /**
+       * Region
+       * @description 화면 표시용 지역 이름 (예: 전남광주통합특별시 나주시)
+       */
+      region: string;
+      /**
+       * Monthly Rent Krw
+       * @description 월세 중앙값(원). 못 구하면 null
+       */
+      monthly_rent_krw: number | null;
+      /**
+       * Deposit Krw
+       * @description 같은 거래들의 보증금 중앙값(원)
+       */
+      deposit_krw: number | null;
+      /**
+       * Sample Size
+       * @description 중앙값을 낸 거래 수
+       * @default 0
+       */
+      sample_size: number;
+      /**
+       * Period
+       * @description 조회한 계약 기간 (예: 2026년 5~10월)
+       */
+      period: string;
+      /**
+       * Source
+       * @description 출처 문장 (데이터명·기간·조건·표본 수)
+       */
+      source: string;
+      /**
+       * Status
+       * @description estimated=시세를 구함 / missing=조건에 맞는 거래가 없음 / unavailable=불러오지 못함(잠시 후 다시 조회)
+       * @default estimated
+       * @enum {string}
+       */
+      status: 'estimated' | 'missing' | 'unavailable';
+      /**
+       * Reason
+       * @description 못 구한 이유
+       */
+      reason: string | null;
     };
     /** SalaryTypeCell */
     SalaryTypeCell: {
@@ -943,8 +1142,81 @@ export interface components {
       profile?: components['schemas']['UserProfile'] | null;
       /** @description 계산 결과 (status가 completed일 때) */
       result?: components['schemas']['CalculationResult'] | null;
+      /** @description 근무지 지역별 청년 지원 (status가 completed일 때, 키가 없으면 null) */
+      local_support?: components['schemas']['LocalSupport'] | null;
       /** Report */
       report?: string | null;
+    };
+    /**
+     * SupportPolicy
+     * @description 받을 수 있는 정책 하나. 화면에 그대로 보여 준다.
+     */
+    SupportPolicy: {
+      /**
+       * Id
+       * @description 온통청년 정책 번호
+       */
+      id: string;
+      /** Name */
+      name: string;
+      /**
+       * Category
+       * @description 대분류 (주거, 금융･복지･문화 등)
+       */
+      category: string;
+      /**
+       * Support
+       * @description 지원 내용 (원문, 길면 줄임)
+       */
+      support: string | null;
+      /**
+       * Agency
+       * @description 주관 기관
+       */
+      agency: string | null;
+      /**
+       * Age Range
+       * @description 나이 조건 (예: '19~39세', '나이 제한 없음')
+       */
+      age_range: string;
+      /**
+       * Income
+       * @description 소득 조건 (예: '소득 무관', 원문 서술)
+       */
+      income: string;
+      /**
+       * Conditions
+       * @description 추가 신청 자격 (원문, 길면 줄임)
+       */
+      conditions: string | null;
+      /**
+       * Scope
+       * @description local=근무지 지자체 정책, national=전국 정책
+       * @enum {string}
+       */
+      scope: 'local' | 'national';
+      /**
+       * Fit
+       * @description moving=이사하는 사회초년생에게 바로 쓰이는 것(월세·전세 등), general=그 밖, targeted=특정 대상(자립준비청년·장애·대학생·창업 등, 혼자면 신혼·출산도) → 아래로
+       * @enum {string}
+       */
+      fit: 'moving' | 'general' | 'targeted';
+      /**
+       * Apply Status
+       * @description open=신청 기간 중, always=상시, upcoming=곧 시작, unknown=기간을 모름 (끝난 정책은 담지 않는다)
+       * @enum {string}
+       */
+      apply_status: 'open' | 'always' | 'upcoming' | 'unknown';
+      /**
+       * Apply Period
+       * @description 신청 기간 (예: '2026-04-01 ~ 2026-11-30')
+       */
+      apply_period: string | null;
+      /**
+       * Url
+       * @description 신청·안내 페이지 (https 붙임). 자격은 여기서 확인
+       */
+      url: string | null;
     };
     /** TextCell */
     TextCell: {
@@ -1018,6 +1290,11 @@ export interface components {
        * @description 매달 남아야 하는 목표 금액. 있으면 손익분기 기준으로 가장 먼저 쓴다
        */
       target_monthly_remaining?: number | null;
+      /**
+       * Age
+       * @description 만 나이. 청년 지원 정책을 나이 조건으로 거르는 데만 쓴다 (계산에는 안 씀)
+       */
+      age?: number | null;
     };
   };
   responses: never;
@@ -1044,7 +1321,7 @@ export interface operations {
         };
         content: {
           'application/json': {
-            [key: string]: string;
+            [key: string]: string | boolean;
           };
         };
       };
@@ -1356,6 +1633,55 @@ export interface operations {
       };
     };
   };
+  get_local_support_sessions__session_id__local_support_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        session_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LocalSupport'] | null;
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Unprocessable Content */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Internal Server Error */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
   get_session_sessions__session_id__get: {
     parameters: {
       query?: never;
@@ -1374,6 +1700,55 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['SessionResponse'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Unprocessable Content */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Internal Server Error */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  get_rent_rent__lawd_cd__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        lawd_cd: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RentEstimate'];
         };
       };
       /** @description Not Found */

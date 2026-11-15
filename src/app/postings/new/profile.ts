@@ -30,7 +30,16 @@ export type ProfileForm = {
   currentMeal: Money; // 그중 비과세 식대 (월)
   currentTransport: Money; // 지금 회사까지 월 교통비
   target: Money; // 매달 이만큼은 남아야 한다 (선택)
+  age: number | null; // 만 나이 (선택). 청년 지원 정책을 나이 조건으로 거르는 데만 쓴다
 };
+
+/** 나이로 받는 범위 (백엔드 UserProfile.age와 같다). 벗어나면 보내지 않는다 (422가 나지 않게) */
+export const AGE_RANGE = { min: 15, max: 99 } as const;
+
+/** 범위 안의 나이만. 비었거나 벗어나면 null → 서버가 나이로 거르지 않는다 */
+export function validAge(age: number | null | undefined): number | null {
+  return age != null && age >= AGE_RANGE.min && age <= AGE_RANGE.max ? age : null;
+}
 
 export const EMPTY_POSTING_COSTS: PostingCostsForm = {
   canCommute: true,
@@ -50,6 +59,7 @@ export const EMPTY_PROFILE: ProfileForm = {
   currentMeal: null,
   currentTransport: null,
   target: null,
+  age: null,
 };
 
 /** 이 공고의 비용 입력. 아직 없으면 빈 값 (공고가 늘거나 새 표를 만들었을 때). */
@@ -76,6 +86,7 @@ function toFixedExpenses(items: FixedExpenseForm[]) {
 
 /** 화면 입력 → 백엔드 UserProfile. 빈 칸은 null로 보내 서버가 '모름'으로 계산한다 (0원으로 채우지 않는다). */
 export function toUserProfile(form: ProfileForm, rows: Row[]): UserProfile {
+  const age = validAge(form.age);
   return {
     family: form.family,
     children_8_to_20: 0, // 화면에서 묻지 않는다 (사회초년생 기준). 필요해지면 입력칸을 더한다
@@ -106,6 +117,9 @@ export function toUserProfile(form: ProfileForm, rows: Row[]): UserProfile {
           }
         : null,
     target_monthly_remaining: form.target,
+    // 비었으면 칸을 아예 보내지 않는다: age를 모르는 예전 백엔드도 받을 수 있게 (모르는 칸은 422).
+    // 나이 칸이 생기기 전에 저장한 화면 값에는 age가 없다 (undefined) → validAge가 null로
+    ...(age != null && { age }),
   };
 }
 

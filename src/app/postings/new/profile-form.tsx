@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Plus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,7 +6,9 @@ import { formatWon, salaryText, type Row } from './format';
 import { CONTROL_CLASS, MoneyInput } from './money-input';
 import { PostingTabs } from './posting-tabs';
 import {
+  AGE_RANGE,
   costsOf,
+  validAge,
   type MissingInput,
   type Money,
   type PostingCostsForm,
@@ -19,6 +21,50 @@ import {
 
 // 자주 넣는 고정비: 누르면 이름이 채워진 줄이 생기고 금액 칸으로 바로 간다
 const COMMON_FIXED = ['통신비', '학자금 상환', '보험료', '구독 서비스'];
+
+/** 나이 칸 (선택). 비워도 계산되고, 넣으면 그 나이로 신청할 수 있는 청년 지원만 골라 준다 */
+function AgeField({
+  age,
+  onChange,
+}: {
+  age: number | null;
+  onChange: (age: number | null) => void;
+}) {
+  // 범위 안내는 칸을 떠난 뒤에만 보여 준다 ('27'을 치다가 '2'에서 오류가 뜨지 않게)
+  const [editing, setEditing] = useState(false);
+  const outOfRange = !editing && age != null && validAge(age) == null;
+  return (
+    <div className="row-field profile-field">
+      <label htmlFor="age">나이 (선택)</label>
+      <div className="unit-input">
+        <Input
+          id="age"
+          inputMode="numeric"
+          value={age?.toString() ?? ''}
+          placeholder="예: 27"
+          onFocus={() => setEditing(true)}
+          onBlur={() => setEditing(false)}
+          onChange={(event) => {
+            // 첫 숫자만 읽는다 ('27세(1999년생)'를 붙여 넣어도 27)
+            const first = /\d+/.exec(event.target.value);
+            const next = first ? Number(first[0]) : null;
+            if (next != null && next > AGE_RANGE.max) return; // 세 자리는 받지 않는다
+            onChange(next);
+          }}
+          className={CONTROL_CLASS}
+          aria-describedby="age-hint"
+          aria-invalid={outOfRange || undefined}
+        />
+        <span aria-hidden>세</span>
+      </div>
+      <p id="age-hint" className="row-field-hint" aria-live="polite">
+        {outOfRange
+          ? `${AGE_RANGE.min}~${AGE_RANGE.max}세로 넣어 주세요. 이 값은 쓰지 않아요`
+          : '만 나이. 청년 지원 정책을 나이 조건에 맞게 골라 드려요. 비워도 계산돼요'}
+      </p>
+    </div>
+  );
+}
 
 /** 라벨·도움말이 붙은 금액 칸 */
 function MoneyField({
@@ -179,6 +225,7 @@ export function ProfileFormView({
   activeId,
   onSelectPosting,
   missingFor,
+  askAge,
 }: {
   form: Form;
   rows: Row[];
@@ -188,6 +235,8 @@ export function ProfileFormView({
   onSelectPosting: (id: string) => void;
   /** 이 공고에서 아직 비어 있는 칸 (profile.ts의 missingInputs 중 이 공고 것) */
   missingFor: (row: Row) => MissingInput[];
+  /** 나이 칸을 보일지 (서버가 청년 지원을 찾을 수 있을 때만. 나이는 그것에만 쓴다) */
+  askAge: boolean;
 }) {
   const set = (patch: Partial<Form>) => onChange({ ...form, ...patch });
   const setFixed = (fixedExpenses: Form['fixedExpenses']) => set({ fixedExpenses });
@@ -203,7 +252,7 @@ export function ProfileFormView({
   return (
     <div className="space-y-8">
       <fieldset className="row-group">
-        <legend>지금 사는 곳</legend>
+        <legend>나와 지금 사는 곳</legend>
         <MoneyField
           id="current-housing"
           label="지금 집 주거비 (매달)"
@@ -231,6 +280,7 @@ export function ProfileFormView({
             세금 계산에 써요. 혼자 살면 1명
           </p>
         </div>
+        {askAge && <AgeField age={form.age ?? null} onChange={(age) => set({ age })} />}
       </fieldset>
 
       <fieldset className="row-group">
