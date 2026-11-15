@@ -836,6 +836,19 @@ section.desk-sheet > .sheet-heading {
   border-block-end: 1px solid var(--border);
   font-size: 0.875rem;
 }
+/* 내역의 마지막 줄 '매달 남는 돈': 위 2px 선 + 굵게, 금액은 남는 돈 초록 (DESIGN.md) */
+.breakdown > div.breakdown-total {
+  border-block-start: 2px solid var(--foreground);
+  border-block-end: 0;
+  font-weight: 700;
+}
+.breakdown-total dt,
+.breakdown-total dd {
+  color: var(--foreground);
+}
+.breakdown-total .tabular-nums {
+  color: var(--positive);
+}
 .breakdown dt {
   color: var(--muted-foreground);
   font-weight: 600;
