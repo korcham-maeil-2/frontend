@@ -107,6 +107,30 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/sessions/{session_id}/recalculate': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Recalculate
+     * @description 결과 화면에서 생활비나 비교표를 고쳤을 때, 계산·리포트만 다시 한다.
+     *
+     *     비교표 확인을 마친(completed) 세션에서만 된다. 확인 전이면 /confirm에 함께 보낸다 → 409.
+     *     사용자 정보는 보낸 값으로 통째로 바꾸고, 비교표는 보냈을 때만 바꾼다.
+     *     공고 정리(Claude 호출)는 다시 하지 않는다 → 비용 0원, 바로 끝난다.
+     */
+    post: operations['recalculate_sessions__session_id__recalculate_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/sessions/{session_id}': {
     parameters: {
       query?: never;
@@ -131,6 +155,34 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
   schemas: {
+    /**
+     * Baseline
+     * @description 비교 기준: 이만큼은 남아야 한다.
+     */
+    Baseline: {
+      /**
+       * Kind
+       * @description target=사용자 목표 금액 / posting=연봉 공개 공고 / current_job=지금 회사
+       * @enum {string}
+       */
+      kind: 'target' | 'posting' | 'current_job';
+      /**
+       * Label
+       * @description 화면 표시용 (예: "(주)새늘소재 · 회사 근처로 이사")
+       */
+      label: string;
+      /** Monthly Remaining */
+      monthly_remaining: number;
+      /**
+       * Status
+       * @enum {string}
+       */
+      status: 'confirmed' | 'estimated' | 'user_input' | 'missing';
+      /** Posting Id */
+      posting_id: string | null;
+      /** Case */
+      case: ('commute' | 'move') | null;
+    };
     /** Body_start_session_with_files_sessions_uploads_post */
     Body_start_session_with_files_sessions_uploads_post: {
       /**
@@ -167,6 +219,118 @@ export interface components {
       from_image: boolean;
       /** Value */
       value?: boolean | null;
+    };
+    /** BreakEven */
+    BreakEven: {
+      /** Posting Id */
+      posting_id: string;
+      /** Company */
+      company: string | null;
+      baseline: components['schemas']['Baseline'];
+      /** Cases */
+      cases: components['schemas']['BreakEvenCase'][];
+    };
+    /** BreakEvenCase */
+    BreakEvenCase: {
+      /**
+       * Case
+       * @enum {string}
+       */
+      case: 'commute' | 'move';
+      /** Label */
+      label: string;
+      /**
+       * Annual Salary Krw
+       * @description 이 금액 이상이면 늘 기준 이상 남는 최소 세전 연봉(원, 만 원 단위). 기간이 정해진 지원이 끝난 뒤 기준. 못 구하면 null
+       */
+      annual_salary_krw: number | null;
+      /**
+       * Monthly Remaining
+       * @description 그 연봉일 때의 월 잔여액 (기준 이상)
+       */
+      monthly_remaining: number | null;
+      /**
+       * Net Income Krw
+       * @description 그 연봉일 때의 세후 월급 (화면이 거꾸로 계산하지 않게)
+       */
+      net_income_krw: number | null;
+      /** @description 이 답에 쓴 주거비 (주거지원비가 끝난 뒤 기준) */
+      housing: components['schemas']['Item'] | null;
+      /** @description 이 답에 쓴 교통비 */
+      transport: components['schemas']['Item'] | null;
+      /**
+       * During Support Annual Salary Krw
+       * @description 주거지원비를 받는 동안만 따진 손익분기 연봉 (지원이 있을 때만)
+       */
+      during_support_annual_salary_krw: number | null;
+      /**
+       * Support Excluded
+       * @description 주거지원비를 빼고 계산했는지 (지원이 끝난 뒤 기준). 화면이 주거비 옆에 알린다
+       * @default false
+       */
+      support_excluded: boolean;
+      /**
+       * Floor
+       * @description minimum_wage=계산한 연봉이 최저임금보다 낮아 최저임금 연봉으로 올림. 이때 monthly_remaining은 기준보다 많다
+       */
+      floor: 'minimum_wage' | null;
+      /**
+       * Status
+       * @description 기준과 연봉 외 값(비용·수당 등) 중 가장 약한 신뢰도
+       * @enum {string}
+       */
+      status: 'confirmed' | 'estimated' | 'user_input' | 'missing';
+      /**
+       * Reason
+       * @description 못 구한 이유
+       */
+      reason: string | null;
+      /**
+       * Missing
+       * @description 계산에 필요한데 없는 값
+       */
+      missing: string[];
+      /**
+       * Notes
+       * @description 화면에 함께 보여 줄 안내
+       */
+      notes: string[];
+    };
+    /**
+     * CalculationResult
+     * @description calculate 노드의 결과 = 세션 응답의 result 칸. 프론트 결과 화면이 그대로 쓴다.
+     */
+    CalculationResult: {
+      /**
+       * Rows
+       * @description 비교표 행 수
+       */
+      rows: number;
+      /**
+       * Has User Profile
+       * @description 사용자 정보를 받아 계산했는지
+       */
+      has_user_profile: boolean;
+      /**
+       * Postings
+       * @description 공고별 세후 월급·통근/이사 월 잔여액
+       */
+      postings: components['schemas']['PostingResult'][];
+      /**
+       * Break Even
+       * @description 연봉 비공개 공고별 손익분기 연봉
+       */
+      break_even: components['schemas']['BreakEven'][];
+      /**
+       * Break Even Note
+       * @description 손익분기 연봉 관련 안내 (기준을 못 정한 이유 등)
+       */
+      break_even_note: string | null;
+      /**
+       * Errors
+       * @description 계산하지 못한 부분과 이유
+       */
+      errors: string[];
     };
     /**
      * ComparisonRow
@@ -244,6 +408,62 @@ export interface components {
        * @description 사용자가 비교표를 고쳤을 때만 보낸다. 고친 칸은 status를 user_input으로
        */
       table?: components['schemas']['ComparisonRow'][] | null;
+      /** @description 사용자 정보 (지금 집 주거비, 공고별 통근·이사 비용, 고정비, 지금 연봉 등). 보내면 월 잔여액·손익분기 연봉을 계산한다. 안 보내면 세후 월급까지만 계산 */
+      profile?: components['schemas']['UserProfile'] | null;
+    };
+    /**
+     * Cost
+     * @description 사용자 쪽 금액 하나 (월, 원). 기본 신뢰도는 '사용자 입력'.
+     *
+     *     월세 실거래가 추정값처럼 코드가 추정한 값이면 status='estimated'와 출처를 넣는다.
+     */
+    Cost: {
+      /**
+       * Value
+       * @description 월 금액(원)
+       */
+      value: number;
+      /**
+       * Status
+       * @default user_input
+       * @enum {string}
+       */
+      status: 'confirmed' | 'estimated' | 'user_input';
+      /**
+       * Source
+       * @description 값의 출처 (예: 국토부 실거래가 중앙값)
+       */
+      source?: string | null;
+    };
+    /**
+     * CurrentJob
+     * @description 지금 다니는 회사 (손익분기 연봉의 '현상 유지' 기준). 지금 집에서 다닌다고 본다.
+     */
+    CurrentJob: {
+      /**
+       * Annual Salary Krw
+       * @description 지금 세전 고정연봉(원)
+       */
+      annual_salary_krw: number;
+      /**
+       * Meal Nontaxable Monthly Krw
+       * @description 연봉에 포함된 비과세 식대 월액(원)
+       * @default 0
+       */
+      meal_nontaxable_monthly_krw: number;
+      /** @description 지금 회사까지 월 교통비 */
+      transport?: components['schemas']['Cost'] | null;
+      /**
+       * Status
+       * @default user_input
+       * @enum {string}
+       */
+      status: 'confirmed' | 'estimated' | 'user_input';
+      /**
+       * Source
+       * @description 예: 2026년 10월 급여명세서
+       */
+      source?: string | null;
     };
     /**
      * ErrorCode
@@ -253,6 +473,7 @@ export interface components {
     ErrorCode:
       | 'SESSION_NOT_FOUND'
       | 'SESSION_NOT_AWAITING_CONFIRMATION'
+      | 'SESSION_NOT_COMPLETED'
       | 'NORMALIZE_FAILED'
       | 'FILE_MISSING'
       | 'FILE_TOO_MANY'
@@ -306,6 +527,16 @@ export interface components {
        * @description 무엇이 틀렸는지 (Pydantic 원문 메시지)
        */
       message: string;
+    };
+    /**
+     * FixedExpense
+     * @description 기타 고정비 한 줄 (학자금 상환, 통신비 등).
+     */
+    FixedExpense: {
+      /** Name */
+      name: string;
+      /** Monthly Krw */
+      monthly_krw: number;
     };
     /**
      * InputSummary
@@ -382,6 +613,23 @@ export interface components {
        * @description 개월 수
        */
       value?: number | null;
+    };
+    /**
+     * Item
+     * @description 결과의 값 하나와 그 출처·신뢰도.
+     */
+    Item: {
+      /** Label */
+      label: string;
+      /** Value */
+      value: number | null;
+      /**
+       * Status
+       * @enum {string}
+       */
+      status: 'confirmed' | 'estimated' | 'user_input' | 'missing';
+      /** Source */
+      source: string | null;
     };
     /**
      * Location
@@ -492,6 +740,51 @@ export interface components {
         [key: string]: unknown;
       };
     };
+    /**
+     * PostingCosts
+     * @description 공고(회사 위치)마다 달라지는 비용. 모르면 비워 둔다(None).
+     */
+    PostingCosts: {
+      /** @description 지금 집에서 이 회사까지 월 통근 교통비 */
+      commute_transport?: components['schemas']['Cost'] | null;
+      /** @description 회사 근처로 이사했을 때 월 주거비 (월세 + 관리비) */
+      move_housing?: components['schemas']['Cost'] | null;
+      /** @description 이사한 뒤 월 교통비 (출퇴근 + 본가 왕복 등) */
+      move_transport?: components['schemas']['Cost'] | null;
+      /**
+       * Commute Possible
+       * @description 지금 집에서 통근할 수 있는지. False면 통근 경우는 해당 없음
+       */
+      commute_possible?: boolean | null;
+      /**
+       * Move Possible
+       * @description 이사를 고려하는지. False면 이사 경우는 해당 없음
+       */
+      move_possible?: boolean | null;
+    };
+    /** PostingResult */
+    PostingResult: {
+      /** Posting Id */
+      posting_id: string;
+      /** Company */
+      company: string | null;
+      /** @description 세후 월급 (실수령액) */
+      net_income: components['schemas']['Item'];
+      /**
+       * Payslip
+       * @description 공제 내역 (계산했을 때만)
+       */
+      payslip: {
+        [key: string]: number;
+      } | null;
+      /** @description 회사 수당 합계 (교통비·통신비 등). 세후 월급에 이미 들어 있음 */
+      allowances: components['schemas']['Item'];
+      fixed_expenses: components['schemas']['Item'];
+      /** Scenarios */
+      scenarios: components['schemas']['Scenario'][];
+      /** Notes */
+      notes: string[];
+    };
     /** RateCell */
     RateCell: {
       /**
@@ -518,6 +811,21 @@ export interface components {
        */
       value?: number | null;
     };
+    /**
+     * RecalculateRequest
+     * @description 확인을 마친 세션을 다시 계산하는 요청 (결과 화면에서 생활비나 비교표를 고쳤을 때).
+     *
+     *     예: {"profile": {...}}  또는 비교표도 고쳤으면  {"profile": {...}, "table": [...]}
+     */
+    RecalculateRequest: {
+      /** @description 사용자 정보. 보낸 값으로 통째로 바꾼다 */
+      profile: components['schemas']['UserProfile'];
+      /**
+       * Table
+       * @description 비교표를 고쳤을 때만 보낸다 (안 보내면 확인한 표 그대로)
+       */
+      table?: components['schemas']['ComparisonRow'][] | null;
+    };
     /** SalaryTypeCell */
     SalaryTypeCell: {
       /**
@@ -540,6 +848,40 @@ export interface components {
       from_image: boolean;
       /** Value */
       value?: ('annual' | 'monthly' | 'undisclosed' | 'to_propose') | null;
+    };
+    /** Scenario */
+    Scenario: {
+      /**
+       * Case
+       * @enum {string}
+       */
+      case: 'commute' | 'move';
+      /** Label */
+      label: string;
+      /**
+       * Applicable
+       * @description False면 해당 없는 경우 (예: 통근 불가)
+       * @default true
+       */
+      applicable: boolean;
+      /**
+       * Monthly Remaining
+       * @description 월 잔여액(원). 값이 모자라면 null
+       */
+      monthly_remaining: number | null;
+      /**
+       * Status
+       * @description 월 잔여액의 신뢰도 (들어간 값 중 가장 약한 것)
+       * @enum {string}
+       */
+      status: 'confirmed' | 'estimated' | 'user_input' | 'missing';
+      housing: components['schemas']['Item'];
+      transport: components['schemas']['Item'];
+      /**
+       * Missing
+       * @description 계산에 필요한데 없는 값
+       */
+      missing: string[];
     };
     /**
      * SessionResponse
@@ -576,10 +918,10 @@ export interface components {
        * @default
        */
       input_text: string;
-      /** Result */
-      result?: {
-        [key: string]: unknown;
-      } | null;
+      /** @description 저장된 사용자 정보. 새로고침한 화면이 입력칸을 다시 채울 때 쓴다 */
+      profile?: components['schemas']['UserProfile'] | null;
+      /** @description 계산 결과 (status가 completed일 때) */
+      result?: components['schemas']['CalculationResult'] | null;
       /** Report */
       report?: string | null;
     };
@@ -605,6 +947,56 @@ export interface components {
       from_image: boolean;
       /** Value */
       value?: string | null;
+    };
+    /**
+     * UserProfile
+     * @description 계산에 필요한 사용자 정보. 공고에 없는 값은 모두 여기서 온다.
+     */
+    UserProfile: {
+      /**
+       * Family
+       * @description 소득세용 공제대상가족 수 (본인 포함)
+       * @default 1
+       */
+      family: number;
+      /**
+       * Children 8 To 20
+       * @default 0
+       */
+      children_8_to_20: number;
+      /** @description 지금 집 월 주거비 (월세 + 관리비, 본가면 생활비로 드리는 돈) */
+      current_housing?: components['schemas']['Cost'] | null;
+      /**
+       * Fixed Expenses
+       * @description 이사와 관계없이 매달 나가는 돈. 아직 모르면 null, 없다고 답했으면 []
+       */
+      fixed_expenses?: components['schemas']['FixedExpense'][] | null;
+      /** @description 공고별 값이 없을 때 쓰는 값 */
+      default_costs?: components['schemas']['PostingCosts'];
+      /**
+       * Postings
+       * @description 공고 ID(posting-1 …)별 비용
+       */
+      postings?: {
+        [key: string]: components['schemas']['PostingCosts'];
+      };
+      /**
+       * Baseline Posting Id
+       * @description 손익분기 연봉의 기준 공고 ID. 비우면 월 잔여액이 가장 큰 공고
+       */
+      baseline_posting_id?: string | null;
+      /**
+       * Baseline Case
+       * @description 기준 공고에서 쓸 경우 (commute/move). 비우면 그 공고에서 더 많이 남는 쪽
+       */
+      baseline_case?: ('commute' | 'move') | null;
+      /** @description 지금 회사. 있으면 손익분기 연봉의 기준 후보가 된다 */
+      current_job?: components['schemas']['CurrentJob'] | null;
+      /**
+       * Target Monthly Remaining
+       * @description 매달 남아야 하는 목표 금액. 있으면 손익분기 기준으로 가장 먼저 쓴다
+       */
+      target_monthly_remaining?: number | null;
     };
   };
   responses: never;
@@ -831,6 +1223,68 @@ export interface operations {
     requestBody: {
       content: {
         'application/json': components['schemas']['ConfirmRequest'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SessionResponse'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Unprocessable Content */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Internal Server Error */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  recalculate_sessions__session_id__recalculate_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        session_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['RecalculateRequest'];
       };
     };
     responses: {
