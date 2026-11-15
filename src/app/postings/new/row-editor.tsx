@@ -1,17 +1,16 @@
 import type { ReactNode } from 'react';
 import { Input } from '@/components/ui/input';
 import {
-  MAX_KRW,
   MAX_MONTHS,
   MAX_PERCENT,
   badgeFor,
   formatWon,
   parseCount,
-  parseWon,
   salaryText,
   type Cell,
   type Row,
 } from './format';
+import { CONTROL_CLASS, MoneyInput } from './money-input';
 
 // 비교표 한 행(공고 1건)을 보여 주고 고치는 부품.
 // 칸마다 값 + 배지(확인/추정/입력/공고에 없음) + 공고 원문 조각을 함께 보여 준다.
@@ -325,8 +324,7 @@ function FieldRow({
   const badge = badgeFor(cell);
   const hintId = `${id}-hint`;
   const unit = UNITS[field.kind];
-  const control =
-    'h-11 w-full min-w-0 rounded-md border border-input bg-card px-3 text-base focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-solid focus-visible:outline-ring';
+  const control = CONTROL_CLASS;
   let input: ReactNode;
   let hint: string | null = null;
 
@@ -347,22 +345,13 @@ function FieldRow({
       const value = cell.value as number | null | undefined;
       hint = value != null ? formatWon(value) : null;
       input = (
-        <div className="unit-input">
-          <Input
-            id={id}
-            inputMode="numeric"
-            value={value != null ? value.toLocaleString('ko-KR') : ''}
-            placeholder={`예: ${field.example}`}
-            onChange={(event) => {
-              const next = parseWon(event.target.value);
-              if (next != null && next > MAX_KRW) return; // 1조 원이 넘는 값은 받지 않는다
-              onChange(next);
-            }}
-            className={control}
-            aria-describedby={hintId}
-          />
-          <span aria-hidden>원</span>
-        </div>
+        <MoneyInput
+          id={id}
+          value={value}
+          onChange={onChange}
+          example={field.example}
+          describedBy={hintId}
+        />
       );
       break;
     }

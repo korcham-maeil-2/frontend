@@ -85,15 +85,28 @@ export function salaryText(row: Row): string {
 
 const SMALL_UNITS: Record<string, number> = { 천: 1_000, 백: 100, 십: 10 };
 const BIG_UNITS: Record<string, number> = { 만: 10_000, 억: 100_000_000 };
+// 한글로 쓴 숫자 ('이천오백만'의 이·오)
+const HANGUL_DIGITS: Record<string, number> = {
+  일: 1,
+  이: 2,
+  삼: 3,
+  사: 4,
+  오: 5,
+  육: 6,
+  칠: 7,
+  팔: 8,
+  구: 9,
+};
 
 /**
- * 금액 입력을 원 단위로 읽는다. 한글 단위도 알아듣는다.
- * '36,000,000' → 36000000, '3600만' → 36000000, '1억 2천만원' → 120000000, '20만원' → 200000
- * 숫자가 하나도 없으면 null.
+ * 금액 입력을 원 단위로 읽는다. 한글 단위와 한글 숫자도 알아듣는다.
+ * '36,000,000' → 36000000, '3600만' → 36000000, '1억 2천만원' → 120000000, '20만원' → 200000,
+ * '이천오백만' → 25000000, '삼천육백만원' → 36000000, '천만' → 10000000, '만원' → 10000
+ * 숫자도 한글 숫자·단위도 없으면 null.
  */
 export function parseWon(text: string): number | null {
   const s = text.replace(/[\s,]/g, '');
-  if (!/\d/.test(s)) return null;
+  if (!/[\d일이삼사오육칠팔구십백천만억]/.test(s)) return null;
   let total = 0; // 만·억 단위로 끝난 부분
   let section = 0; // 아직 만·억을 만나지 않은 부분 (천·백·십·맨숫자)
   let digits = '';
@@ -102,11 +115,19 @@ export function parseWon(text: string): number | null {
       digits += ch;
       continue;
     }
-    const x = digits ? Number(digits) : 0;
+    if (ch in HANGUL_DIGITS) {
+      // 한글 숫자는 한 자리씩 온다 ('이천' → 2 × 천). 바로 뒤의 천·백·십·만·억이 곱한다.
+      digits = String(HANGUL_DIGITS[ch]);
+      continue;
+    }
+    const hadNumber = digits !== '';
+    const x = hadNumber ? Number(digits) : 0;
     digits = '';
-    if (ch in SMALL_UNITS) section += (x || 1) * SMALL_UNITS[ch];
+    if (ch in SMALL_UNITS) section += (hadNumber ? x : 1) * SMALL_UNITS[ch];
     else if (ch in BIG_UNITS) {
-      total += (section + x) * BIG_UNITS[ch];
+      // 앞에 아무 수도 없으면 1로 읽는다 ('만원' = 1만 원). '0만'은 0이다.
+      const amount = section + x || (hadNumber || section ? 0 : 1);
+      total += amount * BIG_UNITS[ch];
       section = 0;
     } else section += x; // '원' 등 단위가 아닌 글자
   }

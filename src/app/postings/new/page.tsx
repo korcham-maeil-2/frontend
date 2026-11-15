@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import {
   ArrowLeft,
   ArrowRight,
+  Calculator,
   Check,
   ClipboardPaste,
   FileText,
@@ -21,7 +22,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { api, getHealth } from '@/lib/api/client';
 import type { components } from '@/lib/api/schema';
 import { examplePostings } from './examples';
-import { cellsOf, hasSalary, isImageRead, salaryText, type Row } from './format';
+import { cellsOf, hasSalary, isImageRead, type Row } from './format';
 import { MAX_MESSAGE_CHARS } from './limits';
 import {
   AttachmentList,
@@ -30,15 +31,60 @@ import {
   fileSignature,
   usePostingFiles,
 } from './posting-files';
+import {
+  EMPTY_PROFILE,
+  missingInputs,
+  toUserProfile,
+  type ProfileForm,
+  type UserProfile,
+} from './profile';
+import { ProfileFormView } from './profile-form';
+import { ResultView, isCalculationResult } from './result-view';
 import { RowEditor, fieldId, focusField } from './row-editor';
 
-// 공고 넣기 → (백엔드가 Claude로 비교표를 만듦) → 조건 확인·수정 → 확인 완료
+// 공고 넣기 → (백엔드가 Claude로 비교표를 만듦) → 조건 확인·수정 → 내 생활비 → 매달 남는 돈
 //   1) POST /sessions                 공고 글을 보내면 비교표(table)를 돌려받는다
 //      POST /sessions/uploads         파일이 있으면 파일(+ 붙여 넣은 글)을 multipart로 보낸다
 //   2) 사용자가 칸을 확인·수정한다       고친 칸은 status가 user_input이 된다
-//   3) POST /sessions/{id}/confirm    고친 비교표를 보내면 다음 단계(계산)로 넘어간다
+//   3) 사용자가 생활비를 넣는다          (서버로 보내지 않고 화면에만 들고 있다)
+//   4) POST /sessions/{id}/confirm      고친 비교표 + 생활비를 보내면 계산 결과(result)를 돌려받는다
+//      POST /sessions/{id}/recalculate  결과를 본 뒤 생활비·비교표를 고치면 계산만 다시 한다 (AI 호출 없음)
 
-type Step = 'input' | 'review' | 'done';
+type Step = 'input' | 'review' | 'living' | 'result';
+type CalculationResult = components['schemas']['CalculationResult'];
+type SessionResponse = components['schemas']['SessionResponse'];
+
+// 화면과 서버의 세션 상태가 어긋났을 때 서버가 주는 답 (새로고침·응답 유실, 서버를 새로 띄움 등)
+const ALREADY_CONFIRMED = 'SESSION_NOT_AWAITING_CONFIRMATION'; // 서버는 이미 확인을 마침 → 다시 계산으로
+const SESSION_LOST = new Set(['SESSION_NOT_FOUND', 'SESSION_NOT_COMPLETED']); // → 새 세션으로
+const errorCode = (error: unknown) => (error as { code?: string } | undefined)?.code ?? '';
+
+/**
+ * 내 생활비 칸에서 엔터: 계산하지 않고 다음 칸으로 간다.
+ * 엔터를 '이 칸 입력 끝'으로 누르는 습관 때문에, 빈칸이 남은 채로 계산되지 않게 한다.
+ * 한글을 조합하는 중의 엔터(글자 확정)는 건드리지 않는다 (keyCode 229: 조합 중을 알리는 값, Safari 대비).
+ * 마지막 칸에서는 '계산하기' 버튼으로 간다 — 계산은 그 버튼을 눌러야 한다.
+ */
+function enterMovesToNextField(event: KeyboardEvent<HTMLFormElement>) {
+  const target = event.target;
+  const composing = event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229;
+  if (event.key !== 'Enter' || composing || !(target instanceof HTMLInputElement)) return;
+  event.preventDefault();
+  const fields = [
+    ...event.currentTarget.querySelectorAll<HTMLElement>(
+      'input:not([type=hidden]):not(:disabled), select:not(:disabled)',
+    ),
+  ];
+  const next = fields[fields.indexOf(target) + 1];
+  (next ?? event.currentTarget.querySelector<HTMLElement>('button[type=submit]'))?.focus();
+}
+
+const STEPS: { key: Step; label: string }[] = [
+  { key: 'input', label: '공고 넣기' },
+  { key: 'review', label: '조건 확인' },
+  { key: 'living', label: '내 생활비' },
+  { key: 'result', label: '남는 돈' },
+];
 type SourceTab = 'text' | 'files';
 
 // 마지막으로 보낸 입력. 같은 입력으로 다시 '조건 확인하기'를 누르면 새로 읽지 않고 고치던 표로 간다.
@@ -53,11 +99,12 @@ const NOTHING_SUBMITTED: Submitted = { message: '', files: [], inputs: [], input
 // 공고 여러 개를 한 메시지로 보낼 때 사이에 넣는 구분선
 const POSTING_SEPARATOR = '\n\n---\n\n';
 const NETWORK_ERROR = '서버에 연결하지 못했어요. 잠시 후 다시 시도해 주세요.';
+const RESULT_ERROR = '계산 결과를 읽지 못했어요. 잠시 후 다시 계산해 주세요.';
 // 새로고침해도 작성·수정 중인 내용이 남도록 이 탭 안에만 저장한다 (sessionStorage).
 const DRAFT_KEY = 'wolgeup.posting-draft';
 
 type Draft = {
-  step: Step;
+  step: Step | 'done'; // 'done'은 생활비 단계 전에 저장한 초안 (읽기만 한다)
   texts: string[];
   sessionId: string;
   submitted?: Submitted;
@@ -65,7 +112,19 @@ type Draft = {
   rows: Row[];
   originalRows: Row[];
   completed: boolean;
+  profile?: ProfileForm;
+  result?: CalculationResult | null;
+  resultKey?: string;
 };
+
+/**
+ * 결과를 계산한 입력의 지문: 서버로 보낸 비교표 + 사용자 정보.
+ * 지금 입력과 다르면 결과가 낡은 것이다. (보낸 값 기준이라, 빈 고정비 줄을 넣었다 지우는 것처럼
+ * 계산에 영향 없는 화면 변화로는 결과가 사라지지 않는다)
+ */
+function inputKey(rows: Row[], profile: UserProfile) {
+  return JSON.stringify([rows, profile]);
+}
 
 function loadDraft(): Draft | null {
   try {
@@ -103,6 +162,9 @@ export default function NewPosting() {
   const [originalRows, setOriginalRows] = useState<Row[]>([]);
   // 확인을 한 번 마친 세션은 다시 확인할 수 없어서(409), 다시 고칠 때는 새 세션을 만든다.
   const [completed, setCompleted] = useState(false);
+  const [profile, setProfile] = useState<ProfileForm>(EMPTY_PROFILE);
+  const [result, setResult] = useState<CalculationResult | null>(null);
+  const [resultKey, setResultKey] = useState('');
   const [busy, setBusy] = useState<'reading' | 'confirming' | null>(null);
   const [error, setError] = useState('');
   const [salaryWarned, setSalaryWarned] = useState(false);
@@ -115,8 +177,9 @@ export default function NewPosting() {
   useEffect(() => {
     const draft = loadDraft();
     if (draft) {
+      // 생활비 단계 전에 저장한 초안('done')은 생활비 단계로 이어서 연다.
       // eslint-disable-next-line react-hooks/set-state-in-effect -- 저장소는 브라우저에만 있어서 화면이 뜬 뒤에 읽는다
-      setStep(draft.step);
+      setStep(draft.step === 'done' ? (draft.result ? 'result' : 'living') : draft.step);
       setTexts(draft.texts.length ? draft.texts : ['']);
       setSessionId(draft.sessionId);
       const last = draft.submitted ?? {
@@ -132,6 +195,9 @@ export default function NewPosting() {
       setRows(draft.rows);
       setOriginalRows(draft.originalRows);
       setCompleted(draft.completed);
+      setProfile(draft.profile ?? EMPTY_PROFILE);
+      setResult(isCalculationResult(draft.result) ? draft.result : null);
+      setResultKey(draft.resultKey ?? '');
     }
     setRestored(true);
     getHealth()
@@ -144,10 +210,33 @@ export default function NewPosting() {
   const unsaved = useRef<Draft | null>(null);
   useEffect(() => {
     if (!restored) return;
-    unsaved.current = { step, texts, sessionId, submitted, rows, originalRows, completed };
+    unsaved.current = {
+      step,
+      texts,
+      sessionId,
+      submitted,
+      rows,
+      originalRows,
+      completed,
+      profile,
+      result,
+      resultKey,
+    };
     const timer = setTimeout(() => flushDraft(unsaved), 300);
     return () => clearTimeout(timer);
-  }, [restored, step, texts, sessionId, submitted, rows, originalRows, completed]);
+  }, [
+    restored,
+    step,
+    texts,
+    sessionId,
+    submitted,
+    rows,
+    originalRows,
+    completed,
+    profile,
+    result,
+    resultKey,
+  ]);
   useEffect(() => {
     const onLeave = () => flushDraft(unsaved);
     window.addEventListener('pagehide', onLeave);
@@ -157,9 +246,9 @@ export default function NewPosting() {
     };
   }, []);
 
-  // 공고를 읽는 동안(최대 1분쯤) 탭을 닫거나 새로고침하면 결과를 잃는다 → 한 번 묻는다.
+  // 공고를 읽거나 계산하는 동안 탭을 닫거나 새로고침하면 결과를 잃는다 → 한 번 묻는다.
   useEffect(() => {
-    if (busy !== 'reading') return;
+    if (busy === null) return;
     const warn = (event: BeforeUnloadEvent) => event.preventDefault();
     window.addEventListener('beforeunload', warn);
     return () => window.removeEventListener('beforeunload', warn);
@@ -279,6 +368,10 @@ export default function NewPosting() {
       setCompleted(false);
       setRows(table);
       setOriginalRows(table);
+      // 새 표는 공고 ID(posting-1 …)가 다른 회사를 가리킬 수 있어 공고별 비용과 결과는 비운다.
+      // 지금 집 주거비·고정비처럼 공고와 관계없는 값은 그대로 둔다.
+      setProfile((form) => ({ ...form, postings: {} }));
+      setResult(null);
       changeStep('review');
     } catch {
       showError(NETWORK_ERROR, files.length ? 'files' : 'text');
@@ -291,41 +384,89 @@ export default function NewPosting() {
     .map((row, i) => ({ row, number: i + 1 }))
     .filter(({ row }) => !hasSalary(row));
 
-  async function confirmTable() {
+  function goToLiving() {
     // 연봉이 빈 공고가 있으면 한 번 알려 준다. 막지는 않는다 (연봉을 몰라도 계산 단계로 갈 수 있다).
     if (missingSalary.length && !salaryWarned) {
       setSalaryWarned(true);
       return;
     }
+    changeStep('living');
+  }
+
+  const missingProfile = missingInputs(profile, rows);
+  // 지금 보이는 결과가 지금 입력(비교표 + 생활비)으로 계산한 것인지. 고쳤으면 다시 계산해야 결과를 보여 준다.
+  const currentKey = useMemo(() => inputKey(rows, toUserProfile(profile, rows)), [rows, profile]);
+  const freshResult = result !== null && resultKey === currentKey ? result : null;
+
+  /**
+   * 매달 남는 돈 계산.
+   *   - 아직 확인 전인 세션 → POST /confirm      (비교표 + 사용자 정보)
+   *   - 확인을 마친 세션   → POST /recalculate  (비교표 + 사용자 정보, 공고를 다시 읽지 않는다)
+   * 화면과 서버의 상태가 어긋나 있으면 서버의 답에 맞춰 한 번 더 시도한다.
+   *   - '이미 확인을 마침' → 같은 세션에 /recalculate
+   *   - '세션이 없음' 등   → 같은 공고 글로 새 세션을 만들어 /confirm (공고를 다시 읽는다)
+   */
+  async function calculate() {
     setBusy('confirming');
     setError('');
-    try {
-      let id = sessionId;
-      if (completed) {
-        // 이미 확인을 마친 세션은 다시 확인할 수 없어서, 같은 공고로 새 세션을 만든 뒤 고친 표를 보낸다.
-        // 파일로 넣었으면 서버가 파일에서 읽은 글(inputText)을 쓴다: 파일을 다시 올리지 않아도 되고,
-        // 새로고침해서 첨부가 사라졌어도 된다.
-        const started = await api.POST('/sessions', {
-          body: { message: submitted.inputText || submitted.message },
-        });
-        if (started.error || !started.data) {
-          setError(started.error?.message ?? NETWORK_ERROR);
-          return;
-        }
-        id = started.data.session_id;
-        setSessionId(id);
-      }
-      const { data, error } = await api.POST('/sessions/{session_id}/confirm', {
+    const sentRows = rows;
+    const sentProfile = toUserProfile(profile, rows);
+
+    const confirm = (id: string) =>
+      api.POST('/sessions/{session_id}/confirm', {
         params: { path: { session_id: id } },
-        body: { approved: true, table: rows },
+        body: { approved: true, table: sentRows, profile: sentProfile },
       });
-      if (error || !data) {
-        setError(error?.message ?? NETWORK_ERROR);
+    const recalculate = (id: string) =>
+      api.POST('/sessions/{session_id}/recalculate', {
+        params: { path: { session_id: id } },
+        body: { table: sentRows, profile: sentProfile },
+      });
+
+    function finish(data: SessionResponse, id: string) {
+      if (!isCalculationResult(data.result)) {
+        setError(RESULT_ERROR); // 모양이 다르면(예전 백엔드 등) 그리지 않는다
         return;
       }
-      setRows(data.table ?? rows);
+      const calculatedRows = data.table?.length ? data.table : sentRows;
+      setSessionId(id);
+      setRows(calculatedRows);
       setCompleted(true);
-      changeStep('done');
+      setResult(data.result);
+      setResultKey(inputKey(calculatedRows, sentProfile));
+      changeStep('result');
+    }
+
+    try {
+      if (sessionId) {
+        let response = await (completed ? recalculate(sessionId) : confirm(sessionId));
+        if (!response.data && errorCode(response.error) === ALREADY_CONFIRMED) {
+          response = await recalculate(sessionId);
+        }
+        if (response.data) {
+          finish(response.data, sessionId);
+          return;
+        }
+        if (!SESSION_LOST.has(errorCode(response.error))) {
+          setError(response.error?.message ?? NETWORK_ERROR);
+          return;
+        }
+      }
+      // 새 세션: 파일로 넣었으면 서버가 파일에서 읽은 글(inputText)을 쓴다 (파일을 다시 올리지 않아도 된다).
+      const started = await api.POST('/sessions', {
+        body: { message: submitted.inputText || submitted.message },
+      });
+      if (started.error || !started.data) {
+        setError(started.error?.message ?? NETWORK_ERROR);
+        return;
+      }
+      const id = started.data.session_id;
+      const confirmed = await confirm(id);
+      if (confirmed.error || !confirmed.data) {
+        setError(confirmed.error?.message ?? NETWORK_ERROR);
+        return;
+      }
+      finish(confirmed.data, id);
     } catch {
       setError(NETWORK_ERROR);
     } finally {
@@ -334,6 +475,13 @@ export default function NewPosting() {
   }
 
   function startOver() {
+    // 결과까지 본 비교를 지우는 일이라 한 번 묻는다.
+    if (
+      result &&
+      !window.confirm('지금 비교를 지우고 새 공고로 시작할까요? 생활비는 그대로 둬요.')
+    ) {
+      return;
+    }
     setTexts(['']);
     setRows([]);
     setOriginalRows([]);
@@ -342,6 +490,10 @@ export default function NewPosting() {
     setFilesLost(false);
     attachments.clear();
     setCompleted(false);
+    // 지금 집 주거비·고정비는 다음 비교에도 그대로 쓴다. 공고별 비용과 결과만 비운다.
+    setProfile((form) => ({ ...form, postings: {} }));
+    setResult(null);
+    setResultKey('');
     changeStep('input');
   }
 
@@ -354,7 +506,9 @@ export default function NewPosting() {
   const hasImageCells = rows.some((row) => cellsOf(row).some(isImageRead));
   const names = (list: typeof inputs) => list.map((item) => item.name).join(', ');
 
-  const reviewing = step !== 'input';
+  // 화면에 보이는 단계. 결과 단계인데 결과가 지금 입력과 맞지 않으면(고쳤거나 예전 초안) 생활비 단계를 보여 준다.
+  const shown: Step = step === 'result' && !freshResult ? 'living' : step;
+  const reviewing = shown !== 'input';
   const demoNotice = demoMode && (
     <p className="demo-notice">
       시연 모드예요. 실제 AI 대신 미리 준비한 답을 써서 &ldquo;예시 공고 넣기&rdquo;의 공고와 시연용
@@ -366,47 +520,39 @@ export default function NewPosting() {
     <div className="desk-spread">
       <div className="desk-intro">
         <div className="desk-intro-inner">
-          <ol className="step-track" aria-label="공고 넣기 진행 단계">
-            <li aria-current={step === 'input' ? 'step' : undefined}>
-              {reviewing ? (
-                <button
-                  type="button"
-                  onClick={() => changeStep('input')}
-                  aria-label="공고 넣기 완료, 공고 넣기로 돌아가기"
-                >
-                  <span className="step-number">
-                    <Check aria-hidden />
-                  </span>
-                  공고 넣기
-                </button>
-              ) : (
-                <>
-                  <span className="step-number">1</span>공고 넣기
-                </>
-              )}
-            </li>
-            <li aria-current={step === 'review' ? 'step' : undefined}>
-              {step === 'done' ? (
-                <button
-                  type="button"
-                  onClick={() => changeStep('review')}
-                  aria-label="조건 확인 완료, 조건 다시 고치기"
-                >
-                  <span className="step-number">
-                    <Check aria-hidden />
-                  </span>
-                  조건 확인
-                </button>
-              ) : (
-                <>
-                  <span className="step-number">2</span>조건 확인
-                </>
-              )}
-            </li>
+          <ol className="step-track" aria-label="진행 단계">
+            {STEPS.map(({ key, label }, i) => {
+              const current = STEPS.findIndex((item) => item.key === shown);
+              const done = i < current;
+              // 지난 단계, 또는 계산을 마친 뒤 생활비 단계에서 결과로 돌아가기
+              const reachable = done || (key === 'result' && freshResult !== null && shown !== key);
+              return (
+                <li key={key} aria-current={shown === key ? 'step' : undefined}>
+                  {reachable ? (
+                    <button
+                      type="button"
+                      onClick={() => changeStep(key)}
+                      disabled={busy !== null}
+                      aria-label={`${label}${done ? ' 완료' : ''}, ${label} 단계로 가기`}
+                    >
+                      <span className="step-number">{done ? <Check aria-hidden /> : i + 1}</span>
+                      {label}
+                    </button>
+                  ) : (
+                    <>
+                      <span className="step-number">{i + 1}</span>
+                      {label}
+                    </>
+                  )}
+                </li>
+              );
+            })}
           </ol>
           <h1 ref={heading} tabIndex={-1} className="desk-title outline-none">
-            {step === 'done' ? (
-              '조건 확인 완료'
+            {shown === 'result' ? (
+              '매달 남는 돈'
+            ) : shown === 'living' ? (
+              '내 생활비'
             ) : reviewing ? (
               '근무 조건 확인'
             ) : (
@@ -417,11 +563,13 @@ export default function NewPosting() {
             )}
           </h1>
           <p className="intro-copy">
-            {step === 'done'
-              ? '확인한 조건은 저장했어요. 다음 단계에서 매달 남는 돈을 계산해요.'
-              : reviewing
-                ? '공고에서 읽은 값이 맞는지 확인하세요. 틀린 값은 고치고, 빠진 값은 직접 입력할 수 있어요.'
-                : '비교할 공고의 본문을 붙여 넣거나 공고 파일을 넣어 주세요. 여러 개를 함께 넣을 수 있어요.'}
+            {shown === 'result'
+              ? '세금·4대보험을 빼고, 집·교통비·고정비까지 빼면 매달 이만큼 남아요.'
+              : shown === 'living'
+                ? '공고에는 없는 내 사정을 알려 주세요. 빈칸은 계산할 수 없다고 표시하고, 지어내지 않아요.'
+                : reviewing
+                  ? '공고에서 읽은 값이 맞는지 확인하세요. 틀린 값은 고치고, 빠진 값은 직접 입력할 수 있어요.'
+                  : '비교할 공고의 본문을 붙여 넣거나 공고 파일을 넣어 주세요. 여러 개를 함께 넣을 수 있어요.'}
           </p>
           <div className="desk-illustration" aria-hidden="true">
             <Image
@@ -434,31 +582,79 @@ export default function NewPosting() {
         </div>
       </div>
 
-      {step === 'done' ? (
-        <section className="desk-sheet" aria-label="확인한 공고">
-          <h2 className="sheet-heading">확인한 공고 {rows.length}개</h2>
-          <dl className="condition-summary">
-            {rows.map((row, i) => (
-              <div key={row.id}>
-                <dt>
-                  {i + 1}. {row.company?.value || `공고 ${i + 1}`}
-                </dt>
-                <dd>{salaryText(row)}</dd>
-              </div>
-            ))}
-          </dl>
-          <p className="mt-5 rounded-lg bg-muted p-4 text-sm text-body">
-            매달 남는 돈을 계산하는 화면은 준비 중이에요.
-          </p>
-          <div className="sheet-actions">
-            <Button variant="outline" className="min-h-11" onClick={() => changeStep('review')}>
-              <Pencil aria-hidden /> 조건 다시 고치기
-            </Button>
+      {shown === 'result' && freshResult ? (
+        <section className="desk-sheet sheet-enter" aria-label="매달 남는 돈">
+          {demoNotice}
+          <h2 className="sheet-heading">공고 {rows.length}개 비교</h2>
+          <ResultView result={freshResult} rows={rows} />
+          <div className="sheet-actions flex-wrap">
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" className="min-h-11" onClick={() => changeStep('living')}>
+                <Calculator aria-hidden /> 생활비 바꾸기
+              </Button>
+              <Button variant="ghost" className="min-h-11" onClick={() => changeStep('review')}>
+                <Pencil aria-hidden /> 조건 다시 고치기
+              </Button>
+            </div>
             <Button className="main-action" onClick={startOver}>
               새로 비교하기 <ArrowRight aria-hidden />
             </Button>
           </div>
         </section>
+      ) : shown === 'living' ? (
+        <form
+          className="desk-sheet sheet-enter"
+          aria-label="내 생활비"
+          aria-busy={busy === 'confirming'}
+          onKeyDown={enterMovesToNextField}
+          onSubmit={(event) => {
+            event.preventDefault();
+            calculate();
+          }}
+        >
+          {demoNotice}
+          <h2 className="sheet-heading">공고 {rows.length}개에 필요한 값</h2>
+          {/* 계산하는 동안은 입력을 잠근다 (계산이 끝나면 보낸 값으로 화면을 맞추므로, 그사이 고친 값이 사라진다) */}
+          <fieldset disabled={busy !== null} className="min-w-0">
+            <ProfileFormView form={profile} rows={rows} onChange={setProfile} />
+          </fieldset>
+          {missingProfile.length > 0 && (
+            <div className="salary-notice mt-6">
+              <p className="font-semibold">비어 있는 값은 계산할 수 없다고 표시돼요</p>
+              <ul>
+                {missingProfile.map((item) => (
+                  <li key={item.fieldId}>
+                    <button
+                      type="button"
+                      className="question-link"
+                      onClick={() => focusField(item.fieldId)}
+                    >
+                      {item.label}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <p role="alert" className="form-hint">
+            {error}
+          </p>
+          <div className="sheet-actions">
+            <Button
+              type="button"
+              variant="ghost"
+              className="min-h-11"
+              disabled={busy !== null}
+              onClick={() => changeStep('review')}
+            >
+              <ArrowLeft aria-hidden /> 조건 확인으로
+            </Button>
+            <Button type="submit" className="main-action" disabled={busy !== null}>
+              {busy === 'confirming' ? '계산하는 중…' : '매달 남는 돈 계산하기'}{' '}
+              <Calculator aria-hidden />
+            </Button>
+          </div>
+        </form>
       ) : reviewing ? (
         <section className="desk-sheet sheet-enter" aria-label="공고 조건 확인">
           {demoNotice}
@@ -538,15 +734,13 @@ export default function NewPosting() {
             <Button variant="ghost" className="min-h-11" onClick={() => changeStep('input')}>
               <ArrowLeft aria-hidden /> 공고 넣기로
             </Button>
-            <Button className="main-action" disabled={busy !== null} onClick={confirmTable}>
-              {busy === 'confirming'
-                ? '확인하는 중…'
-                : salaryWarned && missingSalary.length
-                  ? '연봉 없이 확인 완료'
-                  : edited
-                    ? '고친 내용으로 확인 완료'
-                    : '이대로 확인 완료'}{' '}
-              <Check aria-hidden />
+            <Button className="main-action" disabled={busy !== null} onClick={goToLiving}>
+              {salaryWarned && missingSalary.length
+                ? '연봉 없이 다음으로'
+                : edited
+                  ? '고친 내용으로 다음'
+                  : '이대로 다음'}{' '}
+              <ArrowRight aria-hidden />
             </Button>
           </div>
         </section>
