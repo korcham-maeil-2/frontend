@@ -990,16 +990,6 @@ export interface components {
        */
       matched: number;
       /**
-       * Past
-       * @description 신청이 끝난 지역 정책 (지난 일정 참고, 해마다 여는 사업이 많다)
-       */
-      past: components['schemas']['SupportPolicy'][];
-      /**
-       * Past Matched
-       * @description 신청이 끝난 지역 정책 수
-       */
-      past_matched: number;
-      /**
        * Error
        * @description 조회하지 못한 이유 (해요체)
        */
@@ -1213,10 +1203,10 @@ export interface components {
       fit: 'moving' | 'general' | 'targeted';
       /**
        * Apply Status
-       * @description open=신청 기간 중, always=상시, upcoming=곧 시작, unknown=기간을 모름, ended=신청이 끝남 (끝난 지 1년 안 된 지역 정책만. 해마다 여는 사업인지 확인)
+       * @description open=신청 기간 중, always=상시, upcoming=곧 시작, unknown=기간을 모름 (끝난 정책은 담지 않는다)
        * @enum {string}
        */
-      apply_status: 'open' | 'always' | 'upcoming' | 'unknown' | 'ended';
+      apply_status: 'open' | 'always' | 'upcoming' | 'unknown';
       /**
        * Apply Period
        * @description 신청 기간 (예: '2026-04-01 ~ 2026-11-30')

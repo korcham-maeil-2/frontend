@@ -40,6 +40,7 @@ import {
 import { ProfileFormView } from './profile-form';
 import { PostingTabs, companyName } from './posting-tabs';
 import { ResultView, bestRemainingText, isCalculationResult } from './result-view';
+import { SupportView, isLocalSupport } from './support-view';
 import { RowEditor, fieldsToCheck, focusField } from './row-editor';
 
 // 공고 넣기 → (백엔드가 Claude로 비교표를 만듦) → 조건 확인·수정 → 내 생활비 → 매달 남는 돈
@@ -52,6 +53,7 @@ import { RowEditor, fieldsToCheck, focusField } from './row-editor';
 
 type Step = 'input' | 'review' | 'living' | 'result';
 type CalculationResult = components['schemas']['CalculationResult'];
+type LocalSupport = components['schemas']['LocalSupport'];
 type SessionResponse = components['schemas']['SessionResponse'];
 
 // 화면과 서버의 세션 상태가 어긋났을 때 서버가 주는 답 (새로고침·응답 유실, 서버를 새로 띄움 등)
@@ -103,6 +105,11 @@ const RESULT_ERROR = '계산 결과를 읽지 못했어요. 잠시 후 다시 �
 // 새로고침해도 작성·수정 중인 내용이 남도록 이 탭 안에만 저장한다 (sessionStorage).
 const DRAFT_KEY = 'wolgeup.posting-draft';
 
+/** 한국 날짜 'YYYY-MM-DD' (청년 지원 목록의 조회한 날과 비교한다) */
+function todayInKorea(): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(new Date());
+}
+
 type Draft = {
   step: Step | 'done'; // 'done'은 생활비 단계 전에 저장한 초안 (읽기만 한다)
   texts: string[];
@@ -114,6 +121,7 @@ type Draft = {
   completed: boolean;
   profile?: ProfileForm;
   result?: CalculationResult | null;
+  support?: LocalSupport | null; // 근무지별 청년 지원 (계산 결과와 같이 받는다)
   resultKey?: string;
   activePosting?: string;
   seenPostings?: string[];
@@ -166,6 +174,7 @@ export default function NewPosting() {
   const [completed, setCompleted] = useState(false);
   const [profile, setProfile] = useState<ProfileForm>(EMPTY_PROFILE);
   const [result, setResult] = useState<CalculationResult | null>(null);
+  const [support, setSupport] = useState<LocalSupport | null>(null);
   const [resultKey, setResultKey] = useState('');
   const [busy, setBusy] = useState<'reading' | 'confirming' | null>(null);
   const [error, setError] = useState('');
@@ -177,6 +186,8 @@ export default function NewPosting() {
   // 다른 회사 탭의 칸으로 갈 때, 탭이 바뀌어 그 칸이 그려진 뒤 커서를 옮길 칸
   const pendingFocus = useRef<string | null>(null);
   const [demoMode, setDemoMode] = useState(false);
+  // 서버가 청년 지원을 찾을 수 있는지 (온통청년 키). 아니면 나이 칸을 숨긴다 (나이는 그것에만 쓴다)
+  const [supportEnabled, setSupportEnabled] = useState(false);
   const [restored, setRestored] = useState(false);
   const heading = useRef<HTMLHeadingElement>(null);
   const firstTextarea = useRef<HTMLTextAreaElement>(null);
@@ -205,14 +216,28 @@ export default function NewPosting() {
       setCompleted(draft.completed);
       setProfile(draft.profile ?? EMPTY_PROFILE);
       setResult(isCalculationResult(draft.result) ? draft.result : null);
+      setSupport(isLocalSupport(draft.support) ? draft.support : null);
       setResultKey(draft.resultKey ?? '');
       setActivePosting(draft.activePosting ?? '');
       setSeenPostings(draft.seenPostings ?? draft.rows.map((row) => row.id));
     }
     setRestored(true);
+    // 서버가 막 깨어나는 중이면 첫 확인이 실패할 수 있어 한 번 더 묻는다 (나이 칸·시연 표시가 빠지지 않게)
+    const applyHealth = (health: Awaited<ReturnType<typeof getHealth>>) => {
+      setDemoMode(health?.normalize_mode === 'fixture');
+      setSupportEnabled(health?.local_support === true);
+    };
     getHealth()
-      .then((health) => setDemoMode(health?.normalize_mode === 'fixture'))
-      .catch(() => {});
+      .then(applyHealth)
+      .catch(() => {
+        setTimeout(
+          () =>
+            getHealth()
+              .then(applyHealth)
+              .catch(() => {}),
+          3000,
+        );
+      });
   }, []);
 
   // 글자를 칠 때마다 저장하지 않고, 입력이 0.3초 멈추면 한 번 저장한다 (긴 글을 매번 저장하면 느리다).
@@ -230,6 +255,7 @@ export default function NewPosting() {
       completed,
       profile,
       result,
+      support,
       resultKey,
       activePosting,
       seenPostings,
@@ -247,6 +273,7 @@ export default function NewPosting() {
     completed,
     profile,
     result,
+    support,
     resultKey,
     activePosting,
     seenPostings,
@@ -388,6 +415,7 @@ export default function NewPosting() {
       // 지금 집 주거비·고정비처럼 공고와 관계없는 값은 그대로 둔다.
       setProfile((form) => ({ ...form, postings: {} }));
       setResult(null);
+      setSupport(null);
       // 새 표: 첫 공고를 고르고 그것만 '본 것'으로 (예전 표에서 연 탭 기록은 버린다)
       setActivePosting(table[0].id);
       setSeenPostings([table[0].id]);
@@ -510,6 +538,8 @@ export default function NewPosting() {
       setRows(calculatedRows);
       setCompleted(true);
       setResult(data.result);
+      // 청년 지원은 키가 없거나 예전 백엔드면 오지 않는다 → 없으면 그 영역만 안 그린다
+      setSupport(isLocalSupport(data.local_support) ? data.local_support : null);
       setResultKey(inputKey(calculatedRows, sentProfile));
       changeStep('result');
     }
@@ -570,6 +600,7 @@ export default function NewPosting() {
     // 지금 집 주거비·고정비는 다음 비교에도 그대로 쓴다. 공고별 비용과 결과만 비운다.
     setProfile((form) => ({ ...form, postings: {} }));
     setResult(null);
+    setSupport(null);
     setResultKey('');
     setActivePosting('');
     setSeenPostings([]);
@@ -587,6 +618,27 @@ export default function NewPosting() {
 
   // 화면에 보이는 단계. 결과 단계인데 결과가 지금 입력과 맞지 않으면(고쳤거나 예전 초안) 생활비 단계를 보여 준다.
   const shown: Step = step === 'result' && !freshResult ? 'living' : step;
+
+  // 결과 화면을 열 때, 청년 지원이 오늘 기준이 아니면(며칠 전에 계산) 오늘 날짜로 다시 고른다.
+  // 저장된 목록은 계산한 날 기준이라 '신청 중'이던 정책이 그새 끝났을 수 있다. 다시 고른 것은
+  // 저장된 계산 결과를 바꾸지 않는다 (GET /sessions/{id}/local-support는 보기만 한다).
+  const showingResult = shown === 'result' && sessionId !== '';
+  const supportDate = support?.checked_on;
+  useEffect(() => {
+    if (!showingResult || !supportDate || supportDate === todayInKorea()) return;
+    let cancelled = false;
+    api
+      .GET('/sessions/{session_id}/local-support', {
+        params: { path: { session_id: sessionId } },
+      })
+      .then(({ data }) => {
+        if (!cancelled && data !== undefined) setSupport(isLocalSupport(data) ? data : null);
+      })
+      .catch(() => {}); // 못 받아 오면 저장된 목록을 그대로 보여 준다
+    return () => {
+      cancelled = true;
+    };
+  }, [showingResult, sessionId, supportDate]);
   const reviewing = shown !== 'input';
   const shownIndex = STEPS.findIndex((item) => item.key === shown);
   // 단계마다 지금까지 넣은 것을 한 줄로 (넓은 화면의 단계 표시 아래)
@@ -686,6 +738,7 @@ export default function NewPosting() {
           {demoNotice}
           <h2 className="sheet-heading">공고 {rows.length}개 비교</h2>
           <ResultView result={freshResult} rows={rows} />
+          {support && <SupportView support={support} rows={rows} />}
           <div className="sheet-actions flex-wrap">
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" className="min-h-11" onClick={() => changeStep('living')}>
@@ -722,6 +775,7 @@ export default function NewPosting() {
               activeId={activeId}
               onSelectPosting={selectPosting}
               missingFor={(row) => missingProfile.filter((item) => item.rowId === row.id)}
+              askAge={supportEnabled}
             />
           </fieldset>
           {missingProfile.length > 0 && (
