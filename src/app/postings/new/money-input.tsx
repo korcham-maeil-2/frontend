@@ -42,6 +42,12 @@ export function MoneyInput({
         placeholder={`예: ${example}`}
         onFocus={() => setTyping(formatted(value))}
         onBlur={() => setTyping(null)}
+        // 엔터를 '입력 끝'으로 누르는 사람이 많다 → 칸을 떠나지 않아도 '100,000'처럼 정리해 보여 준다.
+        // keydown이 아니라 keyup: 한글 입력기는 엔터로 조합 중인 글자('만')를 먼저 확정하므로,
+        // 확정된 글자가 값에 들어간 뒤(키에서 손을 뗄 때) 정리해야 마지막 글자가 빠지지 않는다.
+        onKeyUp={(event) => {
+          if (event.key === 'Enter') setTyping(null);
+        }}
         onChange={(event) => {
           const text = event.target.value;
           const next = parseWon(text);
