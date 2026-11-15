@@ -82,6 +82,18 @@ export function MoneyInput({
         // 엔터를 '입력 끝'으로 누르는 사람이 많다 → 칸을 떠나지 않아도 '100,000'처럼 정리해 보여 준다.
         // keydown이 아니라 keyup: 한글 입력기는 엔터로 조합 중인 글자('만')를 먼저 확정하므로,
         // 확정된 글자가 값에 들어간 뒤(키에서 손을 뗄 때) 정리해야 마지막 글자가 빠지지 않는다.
+        // 쉼표 바로 뒤에서 백스페이스(앞에서 Delete)를 누르면 쉼표만 지워졌다가 다시 붙어서
+        // 커서만 움직이고 숫자는 그대로였다 → 커서를 쉼표 너머로 옮겨 숫자가 지워지게 한다.
+        onKeyDown={(event) => {
+          const input = event.currentTarget;
+          const at = input.selectionStart;
+          if (at == null || at !== input.selectionEnd) return;
+          if (event.key === 'Backspace' && input.value[at - 1] === ',') {
+            input.setSelectionRange(at - 1, at - 1);
+          } else if (event.key === 'Delete' && input.value[at] === ',') {
+            input.setSelectionRange(at + 1, at + 1);
+          }
+        }}
         onKeyUp={(event) => {
           if (event.key === 'Enter') setTyping(null);
         }}
