@@ -386,8 +386,13 @@ export interface components {
       /** @description 연장·야간근무 관련 메모 */
       overtime?: components['schemas']['TextCell'];
       /**
-       * Questions To Ask
+       * Questions
        * @description 계산에 필요한데 공고에 없어 사용자에게 물어볼 것 (코드가 빈칸을 보고 만든다)
+       */
+      questions?: components['schemas']['Question'][];
+      /**
+       * Questions To Ask
+       * @description questions의 문장만 (예전 모양, questions를 쓰세요)
        */
       questions_to_ask?: string[];
     };
@@ -530,7 +535,7 @@ export interface components {
     };
     /**
      * FixedExpense
-     * @description 기타 고정비 한 줄 (학자금 상환, 통신비 등).
+     * @description 고정비 한 줄 (학자금 상환, 통신비 등).
      */
     FixedExpense: {
       /** Name */
@@ -784,6 +789,22 @@ export interface components {
       scenarios: components['schemas']['Scenario'][];
       /** Notes */
       notes: string[];
+    };
+    /**
+     * Question
+     * @description 물어볼 것 하나. 화면이 문장을 보고 칸을 추측하지 않게, 어느 칸 질문인지 함께 준다.
+     */
+    Question: {
+      /**
+       * Text
+       * @description 화면에 보여 줄 문장
+       */
+      text: string;
+      /**
+       * Fields
+       * @description 이 질문이 가리키는 칸 이름 (예: annual_salary_krw, location, other_allowances.0). 비어 있으면 칸이 없는 질문 (예: 연장근로 시간)
+       */
+      fields?: string[];
     };
     /** RateCell */
     RateCell: {

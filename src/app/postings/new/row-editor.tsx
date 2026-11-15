@@ -139,19 +139,6 @@ function labelOf(row: Row, field: Field) {
   return field.label;
 }
 
-/** '확인이 필요한 것' 문장 → 고칠 칸. 칸이 없는 질문(예: 연장근로 시간)은 null */
-function questionTarget(row: Row, question: string): CellKey | 'location' | null {
-  if (question.startsWith('제시받은 연봉') || question.startsWith('연봉 금액')) {
-    return row.salary_type?.value === 'monthly' ? 'monthly_salary_krw' : 'annual_salary_krw';
-  }
-  if (question.startsWith('월급 금액')) return 'monthly_salary_krw';
-  if (question.startsWith('수습 기간 급여')) return 'probation_pay_rate';
-  if (question.startsWith('식대가')) return 'meal_allowance_in_salary';
-  if (question.startsWith('주거지원비 지원 기간')) return 'housing_allowance_months';
-  if (question.startsWith('근무지')) return 'location';
-  return null;
-}
-
 function cellOf(row: Row, key: CellKey | 'location'): Cell {
   return (row[key] as Cell | undefined) ?? { status: 'missing' };
 }
@@ -212,23 +199,47 @@ export function fieldsToCheck(row: Row): string[] {
     .map(({ id }) => id);
 }
 
+type Question = { text: string; fields: string[] };
+
+/** 서버의 칸 이름 → 이 화면의 칸 (기타 수당은 'other_allowances.0' → id 'other-0') */
+function questionField(row: Row, field: string): { id: string; cell: Cell } {
+  const allowance = /^other_allowances\.(\d+)$/.exec(field);
+  if (allowance) {
+    const i = Number(allowance[1]);
+    return {
+      id: fieldId(row, `other-${i}`),
+      cell: row.other_allowances?.[i]?.monthly_krw ?? { status: 'missing' },
+    };
+  }
+  return { id: fieldId(row, field), cell: cellOf(row, field as CellKey) };
+}
+
 /**
- * 아직 남은 '확인이 필요한 것'. 서버 목록은 처음 읽을 때 만든 그대로라, 고칠 칸이 있는 질문은
- * 그 칸 문제가 풀리면 뺀다 (탭의 '확인 끝'과 어긋나지 않게).
- *   - '원문과 맞는지 …': 추정·이미지에서 읽은 칸이 하나라도 남았을 때만
- *   - 근무지: 시·군·구 코드(lawd_cd)를 정했을 때 풀린 것으로 본다 (글자만 있으면 아직)
- *   - 그 밖에 칸이 있는 질문: 칸이 채워지고 다시 볼 필요가 없을 때
+ * 아직 남은 '확인이 필요한 것'. 서버 목록은 처음 읽을 때 만든 그대로라, 질문이 가리키는 칸
+ * (서버가 질문마다 fields로 알려 준다)의 문제가 풀리면 뺀다 → 탭의 '확인 끝'과 어긋나지 않는다.
+ *   - 근무지: 시·군·구 코드(lawd_cd)를 정해야 풀린다 (글자만 있으면 아직)
+ *   - 그 밖: 가리키는 칸 중 하나라도 비었거나 다시 볼 칸(추정·이미지에서 읽음)이면 남는다
  *   - 칸이 없는 질문(예: 연장근로 시간)은 계속 보여 준다
+ * 누르면 갈 칸(target)은 아직 문제가 있는 첫 칸.
  */
-function openQuestions(row: Row): string[] {
-  const anyToCheck = visibleCells(row).some(({ cell }) => needsCheck(cell));
-  return (row.questions_to_ask ?? []).filter((question) => {
-    if (question.startsWith('원문과 맞는지')) return anyToCheck;
-    const target = questionTarget(row, question);
-    if (!target) return true;
-    if (target === 'location') return !row.location?.value?.lawd_cd;
-    const cell = cellOf(row, target);
-    return cell.value == null || needsCheck(cell);
+type OpenQuestion = Question & { target: string | null };
+
+function openQuestions(row: Row): OpenQuestion[] {
+  // 예전 백엔드는 문장만 준다 → 칸 없는 질문으로 다룬다
+  const questions: Question[] =
+    row.questions?.map((q) => ({ text: q.text, fields: q.fields ?? [] })) ??
+    (row.questions_to_ask ?? []).map((text) => ({ text, fields: [] }));
+  return questions.flatMap<OpenQuestion>((question) => {
+    if (!question.fields.length) return [{ ...question, target: null }];
+    if (question.fields.includes('location')) {
+      return row.location?.value?.lawd_cd
+        ? []
+        : [{ ...question, target: fieldId(row, 'location') }];
+    }
+    const open = question.fields
+      .map((field) => questionField(row, field))
+      .find(({ cell }) => cell.value == null || needsCheck(cell));
+    return open ? [{ ...question, target: open.id }] : [];
   });
 }
 
@@ -329,24 +340,21 @@ export function RowEditor({
           <div className="row-questions">
             <p className="font-semibold">확인이 필요한 것</p>
             <ul>
-              {questions.map((question) => {
-                const target = questionTarget(row, question);
-                return (
-                  <li key={question}>
-                    {target ? (
-                      <button
-                        type="button"
-                        className="question-link"
-                        onClick={() => focusField(fieldId(row, target))}
-                      >
-                        {question}
-                      </button>
-                    ) : (
-                      question
-                    )}
-                  </li>
-                );
-              })}
+              {questions.map(({ text, target }) => (
+                <li key={text}>
+                  {target ? (
+                    <button
+                      type="button"
+                      className="question-link"
+                      onClick={() => focusField(target)}
+                    >
+                      {text}
+                    </button>
+                  ) : (
+                    text
+                  )}
+                </li>
+              ))}
             </ul>
           </div>
         )}
