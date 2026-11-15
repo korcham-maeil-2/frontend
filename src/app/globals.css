@@ -819,6 +819,10 @@ section.desk-sheet > .sheet-heading {
   align-items: center;
   gap: 0.5rem;
 }
+.fixed-expense-hint {
+  grid-column: 2;
+  margin-top: -0.25rem;
+}
 
 /* ── 결과 단계 (result-view.tsx) ── */
 /* 랜딩 비교표는 두 열 고정이라, 공고 수만큼 열이 나눠 갖게 한다 */

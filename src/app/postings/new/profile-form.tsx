@@ -277,6 +277,12 @@ export function ProfileFormView({
               >
                 <X aria-hidden />
               </Button>
+              {/* 친 금액을 한글 단위로 (다른 금액 칸의 안내 글씨와 같은 모양) */}
+              {item.amount != null && (
+                <p className="row-field-hint fixed-expense-hint">
+                  <span className="text-foreground">{formatWon(item.amount)}</span>
+                </p>
+              )}
             </li>
           ))}
         </ul>
