@@ -494,6 +494,9 @@ details[open] > summary .when-closed {
   color: var(--body);
 }
 .row-field {
+  /* 단위 글자 폭('개월'까지 들어감)과, 입력칸과 단위 사이 간격(.unit-input의 gap)을 더한 자리 */
+  --unit-width: 2.25rem;
+  --unit-slot: calc(var(--unit-width) + 0.5rem);
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
@@ -519,6 +522,14 @@ details[open] > summary .when-closed {
   background-repeat: no-repeat;
   background-position: right 1rem center;
   background-size: 1rem;
+}
+/* 단위(원·개월·%)가 없는 칸도 단위 자리만큼 비워, 모든 입력칸의 오른쪽 끝을 맞춘다 */
+.row-field > :is(input, select) {
+  width: calc(100% - var(--unit-slot));
+}
+/* 내 생활비 화면의 단위는 '원'뿐이라, 단위 자리를 '원' 폭에 맞춰 오른쪽 빈 곳을 없앤다 */
+.profile-field {
+  --unit-width: 0.875rem;
 }
 .row-field-hint {
   grid-column: 1 / -1;
@@ -548,7 +559,8 @@ details[open] > summary .when-closed {
   font-variant-numeric: tabular-nums;
 }
 .unit-input span {
-  min-width: 2rem;
+  flex: none;
+  width: var(--unit-width);
   font-size: 0.875rem;
   color: var(--body);
 }
