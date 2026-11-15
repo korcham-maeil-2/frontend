@@ -172,43 +172,61 @@ function needsCheck(cell: Cell) {
   return cell.status === 'estimated' || isImageRead(cell);
 }
 
-/**
- * 이 공고에서 다시 볼 칸의 id (화면 순서). 회사 탭의 'n개 남음'과 '첫 칸으로 이동'에 쓴다.
- * 서버가 준 질문 목록이 아니라 지금 칸 상태로 센다 → 고치면 바로 줄어든다.
- * 화면에 보이는 칸만 센다 (연봉 공고의 숨은 월급 칸 등은 빼고).
- * 연봉·월급이라고 했는데 금액이 비었으면 그 칸도 넣는다 (계산에 꼭 필요).
- */
-export function fieldsToCheck(row: Row): string[] {
-  const ids: string[] = [];
-  const type = row.salary_type?.value;
+/** 화면에 보이는 칸 전부 (화면 순서): 숨은 칸(연봉 공고의 월급 칸 등)은 빼고, 기타 수당은 급여 뒤에 */
+function visibleCells(row: Row): { id: string; key: CellKey | 'location' | null; cell: Cell }[] {
+  const cells: { id: string; key: CellKey | 'location' | null; cell: Cell }[] = [];
   for (const group of groups) {
     for (const field of group.fields) {
-      if (hidden(row, field.key)) continue;
-      const cell = cellOf(row, field.key);
-      const isAmount = field.key === 'annual_salary_krw' || field.key === 'monthly_salary_krw';
-      const emptyAmount =
-        isAmount && cell.value == null && (type === 'annual' || type === 'monthly');
-      if (needsCheck(cell) || emptyAmount) ids.push(fieldId(row, field.key));
+      if (!hidden(row, field.key)) {
+        cells.push({ id: fieldId(row, field.key), key: field.key, cell: cellOf(row, field.key) });
+      }
     }
     if (group.title === '급여') {
       row.other_allowances?.forEach((allowance, i) => {
-        if (needsCheck(allowance.monthly_krw)) ids.push(fieldId(row, `other-${i}`));
+        cells.push({ id: fieldId(row, `other-${i}`), key: null, cell: allowance.monthly_krw });
       });
     }
   }
-  return ids;
+  return cells;
+}
+
+/** 금액을 받아야 하는 급여인지: 연봉 비공개·희망 연봉 질문만 빼고 (급여 종류를 못 읽은 경우도 받아야 한다) */
+function expectsAmount(row: Row) {
+  const type = row.salary_type?.value;
+  return type !== 'undisclosed' && type !== 'to_propose';
+}
+
+/**
+ * 이 공고에서 다시 볼 칸의 id (화면 순서). 회사 탭의 'n개 남음'과 '첫 칸으로 이동'에 쓴다.
+ * 서버가 준 질문 목록이 아니라 지금 칸 상태로 센다 → 고치면 바로 줄어든다.
+ *   - 추정·이미지에서 읽은 칸 (고치거나 '맞아요'를 누르면 빠진다)
+ *   - 금액을 받아야 하는데 비어 있는 급여 칸 (계산에 꼭 필요. 연봉 비공개는 빼고)
+ */
+export function fieldsToCheck(row: Row): string[] {
+  const amountKeys = new Set(['annual_salary_krw', 'monthly_salary_krw']);
+  return visibleCells(row)
+    .filter(({ key, cell }) => {
+      const emptyAmount = key !== null && amountKeys.has(key) && cell.value == null;
+      return needsCheck(cell) || (emptyAmount && expectsAmount(row));
+    })
+    .map(({ id }) => id);
 }
 
 /**
  * 아직 남은 '확인이 필요한 것'. 서버 목록은 처음 읽을 때 만든 그대로라, 고칠 칸이 있는 질문은
- * 그 칸이 채워지고 다시 볼 필요가 없어지면 뺀다 (탭의 '확인 끝'과 어긋나지 않게).
- * 칸이 없는 질문(예: 연장근로 시간)은 계속 보여 준다.
+ * 그 칸 문제가 풀리면 뺀다 (탭의 '확인 끝'과 어긋나지 않게).
+ *   - '원문과 맞는지 …': 추정·이미지에서 읽은 칸이 하나라도 남았을 때만
+ *   - 근무지: 시·군·구 코드(lawd_cd)를 정했을 때 풀린 것으로 본다 (글자만 있으면 아직)
+ *   - 그 밖에 칸이 있는 질문: 칸이 채워지고 다시 볼 필요가 없을 때
+ *   - 칸이 없는 질문(예: 연장근로 시간)은 계속 보여 준다
  */
 function openQuestions(row: Row): string[] {
+  const anyToCheck = visibleCells(row).some(({ cell }) => needsCheck(cell));
   return (row.questions_to_ask ?? []).filter((question) => {
-    if (question.startsWith('원문과 맞는지')) return fieldsToCheck(row).length > 0;
+    if (question.startsWith('원문과 맞는지')) return anyToCheck;
     const target = questionTarget(row, question);
     if (!target) return true;
+    if (target === 'location') return !row.location?.value?.lawd_cd;
     const cell = cellOf(row, target);
     return cell.value == null || needsCheck(cell);
   });

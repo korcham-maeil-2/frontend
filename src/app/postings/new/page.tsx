@@ -268,10 +268,11 @@ export default function NewPosting() {
     return () => window.removeEventListener('beforeunload', warn);
   }, [busy]);
 
-  function changeStep(next: Step) {
+  /** 단계 바꾸기. 조건 확인으로 갈 때는 지금 고른 공고를 '본 것'으로 (새 표를 읽을 때는 따로 정한다) */
+  function changeStep(next: Step, { markActiveSeen = true } = {}) {
     setError('');
     setCheckWarned(false);
-    if (next === 'review' && activeId) markSeen(activeId);
+    if (next === 'review' && markActiveSeen && activeId) markSeen(activeId);
     setStep(next);
     // 넓은 화면에서는 왼쪽 제목이 따라다녀서(sticky) 포커스만으로는 위로 안 올라간다.
     window.scrollTo({ top: 0 });
@@ -387,9 +388,10 @@ export default function NewPosting() {
       // 지금 집 주거비·고정비처럼 공고와 관계없는 값은 그대로 둔다.
       setProfile((form) => ({ ...form, postings: {} }));
       setResult(null);
+      // 새 표: 첫 공고를 고르고 그것만 '본 것'으로 (예전 표에서 연 탭 기록은 버린다)
       setActivePosting(table[0].id);
-      changeStep('review');
-      setSeenPostings([table[0].id]); // changeStep이 예전 표의 탭을 '본 것'으로 넣은 것을 덮어쓴다
+      setSeenPostings([table[0].id]);
+      changeStep('review', { markActiveSeen: false });
     } catch {
       showError(NETWORK_ERROR, files.length ? 'files' : 'text');
     } finally {
@@ -429,9 +431,11 @@ export default function NewPosting() {
    * 조건 확인에서 아직 볼 것: 안 연 공고, 다시 볼 칸 (누르면 그곳으로).
    * 연봉 비공개는 넣지 않는다 — 비어 있어도 최소 연봉을 계산해 주는 게 이 서비스의 기능이다.
    */
+  // 공고마다 다시 볼 칸 (탭 개수·확인 알림·단계 요약이 같이 쓴다. 비교표가 바뀔 때만 다시 센다)
+  const toCheck = useMemo(() => new Map(rows.map((row) => [row.id, fieldsToCheck(row)])), [rows]);
   const reviewChecks = rows.flatMap((row, i) => {
     const name = companyName(row, i);
-    const todo = fieldsToCheck(row);
+    const todo = toCheck.get(row.id) ?? [];
     // fieldId가 없으면 그 공고 탭만 연다
     const items: { key: string; label: string; rowId: string; fieldId?: string }[] = [];
     if (!seenPostings.includes(row.id)) {
@@ -451,7 +455,7 @@ export default function NewPosting() {
     return items;
   });
   const unseenCount = rows.filter((row) => !seenPostings.includes(row.id)).length;
-  const cellsToCheck = rows.reduce((sum, row) => sum + fieldsToCheck(row).length, 0);
+  const cellsToCheck = [...toCheck.values()].reduce((sum, ids) => sum + ids.length, 0);
   const reviewSummary =
     [unseenCount && `볼 공고 ${unseenCount}개`, cellsToCheck && `확인할 칸 ${cellsToCheck}개`]
       .filter(Boolean)
@@ -717,9 +721,7 @@ export default function NewPosting() {
               onChange={setProfile}
               activeId={activeId}
               onSelectPosting={selectPosting}
-              missingFor={(row) =>
-                missingProfile.filter((item) => item.fieldId.startsWith(`${row.id}-`))
-              }
+              missingFor={(row) => missingProfile.filter((item) => item.rowId === row.id)}
             />
           </fieldset>
           {missingProfile.length > 0 && (
@@ -731,11 +733,9 @@ export default function NewPosting() {
                     <button
                       type="button"
                       className="question-link"
-                      onClick={() => {
-                        const row = rows.find((r) => item.fieldId.startsWith(`${r.id}-`));
-                        if (row) goToField(row.id, item.fieldId);
-                        else focusField(item.fieldId);
-                      }}
+                      onClick={() =>
+                        item.rowId ? goToField(item.rowId, item.fieldId) : focusField(item.fieldId)
+                      }
                     >
                       {item.label}
                     </button>
@@ -799,7 +799,7 @@ export default function NewPosting() {
             onSelect={selectPosting}
             label="확인할 공고"
             status={(row) => ({
-              remaining: fieldsToCheck(row).length,
+              remaining: toCheck.get(row.id)?.length ?? 0,
               seen: seenPostings.includes(row.id),
             })}
           >

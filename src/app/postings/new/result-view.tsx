@@ -125,22 +125,14 @@ function pickCase(posting: PostingResult, breakEven: BreakEven | undefined, mode
 
 /** 단계 표시에 쓸 결과 한 줄: 매달 가장 많이 남는 공고 (연봉 공개 공고, 고른 경우 중 큰 쪽) */
 export function bestRemainingText(result: Result): string {
-  let best: { company: string; value: number } | null = null;
-  result.postings.forEach((posting, i) => {
-    for (const s of posting.scenarios) {
-      if (
-        s.applicable &&
-        s.monthly_remaining != null &&
-        (!best || s.monthly_remaining > best.value)
-      ) {
-        best = { company: posting.company || `공고 ${i + 1}`, value: s.monthly_remaining };
-      }
-    }
-  });
-  const found = best as { company: string; value: number } | null;
-  return found
-    ? `${found.company} 매달 ${won(found.value)}`
-    : `공고 ${result.postings.length}개 계산`;
+  const candidates = result.postings.flatMap((posting, i) =>
+    posting.scenarios
+      .filter((s) => s.applicable && s.monthly_remaining != null)
+      .map((s) => ({ company: posting.company || `공고 ${i + 1}`, value: s.monthly_remaining! })),
+  );
+  if (!candidates.length) return `공고 ${result.postings.length}개 계산`;
+  const best = candidates.reduce((a, b) => (b.value > a.value ? b : a));
+  return `${best.company} 매달 ${won(best.value)}`;
 }
 
 function remainingCell(value: number, extra: Omit<Shown, 'value'> = {}): Shown {
