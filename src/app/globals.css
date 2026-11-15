@@ -518,6 +518,10 @@ details[open] > summary .when-closed {
 .row-field > :is(input, select) {
   width: calc(100% - var(--unit-slot));
 }
+/* 내 생활비 화면의 단위는 '원'뿐이라, 단위 자리를 '원' 폭에 맞춰 오른쪽 빈 곳을 없앤다 */
+.profile-field {
+  --unit-width: 0.875rem;
+}
 .row-field-hint {
   grid-column: 1 / -1;
   font-size: 0.75rem;
