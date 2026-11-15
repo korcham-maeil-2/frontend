@@ -5,6 +5,7 @@ import {
   MAX_PERCENT,
   badgeFor,
   formatWon,
+  isImageRead,
   parseCount,
   salaryText,
   type Cell,
@@ -161,6 +162,58 @@ function changed(original: Cell, value: unknown): Cell {
   return same ? original : { ...original, value, status: 'user_input', from_image: false };
 }
 
+/** 사용자가 '이 값이 맞아요'를 누른 칸: 값은 그대로, 사용자가 확인했으니 '입력'으로 */
+function confirmed(cell: Cell): Cell {
+  return { ...cell, status: 'user_input', from_image: false };
+}
+
+/** 다시 봐야 하는 칸: 추정·이미지에서 읽음. 고치거나 '맞아요'를 누르면 '입력'이 되어 빠진다. */
+function needsCheck(cell: Cell) {
+  return cell.status === 'estimated' || isImageRead(cell);
+}
+
+/**
+ * 이 공고에서 다시 볼 칸의 id (화면 순서). 회사 탭의 'n개 남음'과 '첫 칸으로 이동'에 쓴다.
+ * 서버가 준 질문 목록이 아니라 지금 칸 상태로 센다 → 고치면 바로 줄어든다.
+ * 화면에 보이는 칸만 센다 (연봉 공고의 숨은 월급 칸 등은 빼고).
+ * 연봉·월급이라고 했는데 금액이 비었으면 그 칸도 넣는다 (계산에 꼭 필요).
+ */
+export function fieldsToCheck(row: Row): string[] {
+  const ids: string[] = [];
+  const type = row.salary_type?.value;
+  for (const group of groups) {
+    for (const field of group.fields) {
+      if (hidden(row, field.key)) continue;
+      const cell = cellOf(row, field.key);
+      const isAmount = field.key === 'annual_salary_krw' || field.key === 'monthly_salary_krw';
+      const emptyAmount =
+        isAmount && cell.value == null && (type === 'annual' || type === 'monthly');
+      if (needsCheck(cell) || emptyAmount) ids.push(fieldId(row, field.key));
+    }
+    if (group.title === '급여') {
+      row.other_allowances?.forEach((allowance, i) => {
+        if (needsCheck(allowance.monthly_krw)) ids.push(fieldId(row, `other-${i}`));
+      });
+    }
+  }
+  return ids;
+}
+
+/**
+ * 아직 남은 '확인이 필요한 것'. 서버 목록은 처음 읽을 때 만든 그대로라, 고칠 칸이 있는 질문은
+ * 그 칸이 채워지고 다시 볼 필요가 없어지면 뺀다 (탭의 '확인 끝'과 어긋나지 않게).
+ * 칸이 없는 질문(예: 연장근로 시간)은 계속 보여 준다.
+ */
+function openQuestions(row: Row): string[] {
+  return (row.questions_to_ask ?? []).filter((question) => {
+    if (question.startsWith('원문과 맞는지')) return fieldsToCheck(row).length > 0;
+    const target = questionTarget(row, question);
+    if (!target) return true;
+    const cell = cellOf(row, target);
+    return cell.value == null || needsCheck(cell);
+  });
+}
+
 /** 칸으로 이동해 커서를 둔다 ('확인이 필요한 것', 연봉 빈칸 안내에서 쓴다) */
 export function focusField(id: string) {
   const element = document.getElementById(id);
@@ -185,6 +238,7 @@ export function RowEditor({
 }) {
   const number = index + 1;
   const company = row.company?.value?.trim();
+  const questions = openQuestions(row);
   const place = [row.location?.value?.sido, row.location?.value?.sigungu].filter(Boolean).join(' ');
 
   function set(key: CellKey | 'location', value: unknown) {
@@ -215,6 +269,27 @@ export function RowEditor({
     onChange(next);
   }
 
+  function confirm(key: CellKey | 'location') {
+    onChange({ ...row, [key]: confirmed(cellOf(row, key)) });
+  }
+
+  function setAllowance(i: number, monthly: (item: Cell, original: Cell) => Cell) {
+    onChange({
+      ...row,
+      other_allowances: row.other_allowances?.map((item, j) =>
+        j === i
+          ? {
+              ...item,
+              monthly_krw: monthly(
+                item.monthly_krw,
+                original.other_allowances?.[j]?.monthly_krw ?? { status: 'missing' },
+              ) as typeof item.monthly_krw,
+            }
+          : item,
+      ),
+    });
+  }
+
   return (
     <section className="row-card" aria-labelledby={`${row.id}-title`}>
       {/* 공고마다 번호와 요약이 있는 머리띠를 둬서, 카드가 길어도 어느 공고인지 바로 보이게 한다. */}
@@ -232,11 +307,11 @@ export function RowEditor({
         </div>
       </header>
       <div className="row-card-body">
-        {(row.questions_to_ask?.length ?? 0) > 0 && (
+        {questions.length > 0 && (
           <div className="row-questions">
             <p className="font-semibold">확인이 필요한 것</p>
             <ul>
-              {row.questions_to_ask?.map((question) => {
+              {questions.map((question) => {
                 const target = questionTarget(row, question);
                 return (
                   <li key={question}>
@@ -269,6 +344,7 @@ export function RowEditor({
                   field={{ ...field, label: labelOf(row, field) } as Field}
                   cell={cellOf(row, field.key)}
                   onChange={(value) => set(field.key, value)}
+                  onConfirm={() => confirm(field.key)}
                 />
               ))}
             {group.title === '급여' &&
@@ -283,24 +359,8 @@ export function RowEditor({
                     example: MONTHLY_EXAMPLE,
                   }}
                   cell={allowance.monthly_krw}
-                  onChange={(value) =>
-                    onChange({
-                      ...row,
-                      other_allowances: row.other_allowances?.map((item, j) =>
-                        j === i
-                          ? {
-                              ...item,
-                              monthly_krw: changed(
-                                original.other_allowances?.[j]?.monthly_krw ?? {
-                                  status: 'missing',
-                                },
-                                value,
-                              ) as typeof item.monthly_krw,
-                            }
-                          : item,
-                      ),
-                    })
-                  }
+                  onChange={(value) => setAllowance(i, (_, first) => changed(first, value))}
+                  onConfirm={() => setAllowance(i, (cell) => confirmed(cell))}
                 />
               ))}
           </fieldset>
@@ -315,11 +375,14 @@ function FieldRow({
   field,
   cell,
   onChange,
+  onConfirm,
 }: {
   id: string;
   field: Field;
   cell: Cell;
   onChange: (value: unknown) => void;
+  /** 다시 볼 칸(추정·이미지에서 읽음)의 값이 맞다고 확인 */
+  onConfirm: () => void;
 }) {
   const badge = badgeFor(cell);
   const hintId = `${id}-hint`;
@@ -467,6 +530,11 @@ function FieldRow({
       {input}
       <span className={`status-badge ${badge.className}`}>{badge.label}</span>
       <p id={hintId} className="row-field-hint">
+        {needsCheck(cell) && (
+          <button type="button" className="confirm-link" onClick={onConfirm}>
+            이 값이 맞아요
+          </button>
+        )}
         {hint && <span className="text-foreground">{hint}</span>}
         {cell.source_text && (
           <span>

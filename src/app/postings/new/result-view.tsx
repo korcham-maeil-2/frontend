@@ -123,6 +123,26 @@ function pickCase(posting: PostingResult, breakEven: BreakEven | undefined, mode
   return best?.case ?? 'commute';
 }
 
+/** 단계 표시에 쓸 결과 한 줄: 매달 가장 많이 남는 공고 (연봉 공개 공고, 고른 경우 중 큰 쪽) */
+export function bestRemainingText(result: Result): string {
+  let best: { company: string; value: number } | null = null;
+  result.postings.forEach((posting, i) => {
+    for (const s of posting.scenarios) {
+      if (
+        s.applicable &&
+        s.monthly_remaining != null &&
+        (!best || s.monthly_remaining > best.value)
+      ) {
+        best = { company: posting.company || `공고 ${i + 1}`, value: s.monthly_remaining };
+      }
+    }
+  });
+  const found = best as { company: string; value: number } | null;
+  return found
+    ? `${found.company} 매달 ${won(found.value)}`
+    : `공고 ${result.postings.length}개 계산`;
+}
+
 function remainingCell(value: number, extra: Omit<Shown, 'value'> = {}): Shown {
   return { value: won(value), tone: value < 0 ? 'negative' : undefined, ...extra };
 }
@@ -449,7 +469,7 @@ export function ResultView({ result, rows }: { result: Result; rows: Row[] }) {
 
         {/* 좁은 화면: 공고를 골라 한 열짜리 명세로 본다. 공고가 둘이면 결과 줄 아래에 상대 값을 붙인다. */}
         <Tabs defaultValue={firstTab} className="compare-mobile">
-          <TabsList aria-label="볼 공고" className="source-tabs compare-switch">
+          <TabsList aria-label="볼 공고" className="posting-tabs compare-switch">
             {columns.map((column, i) => (
               <TabsTrigger key={column.posting.posting_id} value={column.posting.posting_id}>
                 {companyOf(column, i)}
