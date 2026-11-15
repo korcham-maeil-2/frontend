@@ -109,24 +109,42 @@ export function toUserProfile(form: ProfileForm, rows: Row[]): UserProfile {
   };
 }
 
-/** 계산 전에 알려 줄 빈 칸 (막지는 않는다: 빈 경우는 결과에 '계산할 수 없음'으로 나온다). */
-export function missingInputs(form: ProfileForm, rows: Row[]): string[] {
-  const missing: string[] = [];
-  form.fixedExpenses.forEach((item, i) => {
-    if (item.name.trim() && item.amount == null)
-      missing.push(`고정비 ${i + 1}(${item.name.trim()}) 금액`);
-  });
+/** 비어 있는 칸: 화면에 보여 줄 이름과, 누르면 데려갈 입력칸의 id (profile-form.tsx) */
+export type MissingInput = { label: string; fieldId: string };
+
+/**
+ * 계산 전에 알려 줄 빈 칸 (막지는 않는다: 빈 경우는 결과에 '계산할 수 없음'으로 나온다).
+ * 화면 위에서 아래 순서로 돌려준다.
+ */
+export function missingInputs(form: ProfileForm, rows: Row[]): MissingInput[] {
+  const missing: MissingInput[] = [];
+  const add = (label: string, fieldId: string) => missing.push({ label, fieldId });
   const anyCommute = rows.some((row) => costsOf(form, row).canCommute);
-  if (anyCommute && form.currentHousing == null) missing.push('지금 집 주거비');
+  if (anyCommute && form.currentHousing == null) add('지금 집 주거비', 'current-housing');
+  form.fixedExpenses.forEach((item, i) => {
+    if (item.name.trim() && item.amount == null) {
+      add(`고정비 ${i + 1}(${item.name.trim()}) 금액`, `fixed-${i}-amount`);
+    }
+  });
   rows.forEach((row, i) => {
     const c = costsOf(form, row);
     const name = row.company?.value || `공고 ${i + 1}`;
-    if (!c.canCommute && !c.considerMove) missing.push(`${name}: 통근·이사 중 하나는 골라 주세요`);
-    if (c.canCommute && c.commuteTransport == null) missing.push(`${name} 통근 교통비`);
-    if (c.considerMove && c.moveHousing == null) missing.push(`${name} 이사할 집 주거비`);
-    if (c.considerMove && c.moveTransport == null) missing.push(`${name} 이사 뒤 교통비`);
+    if (!c.canCommute && !c.considerMove) {
+      add(`${name}: 통근·이사 중 하나는 골라 주세요`, `${row.id}-can-commute`);
+    }
+    if (c.canCommute && c.commuteTransport == null) {
+      add(`${name} 통근 교통비`, `${row.id}-commute-transport`);
+    }
+    if (c.considerMove && c.moveHousing == null) {
+      add(`${name} 이사할 집 주거비`, `${row.id}-move-housing`);
+    }
+    if (c.considerMove && c.moveTransport == null) {
+      add(`${name} 이사한 뒤 교통비`, `${row.id}-move-transport`);
+    }
   });
-  if (form.hasCurrentJob && form.currentSalary == null) missing.push('지금 연봉');
-  if (form.hasCurrentJob && form.currentTransport == null) missing.push('지금 회사 교통비');
+  if (form.hasCurrentJob && form.currentSalary == null) add('지금 연봉', 'current-salary');
+  if (form.hasCurrentJob && form.currentTransport == null) {
+    add('지금 회사 교통비', 'current-transport');
+  }
   return missing;
 }

@@ -8,6 +8,10 @@ import { costsOf, type Money, type PostingCostsForm, type ProfileForm as Form } 
 
 // '내 생활비' 단계: 매달 남는 돈을 계산하는 데 필요한, 공고에 없는 값을 받는다.
 // 값은 page.tsx가 들고 있고(form), 바꿀 때마다 onChange로 새 값을 돌려준다.
+// 칸마다 id가 있어서 '비어 있는 값' 안내(profile.ts의 missingInputs)가 그 칸으로 데려갈 수 있다.
+
+// 자주 넣는 고정비: 누르면 이름이 채워진 줄이 생기고 금액 칸으로 바로 간다
+const COMMON_FIXED = ['통신비', '학자금 상환', '보험료', '구독 서비스'];
 
 /** 라벨·도움말이 붙은 금액 칸 */
 function MoneyField({
@@ -49,17 +53,24 @@ function MoneyField({
 }
 
 function Check({
+  id,
   checked,
   onChange,
   children,
 }: {
+  id: string;
   checked: boolean;
   onChange: (checked: boolean) => void;
   children: ReactNode;
 }) {
   return (
     <label className="profile-check">
-      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+      <input
+        id={id}
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+      />
       {children}
     </label>
   );
@@ -97,7 +108,11 @@ function PostingCosts({
       <div className="row-card-body">
         <fieldset className="row-group">
           <legend>지금 집에서 다니기</legend>
-          <Check checked={costs.canCommute} onChange={(canCommute) => set({ canCommute })}>
+          <Check
+            id={id('can-commute')}
+            checked={costs.canCommute}
+            onChange={(canCommute) => set({ canCommute })}
+          >
             지금 집에서 다닐 수 있어요
           </Check>
           {costs.canCommute && (
@@ -113,7 +128,11 @@ function PostingCosts({
         </fieldset>
         <fieldset className="row-group">
           <legend>회사 근처로 이사하기</legend>
-          <Check checked={costs.considerMove} onChange={(considerMove) => set({ considerMove })}>
+          <Check
+            id={id('consider-move')}
+            checked={costs.considerMove}
+            onChange={(considerMove) => set({ considerMove })}
+          >
             이사도 생각하고 있어요
           </Check>
           {costs.considerMove && (
@@ -157,6 +176,14 @@ export function ProfileFormView({
 }) {
   const set = (patch: Partial<Form>) => onChange({ ...form, ...patch });
   const setFixed = (fixedExpenses: Form['fixedExpenses']) => set({ fixedExpenses });
+  /** 고정비 줄을 하나 더하고, 이름이 있으면 금액 칸·없으면 이름 칸으로 커서를 옮긴다. */
+  const addFixed = (name = '') => {
+    const next = form.fixedExpenses.length;
+    setFixed([...form.fixedExpenses, { name, amount: null }]);
+    const target = name ? `fixed-${next}-amount` : `fixed-${next}-name`;
+    requestAnimationFrame(() => document.getElementById(target)?.focus());
+  };
+  const used = new Set(form.fixedExpenses.map((item) => item.name.trim()));
 
   return (
     <div className="space-y-8">
@@ -214,6 +241,7 @@ export function ProfileFormView({
                 className={CONTROL_CLASS}
               />
               <MoneyInput
+                id={`fixed-${i}-amount`}
                 label={`고정비 ${i + 1} 금액 (단위: 원)`}
                 value={item.amount}
                 example="5만"
@@ -237,19 +265,27 @@ export function ProfileFormView({
             </li>
           ))}
         </ul>
+        <div className="mt-3 flex flex-wrap gap-2" aria-label="자주 넣는 고정비">
+          {COMMON_FIXED.filter((name) => !used.has(name)).map((name) => (
+            <Button
+              key={name}
+              type="button"
+              variant="secondary"
+              className="min-h-11"
+              onClick={() => addFixed(name)}
+            >
+              <Plus aria-hidden /> {name}
+            </Button>
+          ))}
+        </div>
         <Button
           type="button"
           id="add-fixed"
           variant="outline"
           className="mt-3 min-h-11 w-full"
-          onClick={() => {
-            const next = form.fixedExpenses.length;
-            setFixed([...form.fixedExpenses, { name: '', amount: null }]);
-            // 새 줄의 이름 칸으로 바로 커서를 옮긴다
-            requestAnimationFrame(() => document.getElementById(`fixed-${next}-name`)?.focus());
-          }}
+          onClick={() => addFixed()}
         >
-          <Plus aria-hidden /> 고정비 넣기
+          <Plus aria-hidden /> 다른 고정비 넣기
         </Button>
       </fieldset>
 
@@ -272,7 +308,11 @@ export function ProfileFormView({
           목표 금액을 넣으면 그 금액이 기준이고, 아니면 연봉이 공개된 공고와 지금 회사 중 매달 더
           많이 남는 쪽이 기준이에요.
         </p>
-        <Check checked={form.hasCurrentJob} onChange={(hasCurrentJob) => set({ hasCurrentJob })}>
+        <Check
+          id="has-current-job"
+          checked={form.hasCurrentJob}
+          onChange={(hasCurrentJob) => set({ hasCurrentJob })}
+        >
           지금 다니는 회사가 있어요 (지금처럼 살려면 얼마가 필요한지)
         </Check>
         {form.hasCurrentJob && (

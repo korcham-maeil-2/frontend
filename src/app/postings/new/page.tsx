@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import {
   ArrowLeft,
   ArrowRight,
@@ -58,6 +58,26 @@ type SessionResponse = components['schemas']['SessionResponse'];
 const ALREADY_CONFIRMED = 'SESSION_NOT_AWAITING_CONFIRMATION'; // 서버는 이미 확인을 마침 → 다시 계산으로
 const SESSION_LOST = new Set(['SESSION_NOT_FOUND', 'SESSION_NOT_COMPLETED']); // → 새 세션으로
 const errorCode = (error: unknown) => (error as { code?: string } | undefined)?.code ?? '';
+
+/**
+ * 내 생활비 칸에서 엔터: 계산하지 않고 다음 칸으로 간다.
+ * 엔터를 '이 칸 입력 끝'으로 누르는 습관 때문에, 빈칸이 남은 채로 계산되지 않게 한다.
+ * 한글을 조합하는 중의 엔터(글자 확정)는 건드리지 않는다 (keyCode 229: 조합 중을 알리는 값, Safari 대비).
+ * 마지막 칸에서는 '계산하기' 버튼으로 간다 — 계산은 그 버튼을 눌러야 한다.
+ */
+function enterMovesToNextField(event: KeyboardEvent<HTMLFormElement>) {
+  const target = event.target;
+  const composing = event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229;
+  if (event.key !== 'Enter' || composing || !(target instanceof HTMLInputElement)) return;
+  event.preventDefault();
+  const fields = [
+    ...event.currentTarget.querySelectorAll<HTMLElement>(
+      'input:not([type=hidden]):not(:disabled), select:not(:disabled)',
+    ),
+  ];
+  const next = fields[fields.indexOf(target) + 1];
+  (next ?? event.currentTarget.querySelector<HTMLElement>('button[type=submit]'))?.focus();
+}
 
 const STEPS: { key: Step; label: string }[] = [
   { key: 'input', label: '공고 넣기' },
@@ -586,6 +606,7 @@ export default function NewPosting() {
           className="desk-sheet sheet-enter"
           aria-label="내 생활비"
           aria-busy={busy === 'confirming'}
+          onKeyDown={enterMovesToNextField}
           onSubmit={(event) => {
             event.preventDefault();
             calculate();
@@ -602,7 +623,15 @@ export default function NewPosting() {
               <p className="font-semibold">비어 있는 값은 계산할 수 없다고 표시돼요</p>
               <ul>
                 {missingProfile.map((item) => (
-                  <li key={item}>{item}</li>
+                  <li key={item.fieldId}>
+                    <button
+                      type="button"
+                      className="question-link"
+                      onClick={() => focusField(item.fieldId)}
+                    >
+                      {item.label}
+                    </button>
+                  </li>
                 ))}
               </ul>
             </div>
