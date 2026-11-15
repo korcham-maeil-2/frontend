@@ -4,7 +4,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatWon, salaryText, type Row } from './format';
 import { CONTROL_CLASS, MoneyInput } from './money-input';
-import { costsOf, type Money, type PostingCostsForm, type ProfileForm as Form } from './profile';
+import { PostingTabs } from './posting-tabs';
+import {
+  costsOf,
+  type MissingInput,
+  type Money,
+  type PostingCostsForm,
+  type ProfileForm as Form,
+} from './profile';
 
 // '내 생활비' 단계: 매달 남는 돈을 계산하는 데 필요한, 공고에 없는 값을 받는다.
 // 값은 page.tsx가 들고 있고(form), 바꿀 때마다 onChange로 새 값을 돌려준다.
@@ -169,10 +176,18 @@ export function ProfileFormView({
   form,
   rows,
   onChange,
+  activeId,
+  onSelectPosting,
+  missingFor,
 }: {
   form: Form;
   rows: Row[];
   onChange: (form: Form) => void;
+  /** 회사 탭에서 고른 공고 (조건 확인 화면과 같은 값) */
+  activeId: string;
+  onSelectPosting: (id: string) => void;
+  /** 이 공고에서 아직 비어 있는 칸 (profile.ts의 missingInputs 중 이 공고 것) */
+  missingFor: (row: Row) => MissingInput[];
 }) {
   const set = (patch: Partial<Form>) => onChange({ ...form, ...patch });
   const setFixed = (fixedExpenses: Form['fixedExpenses']) => set({ fixedExpenses });
@@ -289,17 +304,36 @@ export function ProfileFormView({
         </Button>
       </fieldset>
 
-      <div className="space-y-8">
-        {rows.map((row, i) => (
-          <PostingCosts
-            key={row.id}
-            row={row}
-            index={i}
-            costs={costsOf(form, row)}
-            onChange={(costs) => set({ postings: { ...form.postings, [row.id]: costs } })}
-          />
-        ))}
-      </div>
+      <PostingTabs
+        rows={rows}
+        activeId={activeId}
+        onSelect={onSelectPosting}
+        label="비용을 넣을 공고"
+        doneLabel="다 넣음"
+        status={(row) => {
+          const missing = missingFor(row);
+          // 통근·이사를 둘 다 끈 공고는 칸이 아니라 고를 일이 남았다
+          const choose = missing.some((item) => item.fieldId === `${row.id}-can-commute`);
+          return {
+            remaining: missing.length,
+            seen: true,
+            todoLabel: choose ? '골라 주세요' : undefined,
+          };
+        }}
+      >
+        {rows.map(
+          (row, i) =>
+            row.id === activeId && (
+              <PostingCosts
+                key={row.id}
+                row={row}
+                index={i}
+                costs={costsOf(form, row)}
+                onChange={(costs) => set({ postings: { ...form.postings, [row.id]: costs } })}
+              />
+            ),
+        )}
+      </PostingTabs>
 
       <fieldset className="row-group">
         <legend>비교 기준 (선택)</legend>

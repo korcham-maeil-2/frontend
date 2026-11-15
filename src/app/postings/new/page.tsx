@@ -15,14 +15,13 @@ import {
 } from 'lucide-react';
 import Image from 'next/image';
 import noticeArt from '@public/posting-notice.webp';
-import reviewArt from '@public/posting-review.webp';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { api, getHealth } from '@/lib/api/client';
 import type { components } from '@/lib/api/schema';
 import { examplePostings } from './examples';
-import { cellsOf, hasSalary, isImageRead, type Row } from './format';
+import { cellsOf, isImageRead, type Row } from './format';
 import { MAX_MESSAGE_CHARS } from './limits';
 import {
   AttachmentList,
@@ -39,8 +38,9 @@ import {
   type UserProfile,
 } from './profile';
 import { ProfileFormView } from './profile-form';
-import { ResultView, isCalculationResult } from './result-view';
-import { RowEditor, fieldId, focusField } from './row-editor';
+import { PostingTabs, companyName } from './posting-tabs';
+import { ResultView, bestRemainingText, isCalculationResult } from './result-view';
+import { RowEditor, fieldsToCheck, focusField } from './row-editor';
 
 // 공고 넣기 → (백엔드가 Claude로 비교표를 만듦) → 조건 확인·수정 → 내 생활비 → 매달 남는 돈
 //   1) POST /sessions                 공고 글을 보내면 비교표(table)를 돌려받는다
@@ -115,6 +115,8 @@ type Draft = {
   profile?: ProfileForm;
   result?: CalculationResult | null;
   resultKey?: string;
+  activePosting?: string;
+  seenPostings?: string[];
 };
 
 /**
@@ -167,7 +169,13 @@ export default function NewPosting() {
   const [resultKey, setResultKey] = useState('');
   const [busy, setBusy] = useState<'reading' | 'confirming' | null>(null);
   const [error, setError] = useState('');
-  const [salaryWarned, setSalaryWarned] = useState(false);
+  // 다음 단계로 가기 전 '아직 볼 것' 알림을 한 번 보여 줬는지 (막지는 않는다)
+  const [checkWarned, setCheckWarned] = useState(false);
+  // 회사 탭에서 고른 공고(조건 확인·내 생활비 공통)와, 조건 확인에서 한 번이라도 연 공고
+  const [activePosting, setActivePosting] = useState('');
+  const [seenPostings, setSeenPostings] = useState<string[]>([]);
+  // 다른 회사 탭의 칸으로 갈 때, 탭이 바뀌어 그 칸이 그려진 뒤 커서를 옮길 칸
+  const pendingFocus = useRef<string | null>(null);
   const [demoMode, setDemoMode] = useState(false);
   const [restored, setRestored] = useState(false);
   const heading = useRef<HTMLHeadingElement>(null);
@@ -198,6 +206,8 @@ export default function NewPosting() {
       setProfile(draft.profile ?? EMPTY_PROFILE);
       setResult(isCalculationResult(draft.result) ? draft.result : null);
       setResultKey(draft.resultKey ?? '');
+      setActivePosting(draft.activePosting ?? '');
+      setSeenPostings(draft.seenPostings ?? draft.rows.map((row) => row.id));
     }
     setRestored(true);
     getHealth()
@@ -221,6 +231,8 @@ export default function NewPosting() {
       profile,
       result,
       resultKey,
+      activePosting,
+      seenPostings,
     };
     const timer = setTimeout(() => flushDraft(unsaved), 300);
     return () => clearTimeout(timer);
@@ -236,6 +248,8 @@ export default function NewPosting() {
     profile,
     result,
     resultKey,
+    activePosting,
+    seenPostings,
   ]);
   useEffect(() => {
     const onLeave = () => flushDraft(unsaved);
@@ -254,9 +268,11 @@ export default function NewPosting() {
     return () => window.removeEventListener('beforeunload', warn);
   }, [busy]);
 
-  function changeStep(next: Step) {
+  /** 단계 바꾸기. 조건 확인으로 갈 때는 지금 고른 공고를 '본 것'으로 (새 표를 읽을 때는 따로 정한다) */
+  function changeStep(next: Step, { markActiveSeen = true } = {}) {
     setError('');
-    setSalaryWarned(false);
+    setCheckWarned(false);
+    if (next === 'review' && markActiveSeen && activeId) markSeen(activeId);
     setStep(next);
     // 넓은 화면에서는 왼쪽 제목이 따라다녀서(sticky) 포커스만으로는 위로 안 올라간다.
     window.scrollTo({ top: 0 });
@@ -372,7 +388,10 @@ export default function NewPosting() {
       // 지금 집 주거비·고정비처럼 공고와 관계없는 값은 그대로 둔다.
       setProfile((form) => ({ ...form, postings: {} }));
       setResult(null);
-      changeStep('review');
+      // 새 표: 첫 공고를 고르고 그것만 '본 것'으로 (예전 표에서 연 탭 기록은 버린다)
+      setActivePosting(table[0].id);
+      setSeenPostings([table[0].id]);
+      changeStep('review', { markActiveSeen: false });
     } catch {
       showError(NETWORK_ERROR, files.length ? 'files' : 'text');
     } finally {
@@ -380,14 +399,72 @@ export default function NewPosting() {
     }
   }
 
-  const missingSalary = rows
-    .map((row, i) => ({ row, number: i + 1 }))
-    .filter(({ row }) => !hasSalary(row));
+  // 고른 공고. 고른 적이 없거나 표가 바뀌어 없어졌으면 첫 공고
+  const activeId = (rows.find((row) => row.id === activePosting) ?? rows[0])?.id ?? '';
+
+  function markSeen(id: string) {
+    setSeenPostings((seen) => (seen.includes(id) ? seen : [...seen, id]));
+  }
+
+  function selectPosting(id: string) {
+    pendingFocus.current = null; // 탭을 직접 고르면, 예약해 둔 칸 이동은 버린다
+    setActivePosting(id);
+    if (step === 'review') markSeen(id);
+  }
+
+  /** 칸으로 이동. 다른 회사 탭의 칸이면 탭을 바꾸고, 그 탭이 그려진 뒤 커서를 옮긴다. */
+  function goToField(rowId: string, id: string) {
+    if (rowId === activeId || !rows.some((row) => row.id === rowId)) {
+      focusField(id);
+      return;
+    }
+    selectPosting(rowId);
+    pendingFocus.current = id;
+  }
+  useEffect(() => {
+    if (!pendingFocus.current) return;
+    focusField(pendingFocus.current);
+    pendingFocus.current = null;
+  }, [activeId]);
+
+  /**
+   * 조건 확인에서 아직 볼 것: 안 연 공고, 다시 볼 칸 (누르면 그곳으로).
+   * 연봉 비공개는 넣지 않는다 — 비어 있어도 최소 연봉을 계산해 주는 게 이 서비스의 기능이다.
+   */
+  // 공고마다 다시 볼 칸 (탭 개수·확인 알림·단계 요약이 같이 쓴다. 비교표가 바뀔 때만 다시 센다)
+  const toCheck = useMemo(() => new Map(rows.map((row) => [row.id, fieldsToCheck(row)])), [rows]);
+  const reviewChecks = rows.flatMap((row, i) => {
+    const name = companyName(row, i);
+    const todo = toCheck.get(row.id) ?? [];
+    // fieldId가 없으면 그 공고 탭만 연다
+    const items: { key: string; label: string; rowId: string; fieldId?: string }[] = [];
+    if (!seenPostings.includes(row.id)) {
+      items.push({
+        key: `${row.id}-unseen`,
+        label: `${name}: 아직 열어 보지 않았어요`,
+        rowId: row.id,
+      });
+    } else if (todo.length) {
+      items.push({
+        key: `${row.id}-todo`,
+        label: `${name}: 다시 볼 칸 ${todo.length}개`,
+        rowId: row.id,
+        fieldId: todo[0],
+      });
+    }
+    return items;
+  });
+  const unseenCount = rows.filter((row) => !seenPostings.includes(row.id)).length;
+  const cellsToCheck = [...toCheck.values()].reduce((sum, ids) => sum + ids.length, 0);
+  const reviewSummary =
+    [unseenCount && `볼 공고 ${unseenCount}개`, cellsToCheck && `확인할 칸 ${cellsToCheck}개`]
+      .filter(Boolean)
+      .join(' · ') || '확인 끝';
 
   function goToLiving() {
-    // 연봉이 빈 공고가 있으면 한 번 알려 준다. 막지는 않는다 (연봉을 몰라도 계산 단계로 갈 수 있다).
-    if (missingSalary.length && !salaryWarned) {
-      setSalaryWarned(true);
+    // 아직 볼 것이 있으면 한 번 알려 준다. 막지는 않는다 (연봉을 몰라도 계산 단계로 갈 수 있다).
+    if (reviewChecks.length && !checkWarned) {
+      setCheckWarned(true);
       return;
     }
     changeStep('living');
@@ -494,6 +571,8 @@ export default function NewPosting() {
     setProfile((form) => ({ ...form, postings: {} }));
     setResult(null);
     setResultKey('');
+    setActivePosting('');
+    setSeenPostings([]);
     changeStep('input');
   }
 
@@ -509,6 +588,19 @@ export default function NewPosting() {
   // 화면에 보이는 단계. 결과 단계인데 결과가 지금 입력과 맞지 않으면(고쳤거나 예전 초안) 생활비 단계를 보여 준다.
   const shown: Step = step === 'result' && !freshResult ? 'living' : step;
   const reviewing = shown !== 'input';
+  const shownIndex = STEPS.findIndex((item) => item.key === shown);
+  // 단계마다 지금까지 넣은 것을 한 줄로 (넓은 화면의 단계 표시 아래)
+  const summaries: Record<Step, string> = {
+    input: rows.length ? `공고 ${rows.length}개` : '',
+    review: rows.length ? reviewSummary : '',
+    living:
+      shownIndex < 2 && !completed
+        ? ''
+        : missingProfile.length
+          ? `빈칸 ${missingProfile.length}개`
+          : '다 넣음',
+    result: freshResult ? bestRemainingText(freshResult) : '',
+  };
   const demoNotice = demoMode && (
     <p className="demo-notice">
       시연 모드예요. 실제 AI 대신 미리 준비한 답을 써서 &ldquo;예시 공고 넣기&rdquo;의 공고와 시연용
@@ -517,15 +609,24 @@ export default function NewPosting() {
   );
 
   return (
-    <div className="desk-spread">
+    // 공고 넣기는 왼쪽 안내 + 오른쪽 입력 두 칸, 그다음 단계부터는 화면 한 장을 넓게 쓴다
+    <div className={shown === 'input' ? 'desk-spread' : 'desk-spread is-wide'}>
       <div className="desk-intro">
         <div className="desk-intro-inner">
           <ol className="step-track" aria-label="진행 단계">
             {STEPS.map(({ key, label }, i) => {
-              const current = STEPS.findIndex((item) => item.key === shown);
-              const done = i < current;
+              const done = i < shownIndex;
               // 지난 단계, 또는 계산을 마친 뒤 생활비 단계에서 결과로 돌아가기
               const reachable = done || (key === 'result' && freshResult !== null && shown !== key);
+              const content = (
+                <>
+                  <span className="step-number">{done ? <Check aria-hidden /> : i + 1}</span>
+                  <span className="step-text">
+                    <span className="step-label">{label}</span>
+                    {summaries[key] && <span className="step-summary">{summaries[key]}</span>}
+                  </span>
+                </>
+              );
               return (
                 <li key={key} aria-current={shown === key ? 'step' : undefined}>
                   {reachable ? (
@@ -533,16 +634,12 @@ export default function NewPosting() {
                       type="button"
                       onClick={() => changeStep(key)}
                       disabled={busy !== null}
-                      aria-label={`${label}${done ? ' 완료' : ''}, ${label} 단계로 가기`}
+                      aria-label={`${label}${done ? ' 완료' : ''}${summaries[key] ? ` (${summaries[key]})` : ''}, ${label} 단계로 가기`}
                     >
-                      <span className="step-number">{done ? <Check aria-hidden /> : i + 1}</span>
-                      {label}
+                      {content}
                     </button>
                   ) : (
-                    <>
-                      <span className="step-number">{i + 1}</span>
-                      {label}
-                    </>
+                    content
                   )}
                 </li>
               );
@@ -571,14 +668,16 @@ export default function NewPosting() {
                   ? '공고에서 읽은 값이 맞는지 확인하세요. 틀린 값은 고치고, 빠진 값은 직접 입력할 수 있어요.'
                   : '비교할 공고의 본문을 붙여 넣거나 공고 파일을 넣어 주세요. 여러 개를 함께 넣을 수 있어요.'}
           </p>
-          <div className="desk-illustration" aria-hidden="true">
-            <Image
-              src={reviewing ? reviewArt : noticeArt}
-              alt=""
-              fill
-              sizes="(max-width: 767px) 32vw, (max-width: 1150px) 40vw, 460px"
-            />
-          </div>
+          {shown === 'input' && (
+            <div className="desk-illustration" aria-hidden="true">
+              <Image
+                src={noticeArt}
+                alt=""
+                fill
+                sizes="(max-width: 767px) 32vw, (max-width: 1150px) 40vw, 460px"
+              />
+            </div>
+          )}
         </div>
       </div>
 
@@ -616,7 +715,14 @@ export default function NewPosting() {
           <h2 className="sheet-heading">공고 {rows.length}개에 필요한 값</h2>
           {/* 계산하는 동안은 입력을 잠근다 (계산이 끝나면 보낸 값으로 화면을 맞추므로, 그사이 고친 값이 사라진다) */}
           <fieldset disabled={busy !== null} className="min-w-0">
-            <ProfileFormView form={profile} rows={rows} onChange={setProfile} />
+            <ProfileFormView
+              form={profile}
+              rows={rows}
+              onChange={setProfile}
+              activeId={activeId}
+              onSelectPosting={selectPosting}
+              missingFor={(row) => missingProfile.filter((item) => item.rowId === row.id)}
+            />
           </fieldset>
           {missingProfile.length > 0 && (
             <div className="salary-notice mt-6">
@@ -627,7 +733,9 @@ export default function NewPosting() {
                     <button
                       type="button"
                       className="question-link"
-                      onClick={() => focusField(item.fieldId)}
+                      onClick={() =>
+                        item.rowId ? goToField(item.rowId, item.fieldId) : focusField(item.fieldId)
+                      }
                     >
                       {item.label}
                     </button>
@@ -685,42 +793,49 @@ export default function NewPosting() {
               )}
             </div>
           )}
-          <div className="space-y-8">
-            {rows.map((row, i) => (
-              <RowEditor
-                key={row.id}
-                index={i}
-                row={row}
-                original={originalRows[i]}
-                onChange={(next) => {
-                  setSalaryWarned(false);
-                  setRows(rows.map((item, j) => (j === i ? next : item)));
-                }}
-              />
-            ))}
-          </div>
-          {salaryWarned && missingSalary.length > 0 && (
+          <PostingTabs
+            rows={rows}
+            activeId={activeId}
+            onSelect={selectPosting}
+            label="확인할 공고"
+            status={(row) => ({
+              remaining: toCheck.get(row.id)?.length ?? 0,
+              seen: seenPostings.includes(row.id),
+            })}
+          >
+            {rows.map(
+              (row, i) =>
+                row.id === activeId && (
+                  <RowEditor
+                    key={row.id}
+                    index={i}
+                    row={row}
+                    original={originalRows[i]}
+                    onChange={(next) => {
+                      setCheckWarned(false);
+                      setRows(rows.map((item, j) => (j === i ? next : item)));
+                    }}
+                  />
+                ),
+            )}
+          </PostingTabs>
+          {checkWarned && reviewChecks.length > 0 && (
             <div role="alert" className="salary-notice">
-              <p className="font-semibold">연봉이 비어 있는 공고가 있어요</p>
-              <p>제시받은 연봉을 알면 넣어 주세요. 모르면 그대로 확인해도 돼요.</p>
+              <p className="font-semibold">넘어가기 전에 한 번 볼 것이 있어요</p>
+              <p>틀린 값은 계산을 틀리게 만들어요. 모르는 값은 그대로 두고 넘어가도 돼요.</p>
               <ul>
-                {missingSalary.map(({ row, number }) => (
-                  <li key={row.id}>
+                {reviewChecks.map((item) => (
+                  <li key={item.key}>
                     <button
                       type="button"
                       className="question-link"
                       onClick={() =>
-                        focusField(
-                          fieldId(
-                            row,
-                            row.salary_type?.value === 'monthly'
-                              ? 'monthly_salary_krw'
-                              : 'annual_salary_krw',
-                          ),
-                        )
+                        item.fieldId
+                          ? goToField(item.rowId, item.fieldId)
+                          : selectPosting(item.rowId)
                       }
                     >
-                      공고 {number} {row.company?.value ?? ''} 연봉 넣기
+                      {item.label}
                     </button>
                   </li>
                 ))}
@@ -735,8 +850,8 @@ export default function NewPosting() {
               <ArrowLeft aria-hidden /> 공고 넣기로
             </Button>
             <Button className="main-action" disabled={busy !== null} onClick={goToLiving}>
-              {salaryWarned && missingSalary.length
-                ? '연봉 없이 다음으로'
+              {checkWarned && reviewChecks.length
+                ? '그대로 다음으로'
                 : edited
                   ? '고친 내용으로 다음'
                   : '이대로 다음'}{' '}

@@ -110,7 +110,7 @@ export function toUserProfile(form: ProfileForm, rows: Row[]): UserProfile {
 }
 
 /** 비어 있는 칸: 화면에 보여 줄 이름과, 누르면 데려갈 입력칸의 id (profile-form.tsx) */
-export type MissingInput = { label: string; fieldId: string };
+export type MissingInput = { label: string; fieldId: string; rowId?: string };
 
 /**
  * 계산 전에 알려 줄 빈 칸 (막지는 않는다: 빈 경우는 결과에 '계산할 수 없음'으로 나온다).
@@ -118,7 +118,9 @@ export type MissingInput = { label: string; fieldId: string };
  */
 export function missingInputs(form: ProfileForm, rows: Row[]): MissingInput[] {
   const missing: MissingInput[] = [];
-  const add = (label: string, fieldId: string) => missing.push({ label, fieldId });
+  // rowId: 공고별 칸이면 그 공고 (회사 탭 개수와 '그 탭으로 이동'에 쓴다)
+  const add = (label: string, fieldId: string, rowId?: string) =>
+    missing.push({ label, fieldId, rowId });
   const anyCommute = rows.some((row) => costsOf(form, row).canCommute);
   if (anyCommute && form.currentHousing == null) add('지금 집 주거비', 'current-housing');
   form.fixedExpenses.forEach((item, i) => {
@@ -130,16 +132,16 @@ export function missingInputs(form: ProfileForm, rows: Row[]): MissingInput[] {
     const c = costsOf(form, row);
     const name = row.company?.value || `공고 ${i + 1}`;
     if (!c.canCommute && !c.considerMove) {
-      add(`${name}: 통근·이사 중 하나는 골라 주세요`, `${row.id}-can-commute`);
+      add(`${name}: 통근·이사 중 하나는 골라 주세요`, `${row.id}-can-commute`, row.id);
     }
     if (c.canCommute && c.commuteTransport == null) {
-      add(`${name} 통근 교통비`, `${row.id}-commute-transport`);
+      add(`${name} 통근 교통비`, `${row.id}-commute-transport`, row.id);
     }
     if (c.considerMove && c.moveHousing == null) {
-      add(`${name} 이사할 집 주거비`, `${row.id}-move-housing`);
+      add(`${name} 이사할 집 주거비`, `${row.id}-move-housing`, row.id);
     }
     if (c.considerMove && c.moveTransport == null) {
-      add(`${name} 이사한 뒤 교통비`, `${row.id}-move-transport`);
+      add(`${name} 이사한 뒤 교통비`, `${row.id}-move-transport`, row.id);
     }
   });
   if (form.hasCurrentJob && form.currentSalary == null) add('지금 연봉', 'current-salary');
