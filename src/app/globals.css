@@ -494,6 +494,9 @@ details[open] > summary .when-closed {
   color: var(--body);
 }
 .row-field {
+  /* 단위 글자 폭('개월'까지 들어감)과, 입력칸과 단위 사이 간격(.unit-input의 gap)을 더한 자리 */
+  --unit-width: 2.25rem;
+  --unit-slot: calc(var(--unit-width) + 0.5rem);
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
@@ -510,6 +513,23 @@ details[open] > summary .when-closed {
 .row-field > :is(input, select, .unit-input) {
   grid-row: 2;
   grid-column: 1 / -1;
+}
+/* 선택칸의 화살표: 브라우저 기본 화살표는 칸 테두리에 거의 붙어 있어서, 직접 그려 안쪽으로 띄운다 */
+.row-field select {
+  appearance: none;
+  padding-inline-end: 2.75rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23596273' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 1rem center;
+  background-size: 1rem;
+}
+/* 단위(원·개월·%)가 없는 칸도 단위 자리만큼 비워, 모든 입력칸의 오른쪽 끝을 맞춘다 */
+.row-field > :is(input, select) {
+  width: calc(100% - var(--unit-slot));
+}
+/* 내 생활비 화면의 단위는 '원'뿐이라, 단위 자리를 '원' 폭에 맞춰 오른쪽 빈 곳을 없앤다 */
+.profile-field {
+  --unit-width: 0.875rem;
 }
 .row-field-hint {
   grid-column: 1 / -1;
@@ -539,7 +559,8 @@ details[open] > summary .when-closed {
   font-variant-numeric: tabular-nums;
 }
 .unit-input span {
-  min-width: 2rem;
+  flex: none;
+  width: var(--unit-width);
   font-size: 0.875rem;
   color: var(--body);
 }
@@ -812,12 +833,28 @@ section.desk-sheet > .sheet-heading {
   height: 1.15rem;
   accent-color: var(--primary);
 }
-/* 고정비 한 줄: 이름 | 금액 | 지우기 */
+/* 고정비 한 줄: [지우기] [이름] [금액 원]
+   금액 칸과 '원'이 위쪽 금액 칸(지금 집 주거비 등)과 같은 오른쪽 끝에 오도록,
+   지우기 버튼은 줄 맨 앞에 둔다. (키보드 순서는 이름 → 금액 → 지우기 그대로) */
 .fixed-expense {
+  --unit-width: 0.875rem; /* 생활비 화면의 '원' 자리 폭 (.profile-field와 같게) */
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr);
   align-items: center;
   gap: 0.5rem;
+}
+.fixed-expense > :nth-child(1) {
+  grid-area: 1 / 2;
+}
+.fixed-expense > .unit-input {
+  grid-area: 1 / 3;
+}
+.fixed-expense > button {
+  grid-area: 1 / 1;
+}
+.fixed-expense-hint {
+  grid-column: 3;
+  margin-top: -0.25rem;
 }
 
 /* ── 결과 단계 (result-view.tsx) ── */
