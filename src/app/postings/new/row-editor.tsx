@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { CircleAlert } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import {
   MAX_MONTHS,
@@ -160,21 +161,47 @@ function needsCheck(cell: Cell) {
 }
 
 /** 화면에 보이는 칸 전부 (화면 순서): 숨은 칸(연봉 공고의 월급 칸 등)은 빼고, 기타 수당은 급여 뒤에 */
-function visibleCells(row: Row): { id: string; key: CellKey | 'location' | null; cell: Cell }[] {
-  const cells: { id: string; key: CellKey | 'location' | null; cell: Cell }[] = [];
+type VisibleCell = { id: string; key: CellKey | 'location' | null; label: string; cell: Cell };
+
+function visibleCells(row: Row): VisibleCell[] {
+  const cells: VisibleCell[] = [];
   for (const group of groups) {
     for (const field of group.fields) {
       if (!hidden(row, field.key)) {
-        cells.push({ id: fieldId(row, field.key), key: field.key, cell: cellOf(row, field.key) });
+        cells.push({
+          id: fieldId(row, field.key),
+          key: field.key,
+          label: labelOf(row, field as Field),
+          cell: cellOf(row, field.key),
+        });
       }
     }
     if (group.title === '급여') {
       row.other_allowances?.forEach((allowance, i) => {
-        cells.push({ id: fieldId(row, `other-${i}`), key: null, cell: allowance.monthly_krw });
+        cells.push({
+          id: fieldId(row, `other-${i}`),
+          key: null,
+          label: `기타 수당(${allowance.name})`,
+          cell: allowance.monthly_krw,
+        });
       });
     }
   }
   return cells;
+}
+
+/**
+ * '확인해 주세요' 상자에 넣을 칸 (화면 순서). 서버 문장이 아니라 지금 칸 상태로 고른다 →
+ * 개수가 회사 탭의 'n개 남음'과 맞고, 고치거나 '맞아요'를 누르면 바로 빠진다.
+ *   estimated: AI가 원문에 없는 값을 냈을 수 있음 → 칸마다 한 줄
+ *   image:     이미지에서 옮겨 적은 값 (틀렸다는 뜻이 아니라 원본과 한 번 비교) → 한 줄로 묶음
+ */
+function cellsToCheck(row: Row) {
+  const cells = visibleCells(row);
+  return {
+    estimated: cells.filter(({ cell }) => cell.status === 'estimated'),
+    image: cells.filter(({ cell }) => cell.status !== 'estimated' && isImageRead(cell)),
+  };
 }
 
 /** 금액을 받아야 하는 급여인지: 연봉 비공개·희망 연봉 질문만 빼고 (급여 종류를 못 읽은 경우도 받아야 한다) */
@@ -199,7 +226,17 @@ export function fieldsToCheck(row: Row): string[] {
     .map(({ id }) => id);
 }
 
-type Question = { text: string; fields: string[] };
+/**
+ * 물어볼 것. kind로 두 묶음으로 나눠 보여 준다 (백엔드 normalize/schema.py의 Question).
+ *   check    AI가 추정했거나 이미지에서 읽은 값 → 화면은 이 문장 대신 칸 상태로 그린다 (cellsToCheck)
+ *   optional 공고에 없는 값 → '알면 더 정확해요 · 몰라도 계산돼요' (ifUnknown: 비우면 어떻게 계산하는지)
+ */
+type Question = {
+  text: string;
+  fields: string[];
+  kind: 'check' | 'optional';
+  ifUnknown: string | null;
+};
 
 /** 서버의 칸 이름 → 이 화면의 칸 (기타 수당은 'other_allowances.0' → id 'other-0') */
 function questionField(row: Row, field: string): { id: string; cell: Cell } {
@@ -225,10 +262,20 @@ function questionField(row: Row, field: string): { id: string; cell: Cell } {
 type OpenQuestion = Question & { target: string | null };
 
 function openQuestions(row: Row): OpenQuestion[] {
-  // 예전 백엔드는 문장만 준다 → 칸 없는 질문으로 다룬다
+  // 예전 백엔드는 문장만 주거나(questions_to_ask) 종류(kind)를 주지 않는다 → '몰라도 계산됨'으로 다룬다
   const questions: Question[] =
-    row.questions?.map((q) => ({ text: q.text, fields: q.fields ?? [] })) ??
-    (row.questions_to_ask ?? []).map((text) => ({ text, fields: [] }));
+    row.questions?.map((q) => ({
+      text: q.text,
+      fields: q.fields ?? [],
+      kind: q.kind ?? 'optional',
+      ifUnknown: q.if_unknown ?? null,
+    })) ??
+    (row.questions_to_ask ?? []).map((text) => ({
+      text,
+      fields: [],
+      kind: 'optional',
+      ifUnknown: null,
+    }));
   return questions.flatMap<OpenQuestion>((question) => {
     if (!question.fields.length) return [{ ...question, target: null }];
     if (question.fields.includes('location')) {
@@ -241,6 +288,100 @@ function openQuestions(row: Row): OpenQuestion[] {
       .find(({ cell }) => cell.value == null || needsCheck(cell));
     return open ? [{ ...question, target: open.id }] : [];
   });
+}
+
+/**
+ * 물어볼 것 두 묶음. 꼭 볼 것(AI가 추정한 값)만 눈에 띄게 하고, 빈 값은 '몰라도 계산돼요'로
+ * 숙제처럼 보이지 않게 한다. 평소에는 추정 값이 거의 없어 회색 묶음만 보인다.
+ */
+function RowQuestions({
+  row,
+  questions,
+  onConfirmImage,
+}: {
+  row: Row;
+  questions: OpenQuestion[];
+  /** 이미지에서 읽은 값을 모두 '맞아요'로 */
+  onConfirmImage: () => void;
+}) {
+  // 서버의 check 질문(문장 하나에 칸 이름을 이어 붙임) 대신 칸 상태로 그린다 (cellsToCheck)
+  const optional = questions.filter((q) => q.kind !== 'check');
+  const { estimated, image } = cellsToCheck(row);
+  const total = estimated.length + image.length;
+  return (
+    <>
+      {total > 0 && (
+        <div className="row-questions is-check">
+          <p className="row-questions-title">
+            <CircleAlert aria-hidden className="size-4 shrink-0" />
+            확인해 주세요 {total}개
+          </p>
+          <ul>
+            {estimated.map(({ id, label }) => (
+              <li key={id}>
+                <button type="button" className="question-link" onClick={() => focusField(id)}>
+                  {label}
+                </button>
+                <span className="row-questions-sub">
+                  {' '}
+                  · AI가 추정한 값이에요. 공고와 맞는지 봐 주세요
+                </span>
+              </li>
+            ))}
+            {image.length > 0 && (
+              <li>
+                이미지에서 읽은 값 {image.length}개
+                <span className="row-questions-sub">
+                  {' '}
+                  · 틀렸다는 뜻이 아니라, 원본 그림과 한 번 비교해 주세요
+                </span>
+                <span className="row-questions-actions">
+                  <button
+                    type="button"
+                    className="question-link"
+                    onClick={() => focusField(image[0].id)}
+                  >
+                    첫 칸으로
+                  </button>
+                  <button type="button" className="question-link" onClick={onConfirmImage}>
+                    모두 맞아요
+                  </button>
+                </span>
+              </li>
+            )}
+          </ul>
+        </div>
+      )}
+      {optional.length > 0 && (
+        <div className="row-questions">
+          <p className="row-questions-title">
+            알면 더 정확해요
+            <span className="row-questions-sub">· 몰라도 계산돼요</span>
+          </p>
+          <QuestionList questions={optional} />
+        </div>
+      )}
+    </>
+  );
+}
+
+function QuestionList({ questions }: { questions: OpenQuestion[] }) {
+  return (
+    <ul>
+      {questions.map(({ text, target, ifUnknown }) => (
+        <li key={text}>
+          {target ? (
+            <button type="button" className="question-link" onClick={() => focusField(target)}>
+              {text}
+            </button>
+          ) : (
+            text
+          )}
+          {ifUnknown && <span className="row-questions-sub"> · 모르면 {ifUnknown}</span>}
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 /** 칸으로 이동해 커서를 둔다 ('확인이 필요한 것', 연봉 빈칸 안내에서 쓴다) */
@@ -302,6 +443,20 @@ export function RowEditor({
     onChange({ ...row, [key]: confirmed(cellOf(row, key)) });
   }
 
+  /** 이미지에서 읽은 값을 모두 '맞아요'로 (원본 그림과 비교했을 때). AI가 추정한 값은 그대로 둔다 */
+  function confirmImageValues() {
+    const next: Row = { ...row };
+    for (const { key, cell } of cellsToCheck(row).image) {
+      if (key) (next as Record<string, unknown>)[key] = confirmed(cell);
+    }
+    next.other_allowances = row.other_allowances?.map((item) =>
+      item.monthly_krw.status !== 'estimated' && isImageRead(item.monthly_krw)
+        ? { ...item, monthly_krw: confirmed(item.monthly_krw) as typeof item.monthly_krw }
+        : item,
+    );
+    onChange(next);
+  }
+
   function setAllowance(i: number, monthly: (item: Cell, original: Cell) => Cell) {
     onChange({
       ...row,
@@ -336,28 +491,7 @@ export function RowEditor({
         </div>
       </header>
       <div className="row-card-body">
-        {questions.length > 0 && (
-          <div className="row-questions">
-            <p className="font-semibold">확인이 필요한 것</p>
-            <ul>
-              {questions.map(({ text, target }) => (
-                <li key={text}>
-                  {target ? (
-                    <button
-                      type="button"
-                      className="question-link"
-                      onClick={() => focusField(target)}
-                    >
-                      {text}
-                    </button>
-                  ) : (
-                    text
-                  )}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
+        <RowQuestions row={row} questions={questions} onConfirmImage={confirmImageValues} />
         {groups.map((group) => (
           <fieldset key={group.title} className="row-group">
             <legend>{group.title}</legend>
