@@ -112,7 +112,8 @@ export function ReportView({ report }: { report: Report | null }) {
       )}
       <p className="text-sm text-muted-foreground">
         AI가 계산 결과를 보고 쓴 설명이에요. 설명 속 금액은 AI가 아니라 프로그램이 계산 결과에서
-        그대로 넣었어요{check.attempts > 1 ? ` (검토에서 고칠 곳이 나와 ${check.attempts}번째에 통과)` : ''}.
+        그대로 넣었어요
+        {check.attempts > 1 ? ` (검토에서 고칠 곳이 나와 ${check.attempts}번째에 통과)` : ''}.
       </p>
     </section>
   );
