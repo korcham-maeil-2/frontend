@@ -41,7 +41,7 @@ import { ProfileFormView } from './profile-form';
 import { PostingTabs, companyName } from './posting-tabs';
 import { ResultView, bestRemainingText, isCalculationResult } from './result-view';
 import { SupportView, isLocalSupport } from './support-view';
-import { ReportView, type Report } from './report-view';
+import { ReportView, isReport, type Report } from './report-view';
 import { RowEditor, fieldsToCheck, focusField } from './row-editor';
 
 // 공고 넣기 → (백엔드가 Claude로 비교표를 만듦) → 조건 확인·수정 → 내 생활비 → 매달 남는 돈
@@ -220,7 +220,7 @@ export default function NewPosting() {
       setProfile(draft.profile ?? EMPTY_PROFILE);
       setResult(isCalculationResult(draft.result) ? draft.result : null);
       setSupport(isLocalSupport(draft.support) ? draft.support : null);
-      setReport(draft.report ?? null);
+      setReport(isReport(draft.report) ? draft.report : null);
       setResultKey(draft.resultKey ?? '');
       setActivePosting(draft.activePosting ?? '');
       setSeenPostings(draft.seenPostings ?? draft.rows.map((row) => row.id));
@@ -827,6 +827,12 @@ export default function NewPosting() {
               <Calculator aria-hidden />
             </Button>
           </div>
+          {/* AI 리포트는 쓰고 검증하는 데 시간이 걸린다 (시연 모드는 리포트를 쓰지 않는다) */}
+          <p role="status" className="mt-3 text-sm text-muted-foreground">
+            {busy === 'confirming' && !demoMode
+              ? '계산한 뒤 AI가 설명을 쓰고 검증하는 중이에요. 20초쯤 걸릴 수 있어요.'
+              : ''}
+          </p>
         </form>
       ) : reviewing ? (
         <section className="desk-sheet sheet-enter" aria-label="공고 조건 확인">

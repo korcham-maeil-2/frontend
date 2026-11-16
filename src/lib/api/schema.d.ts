@@ -1064,10 +1064,11 @@ export interface components {
        */
       attempts: number;
       /**
-       * Problems
-       * @description 마지막 검증에서 찾은 문제
+       * Problem Count
+       * @description 마지막 검증에서 찾은 문제 수 (내용은 서버 로그에만 남긴다)
+       * @default 0
        */
-      problems: string[];
+      problem_count: number;
       /**
        * Reason
        * @description 쓰지 못한 이유 (해요체)
