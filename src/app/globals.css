@@ -568,6 +568,10 @@ details[open] > summary .when-closed {
 .row-field-hint:empty {
   display: none;
 }
+/* 이사할 집 주거비 칸 아래 월세 시세 한 줄 (profile-form.tsx rentNote) */
+.rent-note {
+  margin-top: 0.25rem;
+}
 .status-badge {
   justify-self: end;
   white-space: nowrap;
@@ -1337,8 +1341,4 @@ section.desk-sheet > .sheet-heading {
   margin-top: 2rem;
   border-top: 1px solid var(--border);
   padding-top: 1.5rem;
-}
-/* 이사할 집 주거비 칸 아래 월세 시세 한 줄 (profile-form.tsx rentNote) */
-.rent-note {
-  margin-top: 0.25rem;
 }
