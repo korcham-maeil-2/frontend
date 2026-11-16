@@ -1046,6 +1046,34 @@ export interface components {
        */
       reason: string | null;
     };
+    /**
+     * ReportCheck
+     * @description 리포트 검증 결과 = 세션 응답의 report_check 칸.
+     */
+    ReportCheck: {
+      /**
+       * Status
+       * @description verified=검증 통과, unverified=다시 써도 통과 못 해 보여 주지 않음, unavailable=쓰지 못함(Claude 오류), skipped=리포트 기능 꺼짐(키 없음·시연 모드)
+       * @enum {string}
+       */
+      status: 'verified' | 'unverified' | 'unavailable' | 'skipped';
+      /**
+       * Attempts
+       * @description 쓴 횟수 (1 = 한 번에 통과)
+       * @default 0
+       */
+      attempts: number;
+      /**
+       * Problems
+       * @description 마지막 검증에서 찾은 문제
+       */
+      problems: string[];
+      /**
+       * Reason
+       * @description 쓰지 못한 이유 (해요체)
+       */
+      reason: string | null;
+    };
     /** SalaryTypeCell */
     SalaryTypeCell: {
       /**
@@ -1144,8 +1172,13 @@ export interface components {
       result?: components['schemas']['CalculationResult'] | null;
       /** @description 근무지 지역별 청년 지원 (status가 completed일 때, 키가 없으면 null) */
       local_support?: components['schemas']['LocalSupport'] | null;
-      /** Report */
+      /**
+       * Report
+       * @description 계산 결과를 쉬운 말로 쓴 리포트 (검증을 통과했을 때만)
+       */
       report?: string | null;
+      /** @description 리포트 검증 결과 (통과·다시 써도 실패·쓰지 못함·꺼짐) */
+      report_check?: components['schemas']['ReportCheck'] | null;
     };
     /**
      * SupportPolicy
