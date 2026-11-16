@@ -164,8 +164,8 @@ function rentNote(value: Money, rent: RentEstimate | null, pending: boolean): Re
   return (
     <>
       <span className={`status-badge ${badge.className}`}>{badge.label}</span> {place} 원룸 월세{' '}
-      <span className="text-foreground">{formatWon(rent.monthly_rent_krw)}</span> (
-      {rent.period} 국토부 실거래가 {rent.sample_size.toLocaleString('ko-KR')}건 중앙값
+      <span className="text-foreground">{formatWon(rent.monthly_rent_krw)}</span> ({rent.period}{' '}
+      국토부 실거래가 {rent.sample_size.toLocaleString('ko-KR')}건 중앙값
       {few ? ', 거래가 적어 참고만 하세요' : ''}).{' '}
       {value == null
         ? '비워 두면 이 금액으로 계산해요. 관리비는 빠져 있어서 남는 돈이 실제보다 많게 나올 수 있어요.'
