@@ -5,6 +5,21 @@ import type { Row } from './format';
 // 서버로 보낼 때 toUserProfile()로 백엔드 모양(UserProfile)으로 바꾼다.
 
 export type UserProfile = components['schemas']['UserProfile'];
+/** 근무지(시군구)의 원룸급 월세 시세 (백엔드 GET /rent/{lawd_cd}, 국토부 실거래가) */
+export type RentEstimate = components['schemas']['RentEstimate'];
+/** 시군구 코드 → 월세 시세 */
+export type Rents = Record<string, RentEstimate>;
+
+/**
+ * 이 공고의 '이사할 집 주거비'를 비워 두면 서버가 쓰는 시세 (없으면 null).
+ * 서버(calc/summary.py)와 같은 조건: 시세를 구했고, 회사가 사택·기숙사를 주지 않을 때.
+ */
+export function rentFor(row: Row, rents: Rents): RentEstimate | null {
+  const code = row.location?.value?.lawd_cd;
+  const rent = code ? rents[code] : undefined;
+  if (!rent || rent.status !== 'estimated' || rent.monthly_rent_krw == null) return null;
+  return row.company_housing?.value === true ? null : rent;
+}
 
 /** 금액 입력 한 칸. 비어 있으면 null (0원과 다르다: 0원은 '없다고 답함') */
 export type Money = number | null;
@@ -130,7 +145,7 @@ export type MissingInput = { label: string; fieldId: string; rowId?: string };
  * 계산 전에 알려 줄 빈 칸 (막지는 않는다: 빈 경우는 결과에 '계산할 수 없음'으로 나온다).
  * 화면 위에서 아래 순서로 돌려준다.
  */
-export function missingInputs(form: ProfileForm, rows: Row[]): MissingInput[] {
+export function missingInputs(form: ProfileForm, rows: Row[], rents: Rents = {}): MissingInput[] {
   const missing: MissingInput[] = [];
   // rowId: 공고별 칸이면 그 공고 (회사 탭 개수와 '그 탭으로 이동'에 쓴다)
   const add = (label: string, fieldId: string, rowId?: string) =>
@@ -151,7 +166,8 @@ export function missingInputs(form: ProfileForm, rows: Row[]): MissingInput[] {
     if (c.canCommute && c.commuteTransport == null) {
       add(`${name} 통근 교통비`, `${row.id}-commute-transport`, row.id);
     }
-    if (c.considerMove && c.moveHousing == null) {
+    // 비워 두면 근무지 월세 시세로 계산하므로 빈칸이 아니다
+    if (c.considerMove && c.moveHousing == null && !rentFor(row, rents)) {
       add(`${name} 이사할 집 주거비`, `${row.id}-move-housing`, row.id);
     }
     if (c.considerMove && c.moveTransport == null) {

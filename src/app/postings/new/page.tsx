@@ -35,6 +35,7 @@ import {
   missingInputs,
   toUserProfile,
   type ProfileForm,
+  type Rents,
   type UserProfile,
 } from './profile';
 import { ProfileFormView } from './profile-form';
@@ -188,6 +189,8 @@ export default function NewPosting() {
   const [demoMode, setDemoMode] = useState(false);
   // 서버가 청년 지원을 찾을 수 있는지 (온통청년 키). 아니면 나이 칸을 숨긴다 (나이는 그것에만 쓴다)
   const [supportEnabled, setSupportEnabled] = useState(false);
+  // 근무지(시군구 코드)별 원룸 월세 시세. 이사할 집 주거비를 비우면 서버가 이 값으로 계산한다
+  const [rents, setRents] = useState<Rents>({});
   const [restored, setRestored] = useState(false);
   const heading = useRef<HTMLHeadingElement>(null);
   const firstTextarea = useRef<HTMLTextAreaElement>(null);
@@ -498,7 +501,7 @@ export default function NewPosting() {
     changeStep('living');
   }
 
-  const missingProfile = missingInputs(profile, rows);
+  const missingProfile = missingInputs(profile, rows, rents);
   // 지금 보이는 결과가 지금 입력(비교표 + 생활비)으로 계산한 것인지. 고쳤으면 다시 계산해야 결과를 보여 준다.
   const currentKey = useMemo(() => inputKey(rows, toUserProfile(profile, rows)), [rows, profile]);
   const freshResult = result !== null && resultKey === currentKey ? result : null;
@@ -639,6 +642,28 @@ export default function NewPosting() {
       cancelled = true;
     };
   }, [showingResult, sessionId, supportDate]);
+  // 내 생활비 화면에서 근무지 월세 시세를 받아 온다 (이사할 집 주거비 칸 안내, 빈칸 경고).
+  // 지역마다 한 번만 묻고, 못 받으면 안내 없이 지금처럼 둔다 (서버가 계산할 때 다시 조회한다)
+  const rentCodes = [
+    ...new Set(rows.map((row) => row.location?.value?.lawd_cd).filter((c): c is string => !!c)),
+  ]
+    .filter((code) => !(code in rents))
+    .join(',');
+  useEffect(() => {
+    if (shown !== 'living' || !rentCodes) return;
+    let cancelled = false;
+    for (const code of rentCodes.split(',')) {
+      api
+        .GET('/rent/{lawd_cd}', { params: { path: { lawd_cd: code } } })
+        .then(({ data }) => {
+          if (!cancelled && data) setRents((known) => ({ ...known, [code]: data }));
+        })
+        .catch(() => {});
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [shown, rentCodes]);
   const reviewing = shown !== 'input';
   const shownIndex = STEPS.findIndex((item) => item.key === shown);
   // 단계마다 지금까지 넣은 것을 한 줄로 (넓은 화면의 단계 표시 아래)
@@ -776,6 +801,7 @@ export default function NewPosting() {
               onSelectPosting={selectPosting}
               missingFor={(row) => missingProfile.filter((item) => item.rowId === row.id)}
               askAge={supportEnabled}
+              rents={rents}
             />
           </fieldset>
           {missingProfile.length > 0 && (

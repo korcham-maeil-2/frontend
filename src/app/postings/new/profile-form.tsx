@@ -8,8 +8,11 @@ import { PostingTabs } from './posting-tabs';
 import {
   AGE_RANGE,
   costsOf,
+  rentFor,
   validAge,
   type MissingInput,
+  type RentEstimate,
+  type Rents,
   type Money,
   type PostingCostsForm,
   type ProfileForm as Form,
@@ -129,15 +132,38 @@ function Check({
   );
 }
 
+/**
+ * '이사할 집 주거비' 칸 안내. 근무지 월세 시세가 있으면, 비워 두면 그 값으로 계산한다고 알린다
+ * (서버 calc/summary.py가 비어 있는 이사 주거비를 시세로 채운다).
+ */
+function moveHousingHelp(value: Money, aid: number | null | undefined, rent: RentEstimate | null) {
+  const parts = ['월세 + 관리비'];
+  if (aid) parts.push(`회사 주거지원비 ${formatWon(aid)}은 빼지 말고 넣어 주세요 (계산할 때 빼요)`);
+  if (rent?.monthly_rent_krw != null) {
+    const place = rent.region.split(' ').slice(1).join(' ') || rent.region;
+    const won = formatWon(rent.monthly_rent_krw);
+    const basis = `국토부 실거래가 ${rent.sample_size.toLocaleString('ko-KR')}건 중앙값, 관리비 별도`;
+    parts.push(
+      value == null
+        ? `비워 두면 ${place} 원룸 월세 시세 ${won}으로 계산해요 (${basis})`
+        : `참고: ${place} 원룸 월세 시세 ${won} (${basis})`,
+    );
+  }
+  return parts.join('. ');
+}
+
 function PostingCosts({
   row,
   index,
   costs,
+  rent,
   onChange,
 }: {
   row: Row;
   index: number;
   costs: PostingCostsForm;
+  /** 근무지 월세 시세 (없으면 null) */
+  rent: RentEstimate | null;
   onChange: (costs: PostingCostsForm) => void;
 }) {
   const id = (key: string) => `${row.id}-${key}`;
@@ -196,11 +222,7 @@ function PostingCosts({
                 example="50만"
                 value={costs.moveHousing}
                 onChange={(moveHousing) => set({ moveHousing })}
-                help={
-                  aid
-                    ? `월세 + 관리비. 회사 주거지원비 ${formatWon(aid)}은 빼지 말고 넣어 주세요 (계산할 때 빼요)`
-                    : '월세 + 관리비'
-                }
+                help={moveHousingHelp(costs.moveHousing, aid, rent)}
               />
               <MoneyField
                 id={id('move-transport')}
@@ -226,6 +248,7 @@ export function ProfileFormView({
   onSelectPosting,
   missingFor,
   askAge,
+  rents,
 }: {
   form: Form;
   rows: Row[];
@@ -237,6 +260,8 @@ export function ProfileFormView({
   missingFor: (row: Row) => MissingInput[];
   /** 나이 칸을 보일지 (서버가 청년 지원을 찾을 수 있을 때만. 나이는 그것에만 쓴다) */
   askAge: boolean;
+  /** 근무지(시군구 코드)별 월세 시세. 이사할 집 주거비를 비우면 이 값으로 계산된다 */
+  rents: Rents;
 }) {
   const set = (patch: Partial<Form>) => onChange({ ...form, ...patch });
   const setFixed = (fixedExpenses: Form['fixedExpenses']) => set({ fixedExpenses });
@@ -385,6 +410,7 @@ export function ProfileFormView({
                 row={row}
                 index={i}
                 costs={costsOf(form, row)}
+                rent={rentFor(row, rents)}
                 onChange={(costs) => set({ postings: { ...form.postings, [row.id]: costs } })}
               />
             ),
