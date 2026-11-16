@@ -32,7 +32,9 @@ import {
 } from './posting-files';
 import {
   EMPTY_PROFILE,
+  isSettledRent,
   missingInputs,
+  rentsFromResult,
   toUserProfile,
   type ProfileForm,
   type Rents,
@@ -191,6 +193,9 @@ export default function NewPosting() {
   const [supportEnabled, setSupportEnabled] = useState(false);
   // 근무지(시군구 코드)별 원룸 월세 시세. 이사할 집 주거비를 비우면 서버가 이 값으로 계산한다
   const [rents, setRents] = useState<Rents>({});
+  // 시세를 불러오지 못한 지역 (빈칸 경고에 넣고, '내 생활비' 단계에 다시 들어오면 다시 묻는다)
+  const [failedRents, setFailedRents] = useState<string[]>([]);
+  const requestedRents = useRef(new Set<string>()); // 한 번 물은 지역 (응답 전에 또 묻지 않게)
   const [restored, setRestored] = useState(false);
   const heading = useRef<HTMLHeadingElement>(null);
   const firstTextarea = useRef<HTMLTextAreaElement>(null);
@@ -219,6 +224,9 @@ export default function NewPosting() {
       setCompleted(draft.completed);
       setProfile(draft.profile ?? EMPTY_PROFILE);
       setResult(isCalculationResult(draft.result) ? draft.result : null);
+      if (isCalculationResult(draft.result)) {
+        setRents(rentsFromResult(draft.result.rent_estimates));
+      }
       setSupport(isLocalSupport(draft.support) ? draft.support : null);
       setResultKey(draft.resultKey ?? '');
       setActivePosting(draft.activePosting ?? '');
@@ -303,6 +311,11 @@ export default function NewPosting() {
     setError('');
     setCheckWarned(false);
     if (next === 'review' && markActiveSeen && activeId) markSeen(activeId);
+    if (next === 'living' && failedRents.length) {
+      // 불러오지 못했던 지역은 다시 묻는다
+      for (const code of failedRents) requestedRents.current.delete(code);
+      setFailedRents([]);
+    }
     setStep(next);
     // 넓은 화면에서는 왼쪽 제목이 따라다녀서(sticky) 포커스만으로는 위로 안 올라간다.
     window.scrollTo({ top: 0 });
@@ -501,7 +514,7 @@ export default function NewPosting() {
     changeStep('living');
   }
 
-  const missingProfile = missingInputs(profile, rows, rents);
+  const missingProfile = missingInputs(profile, rows, rents, failedRents);
   // 지금 보이는 결과가 지금 입력(비교표 + 생활비)으로 계산한 것인지. 고쳤으면 다시 계산해야 결과를 보여 준다.
   const currentKey = useMemo(() => inputKey(rows, toUserProfile(profile, rows)), [rows, profile]);
   const freshResult = result !== null && resultKey === currentKey ? result : null;
@@ -541,6 +554,7 @@ export default function NewPosting() {
       setRows(calculatedRows);
       setCompleted(true);
       setResult(data.result);
+      setRents((known) => ({ ...known, ...rentsFromResult(data.result?.rent_estimates) }));
       // 청년 지원은 키가 없거나 예전 백엔드면 오지 않는다 → 없으면 그 영역만 안 그린다
       setSupport(isLocalSupport(data.local_support) ? data.local_support : null);
       setResultKey(inputKey(calculatedRows, sentProfile));
@@ -643,27 +657,25 @@ export default function NewPosting() {
     };
   }, [showingResult, sessionId, supportDate]);
   // 내 생활비 화면에서 근무지 월세 시세를 받아 온다 (이사할 집 주거비 칸 안내, 빈칸 경고).
-  // 지역마다 한 번만 묻고, 못 받으면 안내 없이 지금처럼 둔다 (서버가 계산할 때 다시 조회한다)
+  // 지역마다 한 번만 묻는다 (근무지가 여러 곳이어도 응답을 버리고 다시 묻지 않는다).
+  // 확정된 결과만 담고, 못 받으면 failedRents에 넣어 빈칸 경고를 띄운다 → 다음에 들어오면 다시 묻는다.
   const rentCodes = [
     ...new Set(rows.map((row) => row.location?.value?.lawd_cd).filter((c): c is string => !!c)),
-  ]
-    .filter((code) => !(code in rents))
-    .join(',');
+  ].join(',');
   useEffect(() => {
     if (shown !== 'living' || !rentCodes) return;
-    let cancelled = false;
     for (const code of rentCodes.split(',')) {
+      if (code in rents || requestedRents.current.has(code)) continue;
+      requestedRents.current.add(code);
       api
         .GET('/rent/{lawd_cd}', { params: { path: { lawd_cd: code } } })
         .then(({ data }) => {
-          if (!cancelled && data) setRents((known) => ({ ...known, [code]: data }));
+          if (isSettledRent(data)) setRents((known) => ({ ...known, [code]: data }));
+          else setFailedRents((codes) => [...codes, code]);
         })
-        .catch(() => {});
+        .catch(() => setFailedRents((codes) => [...codes, code]));
     }
-    return () => {
-      cancelled = true;
-    };
-  }, [shown, rentCodes]);
+  }, [shown, rentCodes, rents]);
   const reviewing = shown !== 'input';
   const shownIndex = STEPS.findIndex((item) => item.key === shown);
   // 단계마다 지금까지 넣은 것을 한 줄로 (넓은 화면의 단계 표시 아래)
@@ -802,6 +814,7 @@ export default function NewPosting() {
               missingFor={(row) => missingProfile.filter((item) => item.rowId === row.id)}
               askAge={supportEnabled}
               rents={rents}
+              failedRents={failedRents}
             />
           </fieldset>
           {missingProfile.length > 0 && (

@@ -7,8 +7,27 @@ import type { Row } from './format';
 export type UserProfile = components['schemas']['UserProfile'];
 /** 근무지(시군구)의 원룸급 월세 시세 (백엔드 GET /rent/{lawd_cd}, 국토부 실거래가) */
 export type RentEstimate = components['schemas']['RentEstimate'];
-/** 시군구 코드 → 월세 시세 */
+/** 시군구 코드 → 월세 시세. 확정된 결과(시세를 구함 'estimated' / 거래 없음 'missing')만 담는다.
+ *  불러오지 못한 것('unavailable')은 담지 않고 다음에 다시 묻는다. */
 export type Rents = Record<string, RentEstimate>;
+
+/** 저장해 둘 만한(확정된) 시세인지 */
+export function isSettledRent(rent: RentEstimate | null | undefined): rent is RentEstimate {
+  return !!rent && (rent.status === 'estimated' || rent.status === 'missing');
+}
+
+/** 계산 결과에 실려 온 시세 → Rents (결과 화면에서 새로고침해도 빈칸 경고가 맞게) */
+export function rentsFromResult(estimates: readonly RentEstimate[] | undefined): Rents {
+  return Object.fromEntries(
+    (estimates ?? []).filter(isSettledRent).map((rent) => [rent.lawd_cd, rent]),
+  );
+}
+
+/** 이 공고 근무지의 시세를 아직 불러오는 중인지 (불러오지 못한 지역은 아니다) */
+export function rentPending(row: Row, rents: Rents, failed: readonly string[]): boolean {
+  const code = row.location?.value?.lawd_cd;
+  return !!code && !(code in rents) && !failed.includes(code);
+}
 
 /**
  * 이 공고의 '이사할 집 주거비'를 비워 두면 서버가 쓰는 시세 (없으면 null).
@@ -145,7 +164,12 @@ export type MissingInput = { label: string; fieldId: string; rowId?: string };
  * 계산 전에 알려 줄 빈 칸 (막지는 않는다: 빈 경우는 결과에 '계산할 수 없음'으로 나온다).
  * 화면 위에서 아래 순서로 돌려준다.
  */
-export function missingInputs(form: ProfileForm, rows: Row[], rents: Rents = {}): MissingInput[] {
+export function missingInputs(
+  form: ProfileForm,
+  rows: Row[],
+  rents: Rents = {},
+  failedRents: readonly string[] = [],
+): MissingInput[] {
   const missing: MissingInput[] = [];
   // rowId: 공고별 칸이면 그 공고 (회사 탭 개수와 '그 탭으로 이동'에 쓴다)
   const add = (label: string, fieldId: string, rowId?: string) =>
@@ -166,8 +190,13 @@ export function missingInputs(form: ProfileForm, rows: Row[], rents: Rents = {})
     if (c.canCommute && c.commuteTransport == null) {
       add(`${name} 통근 교통비`, `${row.id}-commute-transport`, row.id);
     }
-    // 비워 두면 근무지 월세 시세로 계산하므로 빈칸이 아니다
-    if (c.considerMove && c.moveHousing == null && !rentFor(row, rents)) {
+    // 비워 두면 근무지 월세 시세로 계산하므로 빈칸이 아니다 (불러오는 중에도 경고를 띄우지 않는다)
+    if (
+      c.considerMove &&
+      c.moveHousing == null &&
+      !rentFor(row, rents) &&
+      !rentPending(row, rents, failedRents)
+    ) {
       add(`${name} 이사할 집 주거비`, `${row.id}-move-housing`, row.id);
     }
     if (c.considerMove && c.moveTransport == null) {
