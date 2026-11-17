@@ -591,6 +591,10 @@ details[open] > summary .when-closed {
 .rent-note {
   margin-top: 0.25rem;
 }
+/* 화면 읽기용으로 줄은 늘 두지만, 비어 있을 때는 자리를 차지하지 않는다 */
+.rent-note:empty {
+  margin-top: 0;
+}
 .status-badge {
   justify-self: end;
   white-space: nowrap;
@@ -1742,4 +1746,30 @@ section.desk-sheet > .sheet-heading {
   gap: 0.5rem 0.75rem;
   font-size: 0.875rem;
   color: var(--foreground);
+}
+
+/* 계산 실패 안내 (page.tsx 생활비 단계): 오류 색 테두리로 눈에 띄게 */
+.salary-notice.error-notice {
+  border-color: color-mix(in srgb, var(--destructive) 40%, transparent);
+}
+.salary-notice.error-notice > p:first-child {
+  color: var(--destructive);
+}
+/* 글 안의 글자 버튼 (예: 월세 시세 '다시 불러오기'). 누를 자리는 넓힌다 */
+.inline-link {
+  position: relative;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  color: var(--foreground);
+  cursor: pointer;
+}
+.inline-link::before {
+  content: '';
+  position: absolute;
+  inset: -0.75rem -0.25rem;
+}
+.inline-link:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-radius: 0.25rem;
 }

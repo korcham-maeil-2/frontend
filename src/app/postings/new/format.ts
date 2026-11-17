@@ -84,6 +84,11 @@ export function badgeFor(cell: Cell): Badge {
   return statusBadge[cell.status];
 }
 
+/** 시군구 이름만: '전남광주통합특별시 나주시' → '나주시' (세종처럼 한 단어면 그대로) */
+export function placeName(region: string): string {
+  return region.split(' ').slice(1).join(' ') || region;
+}
+
 /** 금액을 한글 단위로: 36000000 → '3,600만원', 200000 → '20만원', 150000000 → '1억 5,000만원' */
 export function formatWon(value: number): string {
   if (value === 0) return '0원';

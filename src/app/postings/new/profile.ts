@@ -26,6 +26,15 @@ export function rentsFromResult(estimates: readonly RentEstimate[] | undefined):
   );
 }
 
+/**
+ * 이 공고 근무지의 시세를 불러오지 못했는지 (공공데이터 조회 실패).
+ * 회사가 사택·기숙사를 주면 시세를 쓰지 않으므로(rentFor와 같은 조건) 실패여도 상관없다.
+ */
+export function rentFailed(row: Row, failed: readonly string[]): boolean {
+  const code = row.location?.value?.lawd_cd;
+  return !!code && failed.includes(code) && row.company_housing?.value !== true;
+}
+
 /** 이 공고 근무지의 시세를 아직 불러오는 중인지 (불러오지 못한 지역은 아니다) */
 export function rentPending(row: Row, rents: Rents, failed: readonly string[]): boolean {
   const code = row.location?.value?.lawd_cd;

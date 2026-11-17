@@ -322,16 +322,19 @@ export default function NewPosting() {
     return () => window.removeEventListener('beforeunload', warn);
   }, [busy]);
 
+  /** 월세 시세를 불러오지 못했던 지역을 다시 묻는다 (생활비 화면 effect가 다시 요청한다) */
+  function retryFailedRents() {
+    if (!failedRents.length) return;
+    for (const code of failedRents) requestedRents.current.delete(code);
+    setFailedRents([]);
+  }
+
   /** 단계 바꾸기. 조건 확인으로 갈 때는 지금 고른 공고를 '본 것'으로 (새 표를 읽을 때는 따로 정한다) */
   function changeStep(next: Step, { markActiveSeen = true } = {}) {
     setError('');
     setCheckWarned(false);
     if (next === 'review' && markActiveSeen && activeId) markSeen(activeId);
-    if (next === 'living' && failedRents.length) {
-      // 불러오지 못했던 지역은 다시 묻는다
-      for (const code of failedRents) requestedRents.current.delete(code);
-      setFailedRents([]);
-    }
+    if (next === 'living') retryFailedRents(); // 불러오지 못했던 지역은 다시 묻는다
     setStep(next);
     // 넓은 화면에서는 왼쪽 제목이 따라다녀서(sticky) 포커스만으로는 위로 안 올라간다.
     window.scrollTo({ top: 0 });
@@ -674,6 +677,9 @@ export default function NewPosting() {
   // 저장된 목록은 계산한 날 기준이라 '신청 중'이던 정책이 그새 끝났을 수 있다. 다시 고른 것은
   // 저장된 계산 결과를 바꾸지 않는다 (GET /sessions/{id}/local-support는 보기만 한다).
   const showingResult = shown === 'result' && sessionId !== '';
+  // 오늘 기준으로 다시 고르지 못한 목록의 날짜. 지금 보이는 목록이 그 날짜면 '그날 기준'이라고 알린다
+  // (다시 고르는 데 성공하거나 새로 비교하면 목록 날짜가 바뀌어 저절로 사라진다)
+  const [staleFor, setStaleFor] = useState<string | null>(null);
   const supportDate = support?.checked_on;
   useEffect(() => {
     if (!showingResult || !supportDate || supportDate === todayInKorea()) return;
@@ -683,9 +689,12 @@ export default function NewPosting() {
         params: { path: { session_id: sessionId } },
       })
       .then(({ data }) => {
-        if (!cancelled && data !== undefined) setSupport(isLocalSupport(data) ? data : null);
+        if (cancelled) return;
+        if (data === undefined) return setStaleFor(supportDate);
+        setSupport(isLocalSupport(data) ? data : null);
       })
-      .catch(() => {}); // 못 받아 오면 저장된 목록을 그대로 보여 준다
+      // 못 받아 오면 저장된 목록을 그대로 보여 주고, 계산한 날 기준이라고 알린다
+      .catch(() => !cancelled && setStaleFor(supportDate));
     return () => {
       cancelled = true;
     };
@@ -709,7 +718,9 @@ export default function NewPosting() {
         })
         .catch(() => setFailedRents((codes) => [...codes, code]));
     }
-  }, [shown, rentCodes, rents]);
+    // failedRents: '다시 불러오기'로 실패 목록을 비우면 같은 화면에서도 다시 묻는다
+    // (실패해서 목록에 들어갈 때는 requestedRents에 남아 있어 다시 묻지 않는다)
+  }, [shown, rentCodes, rents, failedRents]);
   const reviewing = shown !== 'input';
   const shownIndex = STEPS.findIndex((item) => item.key === shown);
   // 단계마다 지금까지 넣은 것을 한 줄로 (넓은 화면의 단계 표시 아래)
@@ -810,7 +821,9 @@ export default function NewPosting() {
           <h2 className="sheet-heading">공고 {rows.length}개 비교</h2>
           <ReportView report={report} />
           <ResultView result={freshResult} rows={rows} />
-          {support && <SupportView support={support} rows={rows} />}
+          {support && (
+            <SupportView support={support} rows={rows} stale={support.checked_on === staleFor} />
+          )}
           <div className="sheet-actions flex-wrap">
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" className="min-h-11" onClick={() => changeStep('living')}>
@@ -876,6 +889,7 @@ export default function NewPosting() {
               askAge={supportEnabled}
               rents={rents}
               failedRents={failedRents}
+              onRetryRents={retryFailedRents}
             />
           </fieldset>
           {missingProfile.length > 0 && (
@@ -898,9 +912,15 @@ export default function NewPosting() {
               </ul>
             </div>
           )}
-          <p role="alert" className="form-hint">
-            {error}
-          </p>
+          {/* 계산 실패: 빨간 한 줄 대신 눈에 띄는 상자로. 할 일은 오류 문구에, 넣은 값은 그대로라는 것을 함께 */}
+          <div role="alert">
+            {error && (
+              <div className="salary-notice error-notice">
+                <p className="font-semibold">{error}</p>
+                <p>넣은 값은 그대로 있어요.</p>
+              </div>
+            )}
+          </div>
           <div className="sheet-actions">
             <Button
               type="button"
