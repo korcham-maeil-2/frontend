@@ -1131,6 +1131,11 @@ export interface components {
        * @description 계산에 필요한데 없는 값
        */
       missing: string[];
+      /**
+       * Assumed Zero
+       * @description 비어 있어 0원으로 놓고 계산한 값 (예: 교통비). 실제로는 더 들 수 있다
+       */
+      assumed_zero: string[];
     };
     /**
      * SessionResponse

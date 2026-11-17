@@ -22,7 +22,7 @@ const rows: Row[] = [
     daegu: { value: '약 199만원', note: '서울만큼 남는 기준' },
   },
   {
-    label: '집',
+    label: '주거비',
     seoul: { value: '−50만원', note: '강서구 원룸 월세' },
     daegu: { value: '−30만원', note: '본가에 드리는 돈' },
   },

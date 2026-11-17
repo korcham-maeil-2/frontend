@@ -11,6 +11,9 @@ export type RentEstimate = components['schemas']['RentEstimate'];
  *  불러오지 못한 것('unavailable')은 담지 않고 다음에 다시 묻는다. */
 export type Rents = Record<string, RentEstimate>;
 
+/** 시세를 낸 거래가 이보다 적으면 '참고만' */
+export const FEW_TRADES = 5;
+
 /** 저장해 둘 만한(확정된) 시세인지 */
 export function isSettledRent(rent: RentEstimate | null | undefined): rent is RentEstimate {
   return !!rent && (rent.status === 'estimated' || rent.status === 'missing');
@@ -187,9 +190,7 @@ export function missingInputs(
     if (!c.canCommute && !c.considerMove) {
       add(`${name}: 통근·이사 중 하나는 골라 주세요`, `${row.id}-can-commute`, row.id);
     }
-    if (c.canCommute && c.commuteTransport == null) {
-      add(`${name} 통근 교통비`, `${row.id}-commute-transport`, row.id);
-    }
+    // 공고별 교통비는 비워 두면 서버가 0원(추정)으로 계산하고 '더 들 수 있어요'라고 알리므로 빈칸이 아니다
     // 비워 두면 근무지 월세 시세로 계산하므로 빈칸이 아니다 (불러오는 중에도 경고를 띄우지 않는다)
     if (
       c.considerMove &&
@@ -198,9 +199,6 @@ export function missingInputs(
       !rentPending(row, rents, failedRents)
     ) {
       add(`${name} 이사할 집 주거비`, `${row.id}-move-housing`, row.id);
-    }
-    if (c.considerMove && c.moveTransport == null) {
-      add(`${name} 이사한 뒤 교통비`, `${row.id}-move-transport`, row.id);
     }
   });
   if (form.hasCurrentJob && form.currentSalary == null) add('지금 연봉', 'current-salary');

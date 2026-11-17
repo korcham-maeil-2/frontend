@@ -12,6 +12,7 @@ import {
   rentPending,
   validAge,
   type MissingInput,
+  FEW_TRADES,
   type RentEstimate,
   type Rents,
   type Money,
@@ -149,8 +150,6 @@ function moveHousingHelp(aid: number | null | undefined) {
   return parts.join('. ');
 }
 
-const FEW_TRADES = 5; // 거래가 이보다 적으면 '참고만'
-
 /**
  * 근무지 원룸 월세 시세 한 줄 ('추정' 배지). 비워 두면 서버(calc/summary.py)가 이 값으로 계산한다.
  * 시세에는 관리비가 빠져 있어, 비워 두면 남는 돈이 실제보다 많게 나올 수 있다고 알린다.
@@ -226,7 +225,11 @@ function PostingCosts({
               example="10만"
               value={costs.commuteTransport}
               onChange={(commuteTransport) => set({ commuteTransport })}
-              help={row.shuttle_bus?.value ? '통근버스가 있어요. 무료면 0원' : undefined}
+              help={
+                row.shuttle_bus?.value
+                  ? '통근버스가 있어요. 무료면 0원. 비워 두면 0원으로 계산해요'
+                  : '비워 두면 0원으로 계산해요'
+              }
             />
           )}
         </fieldset>
@@ -256,7 +259,7 @@ function PostingCosts({
                 example="6만"
                 value={costs.moveTransport}
                 onChange={(moveTransport) => set({ moveTransport })}
-                help="출퇴근 + 본가에 다녀오는 비용"
+                help="출퇴근 + 본가에 다녀오는 비용. 비워 두면 0원으로 계산해요"
               />
             </>
           )}

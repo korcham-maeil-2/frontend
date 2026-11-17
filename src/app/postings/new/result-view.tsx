@@ -5,6 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { components } from '@/lib/api/schema';
 import '../../landing.css'; // 비교표 모양(.offer-table, .compare-table)을 랜딩과 같이 쓴다
 import { formatWon, hasSalary, salaryText, statusBadge, type Row, type Status } from './format';
+import { FEW_TRADES } from './profile';
 
 // 결과 화면: 공고별 '매달 남는 돈'을 한 표로 비교한다 (DESIGN.md "비교표").
 //   열 = 공고, 행 = 연봉 → 세후 월급 → 집 → 교통비 → 고정비 → 매달 남는 돈
@@ -18,6 +19,7 @@ type Scenario = components['schemas']['Scenario'];
 type BreakEven = components['schemas']['BreakEven'];
 type BreakEvenCase = components['schemas']['BreakEvenCase'];
 type Item = components['schemas']['Item'];
+type RentEstimate = components['schemas']['RentEstimate'];
 type Case = Scenario['case'];
 type Mode = 'best' | Case;
 
@@ -56,7 +58,7 @@ type RowKey = 'salary' | 'net' | 'housing' | 'transport' | 'fixed' | 'remaining'
 const ROWS: { key: RowKey; label: string }[] = [
   { key: 'salary', label: '연봉' },
   { key: 'net', label: '세후 월급' },
-  { key: 'housing', label: '집' },
+  { key: 'housing', label: '주거비' },
   { key: 'transport', label: '교통비' },
   { key: 'fixed', label: '고정비' },
   { key: 'remaining', label: '매달 남는 돈' },
@@ -148,9 +150,10 @@ function buildColumn(
   const chosen = pickCase(posting, breakEven, mode);
   const scenario = posting.scenarios.find((s) => s.case === chosen && s.applicable);
   const be = breakEven?.cases.find((c) => c.case === chosen);
+  // 세후 월급은 간이세액표로 계산한 예상값이라 실제 급여명세서와 조금 다를 수 있다 → 늘 '추정'
   const knownNet: Shown =
     posting.net_income.value != null
-      ? { value: won(posting.net_income.value), status: posting.net_income.status }
+      ? { value: won(posting.net_income.value), status: 'estimated' }
       : NOT_APPLICABLE;
   if (!scenario) {
     // 이 경우는 해당 없음 (예: 서울 → 나주 통근). 공고 자체 값(연봉·세후 월급)은 그대로 보여 준다.
@@ -184,6 +187,9 @@ function buildColumn(
       ? UNKNOWN
       : { value: exact(-item.value), note: note ?? undefined, status: item.status };
 
+  // 교통비가 비어서 0원으로 놓고 계산했는지. 예전 백엔드·저장된 초안에는 이 필드가 없다 (배포 순서)
+  const assumedTransport = (scenario.assumed_zero ?? []).includes('교통비');
+  const lessIfTransport = assumedTransport ? '교통비가 들면 줄어요' : undefined;
   let salary: Shown;
   let net: Shown;
   let remaining: Shown;
@@ -192,7 +198,10 @@ function buildColumn(
     net = knownNet;
     remaining =
       scenario.monthly_remaining != null
-        ? remainingCell(scenario.monthly_remaining, { status: scenario.status })
+        ? remainingCell(scenario.monthly_remaining, {
+            status: scenario.status,
+            note: lessIfTransport,
+          })
         : {
             value: '계산 못 함',
             note: `필요한 값: ${scenario.missing.join(', ')}`,
@@ -206,7 +215,9 @@ function buildColumn(
       tone: 'target',
     };
     net =
-      be.net_income_krw != null ? { value: won(be.net_income_krw), note: '그 연봉일 때' } : UNKNOWN;
+      be.net_income_krw != null
+        ? { value: won(be.net_income_krw), note: '그 연봉일 때', status: 'estimated' }
+        : UNKNOWN;
     remaining = remainingCell(be.monthly_remaining!, {
       // 최저임금으로 올린 경우는 기준보다 많이 남는다
       note: be.floor === 'minimum_wage' ? '기준보다 많이' : '기준과 같은 금액',
@@ -243,7 +254,8 @@ function buildColumn(
       net,
       housing:
         solved && be?.support_excluded ? cost(housing, '주거지원비가 끝난 뒤') : cost(housing),
-      transport: cost(transport),
+      // 비워 둬서 0원으로 계산한 교통비: 긴 출처 대신 짧게 (출처 전문은 계산 내역에)
+      transport: assumedTransport ? cost(transport, '비워 둠 · 더 들 수 있어요') : cost(transport),
       fixed: cost(fixed),
       remaining,
     },
@@ -409,6 +421,56 @@ function BreakEvenSummary({ be, column }: { be: BreakEven; column: Column | unde
   );
 }
 
+/**
+ * 이사할 때 처음에 준비할 돈: 근무지 원룸 월세 거래의 보증금 중앙값 (국토부 실거래가, 추정).
+ * 보증금은 매달 나가는 돈이 아니라 '매달 남는 돈'에는 넣지 않는다 — 따로 한 묶음으로 알려 준다.
+ * 이사 경우가 해당되는 공고만, 같은 지역은 한 줄로 묶는다.
+ */
+function DepositSummary({ columns, estimates }: { columns: Column[]; estimates: RentEstimate[] }) {
+  const byRegion = new Map<string, { rent: RentEstimate; companies: string[] }>();
+  columns.forEach((column, i) => {
+    const moves = column.posting.scenarios.some((s) => s.case === 'move' && s.applicable);
+    const code = column.row?.location?.value?.lawd_cd;
+    const rent = estimates.find((e) => e.lawd_cd === code);
+    if (!moves || !code || rent?.status !== 'estimated' || rent.deposit_krw == null) return;
+    const entry = byRegion.get(code) ?? { rent, companies: [] };
+    entry.companies.push(companyOf(column, i));
+    byRegion.set(code, entry);
+  });
+  if (!byRegion.size) return null;
+  const badge = statusBadge.estimated;
+  return (
+    <div className="rounded-2xl bg-muted p-5">
+      <h3 className="mb-2 font-semibold text-foreground">이사하면 처음에 준비할 돈</h3>
+      <ul className="space-y-2 text-sm text-body">
+        {[...byRegion.values()].map(({ rent, companies }) => {
+          const place = rent.region.split(' ').slice(1).join(' ') || rent.region;
+          return (
+            <li key={rent.lawd_cd}>
+              <strong>{companies.join(', ')}</strong> 근처({place}) 원룸 보증금{' '}
+              <strong className="text-foreground tabular-nums">
+                {formatWon(rent.deposit_krw!)}
+              </strong>{' '}
+              <small className={`status-badge result-badge ${badge.className}`}>
+                {badge.label}
+              </small>
+              <small className="deposit-source">
+                {rent.period} 국토부 실거래가 원룸 월세 {rent.sample_size.toLocaleString('ko-KR')}
+                건의 보증금 중앙값
+                {rent.sample_size < FEW_TRADES ? ', 거래가 적어 참고만 하세요' : ''}
+              </small>
+            </li>
+          );
+        })}
+      </ul>
+      <p className="mt-3 text-sm text-body">
+        집마다 보증금 차이가 커요. 보증금은 돌려받는 돈이라 매달 남는 돈에는 넣지 않았어요. 첫
+        달에는 중개보수와 이사비도 따로 들 수 있어요.
+      </p>
+    </div>
+  );
+}
+
 export function ResultView({ result, rows }: { result: Result; rows: Row[] }) {
   const [mode, setMode] = useState<Mode>('best');
   const columns = result.postings.map((posting) =>
@@ -445,8 +507,8 @@ export function ResultView({ result, rows }: { result: Result; rows: Row[] }) {
         <div className="result-scroll">
           <table className="offer-table compare-table result-table" style={tableWidth}>
             <caption className="compare-caption">
-              추정 = 공고와 맞는지, 실제와 맞는지 다시 확인이 필요한 값이에요. 값마다 출처는 아래
-              계산 내역에서 볼 수 있어요.
+              추정 = 실제와 다를 수 있어 다시 확인이 필요한 값이에요. 세후 월급은 간이세액표로
+              계산한 예상값이에요. 값마다 출처는 아래 계산 내역에서 볼 수 있어요.
             </caption>
             <thead>
               <tr>
@@ -527,6 +589,8 @@ export function ResultView({ result, rows }: { result: Result; rows: Row[] }) {
           </ul>
         </div>
       )}
+
+      {mode !== 'commute' && <DepositSummary columns={columns} estimates={result.rent_estimates} />}
 
       {(result.break_even_note || result.errors.length > 0) && (
         <div role="status" className="salary-notice">
