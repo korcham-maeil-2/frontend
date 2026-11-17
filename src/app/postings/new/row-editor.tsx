@@ -13,6 +13,7 @@ import {
   type Row,
 } from './format';
 import { CONTROL_CLASS, MoneyInput } from './money-input';
+import { SourceBadge } from './source-badge';
 
 // 비교표 한 행(공고 1건)을 보여 주고 고치는 부품.
 // 칸마다 값 + 배지(확인/추정/입력/공고에 없음) + 공고 원문 조각을 함께 보여 준다.
@@ -682,13 +683,16 @@ function FieldRow({
 
   return (
     <div className="row-field">
-      <label htmlFor={id}>
-        {field.label}
-        {/* 화면에는 입력칸 옆에 단위가 보이고, 화면 읽기 프로그램은 라벨에서 단위를 듣는다. */}
-        {unit && <span className="sr-only"> (단위: {unit})</span>}
-      </label>
+      {/* 배지는 항목 이름 바로 옆에 둔다 (이름과 배지 사이로 눈을 멀리 옮기지 않게) */}
+      <div className="row-field-head">
+        <label htmlFor={id}>
+          {field.label}
+          {/* 화면에는 입력칸 옆에 단위가 보이고, 화면 읽기 프로그램은 라벨에서 단위를 듣는다. */}
+          {unit && <span className="sr-only"> (단위: {unit})</span>}
+        </label>
+        <SourceBadge badge={badge} />
+      </div>
       {input}
-      <span className={`status-badge ${badge.className}`}>{badge.label}</span>
       <p id={hintId} className="row-field-hint">
         {needsCheck(cell) && (
           <button type="button" className="confirm-link" onClick={onConfirm}>
