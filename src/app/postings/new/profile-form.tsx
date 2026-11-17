@@ -225,7 +225,11 @@ function PostingCosts({
               example="10만"
               value={costs.commuteTransport}
               onChange={(commuteTransport) => set({ commuteTransport })}
-              help={row.shuttle_bus?.value ? '통근버스가 있어요. 무료면 0원' : undefined}
+              help={
+                row.shuttle_bus?.value
+                  ? '통근버스가 있어요. 무료면 0원. 비워 두면 0원으로 계산해요'
+                  : '비워 두면 0원으로 계산해요'
+              }
             />
           )}
         </fieldset>
@@ -255,7 +259,7 @@ function PostingCosts({
                 example="6만"
                 value={costs.moveTransport}
                 onChange={(moveTransport) => set({ moveTransport })}
-                help="출퇴근 + 본가에 다녀오는 비용"
+                help="출퇴근 + 본가에 다녀오는 비용. 비워 두면 0원으로 계산해요"
               />
             </>
           )}

@@ -187,6 +187,9 @@ function buildColumn(
       ? UNKNOWN
       : { value: exact(-item.value), note: note ?? undefined, status: item.status };
 
+  // 교통비가 비어서 0원으로 놓고 계산했는지. 예전 백엔드·저장된 초안에는 이 필드가 없다 (배포 순서)
+  const assumedTransport = (scenario.assumed_zero ?? []).includes('교통비');
+  const lessIfTransport = assumedTransport ? '교통비가 들면 줄어요' : undefined;
   let salary: Shown;
   let net: Shown;
   let remaining: Shown;
@@ -195,7 +198,10 @@ function buildColumn(
     net = knownNet;
     remaining =
       scenario.monthly_remaining != null
-        ? remainingCell(scenario.monthly_remaining, { status: scenario.status })
+        ? remainingCell(scenario.monthly_remaining, {
+            status: scenario.status,
+            note: lessIfTransport,
+          })
         : {
             value: '계산 못 함',
             note: `필요한 값: ${scenario.missing.join(', ')}`,
@@ -248,7 +254,8 @@ function buildColumn(
       net,
       housing:
         solved && be?.support_excluded ? cost(housing, '주거지원비가 끝난 뒤') : cost(housing),
-      transport: cost(transport),
+      // 비워 둬서 0원으로 계산한 교통비: 긴 출처 대신 짧게 (출처 전문은 계산 내역에)
+      transport: assumedTransport ? cost(transport, '비워 둠 · 더 들 수 있어요') : cost(transport),
       fixed: cost(fixed),
       remaining,
     },
