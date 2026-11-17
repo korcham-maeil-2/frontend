@@ -54,6 +54,7 @@ import { PostingTabs, companyName } from './posting-tabs';
 import { ResultView, bestRemainingText, isCalculationResult } from './result-view';
 import { BadgeLegend } from './source-badge';
 import { SupportView, isLocalSupport } from './support-view';
+import { PlanView, isSettlePlan } from './plan-view';
 import { ReportView, isReport, type Report } from './report-view';
 import { RowEditor, fieldsToCheck, focusField } from './row-editor';
 
@@ -68,6 +69,7 @@ import { RowEditor, fieldsToCheck, focusField } from './row-editor';
 type Step = 'input' | 'review' | 'living' | 'result';
 type CalculationResult = components['schemas']['CalculationResult'];
 type LocalSupport = components['schemas']['LocalSupport'];
+type SettlePlan = components['schemas']['SettlePlan'];
 type SessionResponse = components['schemas']['SessionResponse'];
 
 // 화면과 서버의 세션 상태가 어긋났을 때 서버가 주는 답 (새로고침·응답 유실, 서버를 새로 띄움 등)
@@ -136,6 +138,7 @@ type Draft = {
   profile?: ProfileForm;
   result?: CalculationResult | null;
   support?: LocalSupport | null; // 근무지별 청년 지원 (계산 결과와 같이 받는다)
+  plan?: SettlePlan | null; // 1년 정착 플랜 (계산 결과와 같이 받는다)
   report?: Report | null; // AI 리포트와 검증 결과 (계산 결과와 같이 받는다)
   resultKey?: string;
   activePosting?: string;
@@ -190,6 +193,7 @@ export default function NewPosting() {
   const [profile, setProfile] = useState<ProfileForm>(EMPTY_PROFILE);
   const [result, setResult] = useState<CalculationResult | null>(null);
   const [support, setSupport] = useState<LocalSupport | null>(null);
+  const [plan, setPlan] = useState<SettlePlan | null>(null);
   const [report, setReport] = useState<Report | null>(null);
   const [resultKey, setResultKey] = useState('');
   const [busy, setBusy] = useState<'reading' | 'confirming' | null>(null);
@@ -241,6 +245,7 @@ export default function NewPosting() {
         setRents(rentsFromResult(draft.result.rent_estimates));
       }
       setSupport(isLocalSupport(draft.support) ? draft.support : null);
+      setPlan(isSettlePlan(draft.plan) ? draft.plan : null);
       setReport(isReport(draft.report) ? draft.report : null);
       setResultKey(draft.resultKey ?? '');
       setActivePosting(draft.activePosting ?? '');
@@ -281,6 +286,7 @@ export default function NewPosting() {
       profile,
       result,
       support,
+      plan,
       report,
       resultKey,
       activePosting,
@@ -300,6 +306,7 @@ export default function NewPosting() {
     profile,
     result,
     support,
+    plan,
     report,
     resultKey,
     activePosting,
@@ -463,6 +470,7 @@ export default function NewPosting() {
       setProfile((form) => ({ ...form, postings: {} }));
       setResult(null);
       setSupport(null);
+      setPlan(null);
       setReport(null);
       // 새 표: 첫 공고를 고르고 그것만 '본 것'으로 (예전 표에서 연 탭 기록은 버린다)
       setActivePosting(table[0].id);
@@ -589,6 +597,8 @@ export default function NewPosting() {
       setRents((known) => ({ ...known, ...rentsFromResult(data.result?.rent_estimates) }));
       // 청년 지원은 키가 없거나 예전 백엔드면 오지 않는다 → 없으면 그 영역만 안 그린다
       setSupport(isLocalSupport(data.local_support) ? data.local_support : null);
+      // 정착 플랜: 예전 백엔드면 오지 않는다 → 없으면 그 영역만 안 그린다
+      setPlan(isSettlePlan(data.plan) ? data.plan : null);
       // AI 리포트: 검증을 통과했을 때만 글이 온다 (report_check로 상태를 알린다)
       setReport({ text: data.report ?? null, check: data.report_check ?? null });
       setResultKey(inputKey(calculatedRows, sentProfile));
@@ -654,6 +664,7 @@ export default function NewPosting() {
     setProfile((form) => ({ ...form, postings: {} }));
     setResult(null);
     setSupport(null);
+    setPlan(null);
     setReport(null);
     setResultKey('');
     setActivePosting('');
@@ -824,6 +835,7 @@ export default function NewPosting() {
           {support && (
             <SupportView support={support} rows={rows} stale={support.checked_on === staleFor} />
           )}
+          {plan && <PlanView plan={plan} />}
           <div className="sheet-actions flex-wrap">
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" className="min-h-11" onClick={() => changeStep('living')}>

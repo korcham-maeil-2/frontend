@@ -1748,6 +1748,73 @@ section.desk-sheet > .sheet-heading {
   color: var(--foreground);
 }
 
+/* 1년 정착 플랜 (plan-view.tsx): 왼쪽 세로줄 위에 칸(이사 전 → 이사한 달 → 달마다 → 언제든) */
+.plan-timeline {
+  display: grid;
+  gap: 1rem;
+  border-inline-start: 2px solid var(--border);
+  padding-inline-start: 1rem;
+}
+.plan-slot {
+  position: relative;
+}
+/* 세로줄 위의 점: 칸의 시작 */
+.plan-slot::before {
+  content: '';
+  position: absolute;
+  inset-inline-start: calc(-1rem - 6px);
+  top: 0.4rem;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--card);
+  box-shadow: 0 0 0 2px var(--primary);
+}
+.plan-slot.is-anytime::before {
+  box-shadow: 0 0 0 2px var(--border);
+}
+.plan-slot-label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.5rem;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--foreground);
+}
+.plan-slot-label small {
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--muted-foreground);
+}
+.plan-items {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+.plan-item {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: var(--card);
+  padding: 0.75rem;
+}
+.plan-item-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.5rem;
+  font-weight: 600;
+  color: var(--foreground);
+  overflow-wrap: anywhere;
+}
+.plan-amount {
+  margin-top: 0.25rem;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--foreground);
+}
+
 /* 계산 실패 안내 (page.tsx 생활비 단계): 오류 색 테두리로 눈에 띄게 */
 .salary-notice.error-notice {
   border-color: color-mix(in srgb, var(--destructive) 40%, transparent);

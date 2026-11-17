@@ -848,6 +848,74 @@ export interface components {
         [key: string]: unknown;
       };
     };
+    /** PlanItem */
+    PlanItem: {
+      /**
+       * Kind
+       * @description deposit=보증금 마련, move_in=전입신고, policy=지원 신청
+       * @enum {string}
+       */
+      kind: 'deposit' | 'move_in' | 'policy';
+      /** Title */
+      title: string;
+      /**
+       * Detail
+       * @description 한 줄 설명 (해요체)
+       */
+      detail: string | null;
+      /**
+       * When
+       * @description 날짜 표시 (예: '11월 30일 마감', '12월 1일 시작', '상시')
+       */
+      when: string | null;
+      /**
+       * Amount Krw
+       * @description 보증금처럼 금액이 있는 할 일 (원)
+       */
+      amount_krw: number | null;
+      /**
+       * Status
+       * @description 금액이 추정값이면 estimated (보증금 시세)
+       */
+      status: 'estimated' | null;
+      /**
+       * Source
+       * @description 출처 (데이터명·기간 또는 법령)
+       */
+      source: string | null;
+      /**
+       * Url
+       * @description 신청·안내 페이지
+       */
+      url: string | null;
+      /** Policy Id */
+      policy_id: string | null;
+      /**
+       * Scope
+       * @description 정책이면 지역 정책(local)인지 전국 정책(national)인지
+       */
+      scope: ('local' | 'national') | null;
+    };
+    /** PlanSlot */
+    PlanSlot: {
+      /**
+       * Kind
+       * @enum {string}
+       */
+      kind: 'before' | 'move_month' | 'month' | 'anytime';
+      /**
+       * Label
+       * @description '이사 전', '이사한 달', '2026년 12월', '언제든'
+       */
+      label: string;
+      /**
+       * Month
+       * @description 달력 달이면 YYYY-MM
+       */
+      month: string | null;
+      /** Items */
+      items: components['schemas']['PlanItem'][];
+    };
     /**
      * PostingCosts
      * @description 공고(회사 위치)마다 달라지는 비용. 모르면 비워 둔다(None).
@@ -869,6 +937,27 @@ export interface components {
        * @description 이사를 고려하는지. False면 이사 경우는 해당 없음
        */
       move_possible?: boolean | null;
+    };
+    /** PostingPlan */
+    PostingPlan: {
+      /** Posting Id */
+      posting_id: string;
+      /** Company */
+      company: string | null;
+      /**
+       * Region
+       * @description 근무지 시도 시군구
+       */
+      region: string | null;
+      /**
+       * Moving
+       * @description 이사하는 경우를 넣었는지 (이사 경우가 해당될 때)
+       */
+      moving: boolean;
+      /** Slots */
+      slots: components['schemas']['PlanSlot'][];
+      /** Notes */
+      notes: string[];
     };
     /** PostingResult */
     PostingResult: {
@@ -1192,6 +1281,23 @@ export interface components {
       report?: string | null;
       /** @description 리포트 검증 결과 (통과·다시 써도 실패·쓰지 못함·꺼짐) */
       report_check?: components['schemas']['ReportCheck'] | null;
+      /** @description 1년 정착 플랜 (공고마다 이사 전·이사한 달·달마다 할 일). 계산 결과가 있을 때만. 계산 결과·청년 지원에서 바로 만들어 따로 저장하지 않는다 */
+      plan?: components['schemas']['SettlePlan'] | null;
+    };
+    /**
+     * SettlePlan
+     * @description 세션 응답의 plan 칸. 계산 결과·청년 지원에서 바로 만든다.
+     */
+    SettlePlan: {
+      /** Postings */
+      postings: components['schemas']['PostingPlan'][];
+      /**
+       * Start Month
+       * @description 달력의 첫 달 (조회한 날의 달, YYYY-MM)
+       */
+      start_month: string;
+      /** Notes */
+      notes: string[];
     };
     /**
      * SupportPolicy
