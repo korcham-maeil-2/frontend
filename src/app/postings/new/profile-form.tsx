@@ -2,14 +2,18 @@ import { useState, type ReactNode } from 'react';
 import { Plus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { formatWon, salaryText, type Row } from './format';
+import { formatWon, salaryText, statusBadge, type Row } from './format';
 import { CONTROL_CLASS, MoneyInput } from './money-input';
 import { PostingTabs } from './posting-tabs';
 import {
   AGE_RANGE,
   costsOf,
+  rentFor,
+  rentPending,
   validAge,
   type MissingInput,
+  type RentEstimate,
+  type Rents,
   type Money,
   type PostingCostsForm,
   type ProfileForm as Form,
@@ -74,6 +78,7 @@ function MoneyField({
   onChange,
   example,
   help,
+  note,
 }: {
   id: string;
   label: string;
@@ -81,8 +86,11 @@ function MoneyField({
   onChange: (value: Money) => void;
   example: string;
   help?: string;
+  /** 안내 아래 따로 한 줄 (예: 월세 시세) */
+  note?: ReactNode;
 }) {
   const hintId = `${id}-hint`;
+  const noteId = `${id}-note`;
   return (
     <div className="row-field profile-field">
       <label htmlFor={id}>
@@ -94,13 +102,18 @@ function MoneyField({
         value={value}
         onChange={onChange}
         example={example}
-        describedBy={hintId}
+        describedBy={note ? `${hintId} ${noteId}` : hintId}
       />
       <p id={hintId} className="row-field-hint">
         {value != null && <span className="text-foreground">{formatWon(value)}</span>}
         {value != null && help && ' · '}
         {help}
       </p>
+      {note && (
+        <p id={noteId} className="row-field-hint rent-note">
+          {note}
+        </p>
+      )}
     </div>
   );
 }
@@ -129,15 +142,53 @@ function Check({
   );
 }
 
+/** '이사할 집 주거비' 칸 안내: 무엇을 넣는 칸인지 (시세는 rentNote로 따로 한 줄) */
+function moveHousingHelp(aid: number | null | undefined) {
+  const parts = ['월세 + 관리비'];
+  if (aid) parts.push(`회사 주거지원비 ${formatWon(aid)}은 빼지 말고 넣어 주세요 (계산할 때 빼요)`);
+  return parts.join('. ');
+}
+
+const FEW_TRADES = 5; // 거래가 이보다 적으면 '참고만'
+
+/**
+ * 근무지 원룸 월세 시세 한 줄 ('추정' 배지). 비워 두면 서버(calc/summary.py)가 이 값으로 계산한다.
+ * 시세에는 관리비가 빠져 있어, 비워 두면 남는 돈이 실제보다 많게 나올 수 있다고 알린다.
+ */
+function rentNote(value: Money, rent: RentEstimate | null, pending: boolean): ReactNode {
+  if (pending) return '근무지 월세 시세를 불러오는 중이에요…';
+  if (rent?.monthly_rent_krw == null) return null;
+  const place = rent.region.split(' ').slice(1).join(' ') || rent.region;
+  const badge = statusBadge.estimated;
+  const few = rent.sample_size < FEW_TRADES;
+  return (
+    <>
+      <span className={`status-badge ${badge.className}`}>{badge.label}</span> {place} 원룸 월세{' '}
+      <span className="text-foreground">{formatWon(rent.monthly_rent_krw)}</span> ({rent.period}{' '}
+      국토부 실거래가 {rent.sample_size.toLocaleString('ko-KR')}건 중앙값
+      {few ? ', 거래가 적어 참고만 하세요' : ''}).{' '}
+      {value == null
+        ? '비워 두면 이 금액으로 계산해요. 관리비는 빠져 있어서 남는 돈이 실제보다 많게 나올 수 있어요.'
+        : '관리비는 빠진 금액이에요.'}
+    </>
+  );
+}
+
 function PostingCosts({
   row,
   index,
   costs,
+  rent,
+  rentPending,
   onChange,
 }: {
   row: Row;
   index: number;
   costs: PostingCostsForm;
+  /** 근무지 월세 시세 (없으면 null) */
+  rent: RentEstimate | null;
+  /** 시세를 불러오는 중인지 */
+  rentPending: boolean;
   onChange: (costs: PostingCostsForm) => void;
 }) {
   const id = (key: string) => `${row.id}-${key}`;
@@ -196,11 +247,8 @@ function PostingCosts({
                 example="50만"
                 value={costs.moveHousing}
                 onChange={(moveHousing) => set({ moveHousing })}
-                help={
-                  aid
-                    ? `월세 + 관리비. 회사 주거지원비 ${formatWon(aid)}은 빼지 말고 넣어 주세요 (계산할 때 빼요)`
-                    : '월세 + 관리비'
-                }
+                help={moveHousingHelp(aid)}
+                note={rentNote(costs.moveHousing, rent, rentPending)}
               />
               <MoneyField
                 id={id('move-transport')}
@@ -226,6 +274,8 @@ export function ProfileFormView({
   onSelectPosting,
   missingFor,
   askAge,
+  rents,
+  failedRents,
 }: {
   form: Form;
   rows: Row[];
@@ -237,6 +287,10 @@ export function ProfileFormView({
   missingFor: (row: Row) => MissingInput[];
   /** 나이 칸을 보일지 (서버가 청년 지원을 찾을 수 있을 때만. 나이는 그것에만 쓴다) */
   askAge: boolean;
+  /** 근무지(시군구 코드)별 월세 시세. 이사할 집 주거비를 비우면 이 값으로 계산된다 */
+  rents: Rents;
+  /** 시세를 불러오지 못한 시군구 코드 */
+  failedRents: readonly string[];
 }) {
   const set = (patch: Partial<Form>) => onChange({ ...form, ...patch });
   const setFixed = (fixedExpenses: Form['fixedExpenses']) => set({ fixedExpenses });
@@ -385,6 +439,8 @@ export function ProfileFormView({
                 row={row}
                 index={i}
                 costs={costsOf(form, row)}
+                rent={rentFor(row, rents)}
+                rentPending={rentPending(row, rents, failedRents)}
                 onChange={(costs) => set({ postings: { ...form.postings, [row.id]: costs } })}
               />
             ),
