@@ -890,7 +890,7 @@ section.desk-sheet > .sheet-heading {
 
 /* ── 결과 단계 (result-view.tsx) ── */
 /* 랜딩 비교표는 두 열 고정이라, 공고 수만큼 열이 나눠 갖게 한다 */
-.result-table thead th:not(:first-child) {
+.compare-table.result-table thead th:not(:first-child) {
   width: auto;
 }
 .result-badge {
@@ -980,7 +980,11 @@ section.desk-sheet > .sheet-heading {
   overflow-x: auto;
 }
 .result-table {
-  min-width: calc(7rem + var(--result-columns, 2) * 9rem);
+  min-width: calc(6.5rem + var(--result-columns, 2) * 9rem);
+}
+/* 항목 이름 열('매달 남는 돈'이 한 줄에 들어가는 폭)은 좁게, 나머지는 공고 열이 나눠 갖는다 */
+.offer-table.result-table thead th:first-child {
+  width: 6.5rem;
 }
 /* 결과 줄의 초록은 남는 돈에만: 숫자가 아닌 칸과 마이너스는 초록으로 칠하지 않는다 */
 .compare-table .compare-result .cell-value.is-muted,

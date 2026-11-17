@@ -58,7 +58,7 @@ type RowKey = 'salary' | 'net' | 'housing' | 'transport' | 'fixed' | 'remaining'
 const ROWS: { key: RowKey; label: string }[] = [
   { key: 'salary', label: '연봉' },
   { key: 'net', label: '세후 월급' },
-  { key: 'housing', label: '집' },
+  { key: 'housing', label: '주거비' },
   { key: 'transport', label: '교통비' },
   { key: 'fixed', label: '고정비' },
   { key: 'remaining', label: '매달 남는 돈' },
@@ -150,9 +150,10 @@ function buildColumn(
   const chosen = pickCase(posting, breakEven, mode);
   const scenario = posting.scenarios.find((s) => s.case === chosen && s.applicable);
   const be = breakEven?.cases.find((c) => c.case === chosen);
+  // 세후 월급은 간이세액표로 계산한 예상값이라 실제 급여명세서와 조금 다를 수 있다 → 늘 '추정'
   const knownNet: Shown =
     posting.net_income.value != null
-      ? { value: won(posting.net_income.value), status: posting.net_income.status }
+      ? { value: won(posting.net_income.value), status: 'estimated' }
       : NOT_APPLICABLE;
   if (!scenario) {
     // 이 경우는 해당 없음 (예: 서울 → 나주 통근). 공고 자체 값(연봉·세후 월급)은 그대로 보여 준다.
@@ -208,7 +209,9 @@ function buildColumn(
       tone: 'target',
     };
     net =
-      be.net_income_krw != null ? { value: won(be.net_income_krw), note: '그 연봉일 때' } : UNKNOWN;
+      be.net_income_krw != null
+        ? { value: won(be.net_income_krw), note: '그 연봉일 때', status: 'estimated' }
+        : UNKNOWN;
     remaining = remainingCell(be.monthly_remaining!, {
       // 최저임금으로 올린 경우는 기준보다 많이 남는다
       note: be.floor === 'minimum_wage' ? '기준보다 많이' : '기준과 같은 금액',
@@ -497,8 +500,8 @@ export function ResultView({ result, rows }: { result: Result; rows: Row[] }) {
         <div className="result-scroll">
           <table className="offer-table compare-table result-table" style={tableWidth}>
             <caption className="compare-caption">
-              추정 = 공고와 맞는지, 실제와 맞는지 다시 확인이 필요한 값이에요. 값마다 출처는 아래
-              계산 내역에서 볼 수 있어요.
+              추정 = 실제와 다를 수 있어 다시 확인이 필요한 값이에요. 세후 월급은 간이세액표로
+              계산한 예상값이에요. 값마다 출처는 아래 계산 내역에서 볼 수 있어요.
             </caption>
             <thead>
               <tr>
