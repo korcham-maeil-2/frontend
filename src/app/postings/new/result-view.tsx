@@ -4,8 +4,19 @@ import { useState, type CSSProperties } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { components } from '@/lib/api/schema';
 import '../../landing.css'; // 비교표 모양(.offer-table, .compare-table)을 랜딩과 같이 쓴다
-import { formatWon, hasSalary, salaryText, statusBadge, type Row, type Status } from './format';
+import {
+  IMAGE_READ_BADGE,
+  badgeFor,
+  formatWon,
+  hasSalary,
+  salaryText,
+  statusBadge,
+  type Badge,
+  type Row,
+  type Status,
+} from './format';
 import { FEW_TRADES } from './profile';
+import { BadgeLegend, SourceBadge, type Detail } from './source-badge';
 
 // 결과 화면: 공고별 '매달 남는 돈'을 한 표로 비교한다 (DESIGN.md "비교표").
 //   열 = 공고, 행 = 연봉 → 세후 월급 → 집 → 교통비 → 고정비 → 매달 남는 돈
@@ -29,17 +40,61 @@ const MODES: { value: Mode; label: string }[] = [
   { value: 'move', label: '회사 근처로 이사' },
 ];
 
+/** 숫자 옆 배지와, 배지를 누르면 보일 줄들 (계산·출처·참고) */
+type Tag = { badge: Badge; details: Detail[] };
+
 /**
  * 표 한 칸에 보여 줄 것.
+ * note: 칸 아래 짧은 안내 (값의 뜻을 바꾸는 것만: '공고엔 비공개', '더 들 수 있어요').
+ *       긴 출처 글은 note가 아니라 tag.details로 — 배지를 눌러야 보여서 표가 길어지지 않는다.
+ * tag: 숫자인 칸에만 단다 ('해당 없음'·'모름'·'계산 못 함'에는 없음).
  * tone: 'target' = 계산한 최소 연봉(초록), 'muted' = 해당 없음·계산 못 함(숫자가 아님),
  *       'negative' = 남는 돈이 마이너스 (초록은 남는 돈에만 쓰므로 빼고 그린다 — DESIGN.md)
  */
 type Shown = {
   value: string;
   note?: string;
-  status?: Status;
+  tag?: Tag;
   tone?: 'target' | 'muted' | 'negative';
 };
+
+/** 서버가 준 값(비용 등) → 배지 + '출처' 한 줄. '공고에 없음'은 숫자가 없는 칸이라 배지를 달지 않는다. */
+function tag(status: Status, source?: string | null): Tag | undefined {
+  if (status === 'missing') return undefined;
+  return { badge: statusBadge[status], details: source ? [{ label: '출처', text: source }] : [] };
+}
+
+/**
+ * 이 서비스가 계산한 값(세후 월급·매달 남는 돈·최소 연봉) → 늘 '추정'.
+ * 세후 월급이 간이세액표로 낸 예상값이라, 그 값으로 계산한 것도 실제와 조금 다를 수 있다.
+ * (백엔드 신뢰도를 그대로 쓰면 '매달 남는 돈'에 '입력'이 붙어 직접 넣은 값처럼 보인다)
+ * 창에는 어떻게 계산했는지(how)와 왜 추정인지(why)를 줄로 나눠 보여 준다 — 무엇을 고치면
+ * 더 정확해지는지 알 수 있게.
+ */
+function calculated(meaning: string, how: Detail[], why: string[]): Tag {
+  return {
+    badge: { ...statusBadge.estimated, meaning },
+    details: [...how, { label: '이유', text: why }],
+  };
+}
+
+/** 매달 남는 돈·최소 연봉이 추정인 이유: 추정이 들어간 비용 + 세후 월급 */
+function remainingWhy(
+  costs: { housing: Item; transport: Item; fixed: Item },
+  blankTransport: boolean,
+) {
+  const why: string[] = [];
+  if (costs.housing.status === 'estimated') why.push('주거비가 추정값이에요');
+  if (blankTransport) why.push('교통비를 비워 둬서 0원으로 계산했어요');
+  else if (costs.transport.status === 'estimated') why.push('교통비가 추정값이에요');
+  if (costs.fixed.status === 'estimated') why.push('고정비가 추정값이에요');
+  return [...why, '세후 월급이 예상값이에요'];
+}
+
+const NET_MEANING = '국세청 간이세액표로 계산한 예상값';
+const NET_WHY = ['실제 급여명세서와 조금 다를 수 있어요'];
+const REMAINING_MEANING = '세후 월급에서 비용을 뺀 예상값';
+const REMAINING_HOW: Detail = { label: '계산', text: '세후 월급 − 주거비 − 교통비 − 고정비' };
 
 /** 공고 한 열 */
 type Column = {
@@ -89,11 +144,32 @@ function exact(value: number): string {
 }
 
 const NOT_APPLICABLE: Shown = { value: '해당 없음', tone: 'muted' };
-const UNKNOWN: Shown = { value: '모름', status: 'missing', tone: 'muted' };
+const UNKNOWN: Shown = { value: '모름', tone: 'muted' };
 
-/** 표의 '연봉' 줄: 연봉은 금액만, 월급 공고는 '월급 250만원'처럼 종류를 붙인다. */
-function salaryCell(row: Row | undefined): string {
-  return row ? salaryText(row).replace(/^연봉 /, '') : '—';
+/** 표의 '연봉' 줄: 연봉은 금액만, 월급 공고는 '월급 250만원'처럼 종류를 붙인다.
+ *  금액이 있으면 공고 원문과 함께 배지를 단다 (조건 확인 화면과 같은 배지). */
+function salaryCell(row: Row | undefined): Shown {
+  if (!row) return { value: '—' };
+  const value = salaryText(row).replace(/^연봉 /, '');
+  const cell =
+    row.salary_type?.value === 'monthly' ? row.monthly_salary_krw : row.annual_salary_krw;
+  if (!cell || cell.value == null) return { value };
+  const details = cell.source_text
+    ? [{ label: cell.from_image ? '이미지' : '공고', text: `“${cell.source_text}”` }]
+    : [];
+  return { value, tag: { badge: badgeFor(cell), details } };
+}
+
+/**
+ * 이사 주거비에서 주거지원비를 뺐다는 짧은 안내 (지원이 끝나면 주거비가 오른다는 걸 숨기지 않게).
+ * 백엔드 출처 문장이 아니라 공고 값으로 판단한다 — 규칙은 백엔드 calc/remaining.py housing_aid와 같다
+ * (금액이 있고 기간이 0개월이 아니면 지원).
+ */
+function aidNote(row: Row | undefined): string | undefined {
+  const aid = row?.housing_allowance_monthly_krw?.value;
+  const months = row?.housing_allowance_months?.value;
+  if (!aid || months === 0) return undefined;
+  return months ? `주거지원비 뺌 · ${months}개월간` : '주거지원비 뺌 · 기간 모름';
 }
 
 /** 세후 월급을 못 구한 이유. 연봉을 넣었는데 거절된 경우(단위 실수 등) 서버가 이유를 준다. */
@@ -153,7 +229,14 @@ function buildColumn(
   // 세후 월급은 간이세액표로 계산한 예상값이라 실제 급여명세서와 조금 다를 수 있다 → 늘 '추정'
   const knownNet: Shown =
     posting.net_income.value != null
-      ? { value: won(posting.net_income.value), status: 'estimated' }
+      ? {
+          value: won(posting.net_income.value),
+          tag: calculated(
+            NET_MEANING,
+            posting.net_income.source ? [{ label: '계산', text: posting.net_income.source }] : [],
+            NET_WHY,
+          ),
+        }
       : NOT_APPLICABLE;
   if (!scenario) {
     // 이 경우는 해당 없음 (예: 서울 → 나주 통근). 공고 자체 값(연봉·세후 월급)은 그대로 보여 준다.
@@ -166,7 +249,7 @@ function buildColumn(
       housing: undefined,
       transport: undefined,
       cells: {
-        salary: { value: salaryCell(row) },
+        salary: salaryCell(row),
         net: knownNet,
         housing: NOT_APPLICABLE,
         transport: NOT_APPLICABLE,
@@ -182,24 +265,25 @@ function buildColumn(
   const transport = (solved && be?.transport) || scenario.transport;
   const fixed = posting.fixed_expenses;
   // 비용은 사용자가 넣은 금액 그대로 보여 준다 (반올림은 계산한 값 — 세후 월급·남는 돈에만)
-  const cost = (item: Item, note = item.source): Shown =>
+  const cost = (item: Item, note?: string): Shown =>
     item.value == null
       ? UNKNOWN
-      : { value: exact(-item.value), note: note ?? undefined, status: item.status };
+      : { value: exact(-item.value), note, tag: tag(item.status, item.source) };
 
   // 교통비가 비어서 0원으로 놓고 계산했는지. 예전 백엔드·저장된 초안에는 이 필드가 없다 (배포 순서)
   const assumedTransport = (scenario.assumed_zero ?? []).includes('교통비');
   const lessIfTransport = assumedTransport ? '교통비가 들면 줄어요' : undefined;
+  const why = remainingWhy({ housing, transport, fixed }, assumedTransport);
   let salary: Shown;
   let net: Shown;
   let remaining: Shown;
   if (posting.net_income.value != null) {
-    salary = { value: salaryCell(row) };
+    salary = salaryCell(row);
     net = knownNet;
     remaining =
       scenario.monthly_remaining != null
         ? remainingCell(scenario.monthly_remaining, {
-            status: scenario.status,
+            tag: calculated(REMAINING_MEANING, [REMAINING_HOW], why),
             note: lessIfTransport,
           })
         : {
@@ -207,24 +291,42 @@ function buildColumn(
             note: `필요한 값: ${scenario.missing.join(', ')}`,
             tone: 'muted',
           };
-  } else if (solved && be) {
+  } else if (solved && be && breakEven) {
     // 연봉 비공개: 기준만큼 남는 최소 연봉과, 그 연봉일 때의 세후 월급·남는 돈 (모두 서버가 계산한 값)
     salary = {
       value: `최소 ${won(be.annual_salary_krw!)}`,
       note: '공고엔 비공개',
       tone: 'target',
+      tag: calculated(
+        '기준과 같은 금액이 매달 남는 최소 연봉',
+        [{ label: '기준', text: breakEven.baseline.label }],
+        why,
+      ),
     };
     net =
       be.net_income_krw != null
-        ? { value: won(be.net_income_krw), note: '그 연봉일 때', status: 'estimated' }
+        ? {
+            value: won(be.net_income_krw),
+            note: '그 연봉일 때',
+            tag: calculated(
+              NET_MEANING,
+              [
+                {
+                  label: '계산',
+                  text: `연봉 ${won(be.annual_salary_krw!)} ÷ 12 → 4대보험·소득세를 뺀 값`,
+                },
+              ],
+              NET_WHY,
+            ),
+          }
         : UNKNOWN;
     remaining = remainingCell(be.monthly_remaining!, {
       // 최저임금으로 올린 경우는 기준보다 많이 남는다
       note: be.floor === 'minimum_wage' ? '기준보다 많이' : '기준과 같은 금액',
-      status: be.status,
+      tag: calculated(REMAINING_MEANING, [REMAINING_HOW], why),
     });
   } else {
-    salary = { value: salaryCell(row), note: be?.reason ?? undefined };
+    salary = { ...salaryCell(row), note: be?.reason ?? undefined };
     net = { ...UNKNOWN, note: netMissingNote(posting, row) };
     // 연봉 말고도 빈 값이 있으면 그것부터 알려 준다 (그 값이 있어야 최소 연봉도 계산된다)
     const others = be?.missing.length
@@ -253,7 +355,9 @@ function buildColumn(
       salary,
       net,
       housing:
-        solved && be?.support_excluded ? cost(housing, '주거지원비가 끝난 뒤') : cost(housing),
+        solved && be?.support_excluded
+          ? cost(housing, '주거지원비가 끝난 뒤')
+          : cost(housing, chosen === 'move' ? aidNote(row) : undefined),
       // 비워 둬서 0원으로 계산한 교통비: 긴 출처 대신 짧게 (출처 전문은 계산 내역에)
       transport: assumedTransport ? cost(transport, '비워 둠 · 더 들 수 있어요') : cost(transport),
       fixed: cost(fixed),
@@ -262,20 +366,20 @@ function buildColumn(
   };
 }
 
-function Badge({ status }: { status?: Status }) {
-  // 표에서는 다시 봐야 하는 값(추정)만 배지를 단다. 모든 출처는 '계산 내역'에서 본다.
-  if (status !== 'estimated') return null;
-  const badge = statusBadge.estimated;
-  return <small className={`status-badge result-badge ${badge.className}`}>{badge.label}</small>;
-}
-
 const TONE_CLASS = { target: 'is-target', muted: 'is-muted', negative: 'is-negative' } as const;
 
-function CellContent({ cell }: { cell: Shown }) {
+function CellContent({ cell, label }: { cell: Shown; label: string }) {
   return (
     <>
       <span className={`cell-value ${cell.tone ? TONE_CLASS[cell.tone] : ''}`}>{cell.value}</span>
-      <Badge status={cell.status} />
+      {cell.tag && (
+        <SourceBadge
+          badge={cell.tag.badge}
+          details={cell.tag.details}
+          subject={label}
+          className="result-badge"
+        />
+      )}
       {cell.note && (
         <small className={cell.tone === 'target' ? 'offer-badge' : 'cell-note'}>{cell.note}</small>
       )}
@@ -317,7 +421,7 @@ function Breakdown({ column, index }: { column: Column; index: number }) {
       label: '세후 월급',
       value: exact(posting.net_income.value ?? 0),
       note: posting.net_income.source,
-      status: posting.net_income.status,
+      status: 'estimated', // 표와 같이: 세후 월급은 간이세액표로 낸 예상값
     });
   } else if (column.solved && breakEven?.net_income_krw != null) {
     // 연봉 비공개 공고: 공제 내역 대신, 최소 연봉일 때의 세후 월급 한 줄
@@ -325,6 +429,7 @@ function Breakdown({ column, index }: { column: Column; index: number }) {
       label: '세후 월급',
       value: exact(breakEven.net_income_krw),
       note: `연봉 ${exact(breakEven.annual_salary_krw!)}일 때 (4대보험·소득세를 뺀 값)`,
+      status: 'estimated',
     });
   } else if (netMissingNote(posting, row)) {
     // 연봉을 넣었는데 계산하지 않은 이유 (단위 실수 등)
@@ -361,12 +466,9 @@ function Breakdown({ column, index }: { column: Column; index: number }) {
               <dt>{line.label}</dt>
               <dd>
                 <span className="tabular-nums">{line.value}</span>
-                {line.status && line.status !== 'confirmed' && (
-                  <small
-                    className={`status-badge result-badge ${statusBadge[line.status].className}`}
-                  >
-                    {statusBadge[line.status].label}
-                  </small>
+                {/* 내역은 출처를 줄마다 글로 보여 주므로, 배지는 뜻만 알려 준다 */}
+                {line.status && line.status !== 'confirmed' && line.status !== 'missing' && (
+                  <SourceBadge badge={statusBadge[line.status]} className="result-badge" />
                 )}
                 {line.note && <small className="cell-note">{line.note}</small>}
               </dd>
@@ -438,7 +540,6 @@ function DepositSummary({ columns, estimates }: { columns: Column[]; estimates: 
     byRegion.set(code, entry);
   });
   if (!byRegion.size) return null;
-  const badge = statusBadge.estimated;
   return (
     <div className="rounded-2xl bg-muted p-5">
       <h3 className="mb-2 font-semibold text-foreground">이사하면 처음에 준비할 돈</h3>
@@ -451,14 +552,20 @@ function DepositSummary({ columns, estimates }: { columns: Column[]; estimates: 
               <strong className="text-foreground tabular-nums">
                 {formatWon(rent.deposit_krw!)}
               </strong>{' '}
-              <small className={`status-badge result-badge ${badge.className}`}>
-                {badge.label}
-              </small>
-              <small className="deposit-source">
-                {rent.period} 국토부 실거래가 원룸 월세 {rent.sample_size.toLocaleString('ko-KR')}
-                건의 보증금 중앙값
-                {rent.sample_size < FEW_TRADES ? ', 거래가 적어 참고만 하세요' : ''}
-              </small>
+              <SourceBadge
+                badge={statusBadge.estimated}
+                className="result-badge"
+                details={[
+                  { label: '출처', text: `국토부 실거래가 (${rent.period})` },
+                  {
+                    label: '계산',
+                    text: `원룸 월세 ${rent.sample_size.toLocaleString('ko-KR')}건의 보증금 중앙값`,
+                  },
+                ]}
+              />
+              {rent.sample_size < FEW_TRADES && (
+                <small className="deposit-source">거래가 적어 참고만 하세요</small>
+              )}
             </li>
           );
         })}
@@ -506,10 +613,7 @@ export function ResultView({ result, rows }: { result: Result; rows: Row[] }) {
       <div className="compare-view result-compare">
         <div className="result-scroll">
           <table className="offer-table compare-table result-table" style={tableWidth}>
-            <caption className="compare-caption">
-              추정 = 실제와 다를 수 있어 다시 확인이 필요한 값이에요. 세후 월급은 간이세액표로
-              계산한 예상값이에요. 값마다 출처는 아래 계산 내역에서 볼 수 있어요.
-            </caption>
+            <caption className="sr-only">공고별 매달 남는 돈 비교</caption>
             <thead>
               <tr>
                 <th scope="col">
@@ -529,7 +633,7 @@ export function ResultView({ result, rows }: { result: Result; rows: Row[] }) {
                   <th scope="row">{label}</th>
                   {columns.map((column) => (
                     <td key={column.posting.posting_id} className={computed(column)}>
-                      <CellContent cell={column.cells[key]} />
+                      <CellContent cell={column.cells[key]} label={label} />
                     </td>
                   ))}
                 </tr>
@@ -559,7 +663,7 @@ export function ResultView({ result, rows }: { result: Result; rows: Row[] }) {
                     <div key={key} className={rowClass(key)}>
                       <dt>{label}</dt>
                       <dd>
-                        <CellContent cell={column.cells[key]} />
+                        <CellContent cell={column.cells[key]} label={label} />
                         {key === 'remaining' && other && (
                           <small className="cell-note">
                             {companyOf(other, 1 - i)}: {other.cells.remaining.value}
@@ -573,6 +677,18 @@ export function ResultView({ result, rows }: { result: Result; rows: Row[] }) {
             );
           })}
         </Tabs>
+        <BadgeLegend
+          badges={[
+            statusBadge.confirmed,
+            statusBadge.user_input,
+            statusBadge.estimated,
+            // 연봉을 이미지에서 읽은 공고가 있으면 그 배지도 범례에
+            ...(columns.some((c) => c.cells.salary.tag?.badge === IMAGE_READ_BADGE)
+              ? [IMAGE_READ_BADGE]
+              : []),
+          ]}
+          hint="배지를 누르면 출처가 보여요"
+        />
       </div>
 
       {result.break_even.length > 0 && (

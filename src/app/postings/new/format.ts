@@ -9,12 +9,38 @@ export const MAX_KRW = 1_000_000_000_000; // 1조 원
 export const MAX_MONTHS = 1200;
 export const MAX_PERCENT = 100;
 
-/** 셀 상태 → 배지 글자와 색 (DESIGN.md "신뢰도 표시") */
-export const statusBadge: Record<Status, { label: string; className: string }> = {
-  confirmed: { label: '확인', className: 'bg-secondary text-confirmed' },
-  estimated: { label: '추정', className: 'bg-estimated-bg text-estimated' },
-  user_input: { label: '입력', className: 'bg-user-input-bg text-user-input' },
-  missing: { label: '공고에 없음', className: 'text-muted-foreground' },
+/** 배지 하나: 글자, 색, 짧은 뜻 (뜻은 결과 표 범례와 출처 창 맨 위에 쓴다 — source-badge.tsx) */
+export type Badge = { label: string; className: string; meaning: string };
+
+/** 셀 상태 → 배지 (DESIGN.md "신뢰도 표시") */
+export const statusBadge: Record<Status, Badge> = {
+  confirmed: {
+    label: '확인',
+    className: 'bg-card text-confirmed badge-confirmed',
+    meaning: '공고·공공데이터에서 읽은 값',
+  },
+  estimated: {
+    label: '추정',
+    className: 'bg-estimated-bg text-estimated',
+    meaning: '실제와 다를 수 있는 값',
+  },
+  user_input: {
+    label: '입력',
+    className: 'bg-user-input-bg text-user-input',
+    meaning: '직접 넣거나 고친 값',
+  },
+  missing: {
+    label: '공고에 없음',
+    className: 'text-muted-foreground',
+    meaning: '공고에 적혀 있지 않은 값',
+  },
+};
+
+/** 이미지에서 읽은 값: 원본과 다시 비교해야 해서 추정 색을 쓴다 */
+export const IMAGE_READ_BADGE: Badge = {
+  ...statusBadge.estimated,
+  label: '이미지에서 읽음',
+  meaning: 'AI가 이미지에서 옮겨 적은 값',
 };
 
 /** 비교표 한 칸 ({value, status, source_text, from_image}) */
@@ -39,13 +65,11 @@ export function isImageRead(cell: Cell) {
 }
 
 /** 칸의 배지. 사용자가 값을 지운 칸은 '입력' 대신 '비움', 이미지에서 읽은 값은 '이미지에서 읽음'. */
-export function badgeFor(cell: Cell) {
+export function badgeFor(cell: Cell): Badge {
   if (cell.status === 'user_input' && cell.value == null) {
-    return { label: '비움', className: statusBadge.user_input.className };
+    return { ...statusBadge.user_input, label: '비움', meaning: '직접 비워 둔 칸' };
   }
-  if (isImageRead(cell)) {
-    return { label: '이미지에서 읽음', className: statusBadge.estimated.className };
-  }
+  if (isImageRead(cell)) return IMAGE_READ_BADGE;
   return statusBadge[cell.status];
 }
 

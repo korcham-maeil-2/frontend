@@ -80,11 +80,11 @@
   --body: #344052;
   --link: var(--foreground);
   /* 값마다 붙이는 출처·신뢰도 표시 */
-  --confirmed: var(--foreground);
+  --confirmed: var(--primary); /* '확인' 배지: 흰 바탕 + 코발트 테두리·글자 (회색 '입력'과 구분) */
   --estimated: #8a5a00;
   --estimated-bg: #fff4d6;
   --user-input: #455266;
-  --user-input-bg: #edf0f4;
+  --user-input-bg: #e2e6ec; /* 계산한 열(연한 파랑) 위에서도 보이는 회색 */
   /* 남는 돈·더해지는 돈 전용. 남색 일색에서 "결과 숫자"를 구분한다. 다른 뜻으로 쓰지 않는다. */
   --positive: #0b8457;
   --positive-soft: #e3f4ec;
@@ -525,14 +525,22 @@ details[open] > summary .when-closed {
   --unit-width: 2.25rem;
   --unit-slot: calc(var(--unit-width) + 0.5rem);
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
   align-items: center;
   column-gap: 0.75rem;
   row-gap: 0.4rem;
   padding-block: 0.6rem;
   border-bottom: 1px solid var(--border);
 }
-.row-field > label {
+/* 항목 이름 + 배지 한 묶음 (row-editor.tsx). 배지가 이름 바로 옆에 붙는다 */
+.row-field-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.5rem;
+}
+.row-field > label,
+.row-field-head > label {
   font-weight: 600;
   font-size: 0.875rem;
   color: var(--foreground);
@@ -598,6 +606,16 @@ details[open] > summary .when-closed {
 @media (min-width: 64rem) {
   .row-field {
     grid-template-columns: 8.5rem minmax(0, 1fr) 5.5rem;
+  }
+  /* 조건 확인 화면(이름 + 배지 묶음이 있는 칸)만 이름 칸을 넓혀 배지를 그 끝에 둔다.
+     내 생활비 화면(profile-form.tsx)은 배지가 없어 원래 칸 나눔 그대로 */
+  .row-field:has(> .row-field-head) {
+    grid-template-columns: 12rem minmax(0, 1fr);
+  }
+  /* 넓은 화면: 배지를 이름 칸 오른쪽 끝(입력칸 바로 앞)에 세로로 줄 맞춘다 — '확인할 칸'을 위아래로 훑기 쉽게.
+     이름과 배지가 한 줄에 안 들어가면('이미지에서 읽음' 등) 배지가 아랫줄 오른쪽으로 내려간다 */
+  .row-field-head > .status-badge {
+    margin-inline-start: auto;
   }
   .row-field > :is(input, select, .unit-input) {
     grid-row: 1;
@@ -1146,9 +1164,11 @@ section.desk-sheet > .sheet-heading {
   background: var(--estimated-bg);
   color: var(--estimated);
 }
+/* '확인 끝'은 '확인' 배지와 같은 모양 (흰 바탕 + 코발트 테두리) */
 .posting-tab-status[data-state='done'] {
-  background: var(--secondary);
+  background: var(--card);
   color: var(--confirmed);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--confirmed) 45%, transparent);
 }
 .posting-tab-status[data-state='unseen'] {
   border: 1px dashed var(--input);
@@ -1402,7 +1422,7 @@ section.desk-sheet > .sheet-heading {
   list-style: disc;
 }
 
-/* 결과 화면 '이사하면 처음에 준비할 돈': 보증금 한 줄 아래 출처 */
+/* 결과 화면 '이사하면 처음에 준비할 돈': 거래가 적을 때 보증금 아래 '참고만' 안내 */
 .deposit-source {
   display: block;
   margin-top: 0.25rem;
@@ -1536,4 +1556,89 @@ section.desk-sheet > .sheet-heading {
   .agent-bar span {
     transition: none;
   }
+}
+
+/* 신뢰도 배지 (source-badge.tsx): 누르거나 마우스를 올리면 뜻과 출처가 뜬다 */
+/* '확인'은 흰 바탕 + 코발트 테두리 — 회색 '입력', 노란 '추정'과 한눈에 갈린다 (DESIGN.md 신뢰도 표시).
+   테두리 대신 안쪽 선을 그려 다른 배지와 크기가 같다. */
+.badge-confirmed {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--confirmed) 45%, transparent);
+}
+.source-badge {
+  position: relative;
+  border: 0;
+  font-family: inherit;
+  line-height: inherit;
+  cursor: pointer;
+}
+/* 배지는 작아서 손가락으로 누르기 어렵다 → 보이지 않는 누를 자리를 넓힌다 */
+.source-badge::before {
+  content: '';
+  position: absolute;
+  inset: -0.5rem -0.25rem;
+}
+.source-badge:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.source-positioner {
+  z-index: 50;
+}
+.source-popup {
+  width: max-content;
+  max-width: min(18rem, calc(100vw - 2rem));
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: var(--card);
+  padding: 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--body);
+  text-align: start;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+/* 맨 위: 배지 + 짧은 뜻 한 줄 */
+.source-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  color: var(--foreground);
+}
+/* 그 아래: '계산 / 출처 / 이유' 같은 이름표 + 짧은 줄 */
+.source-details {
+  display: grid;
+  gap: 0.375rem;
+  margin-top: 0.625rem;
+  border-top: 1px solid var(--border);
+  padding-top: 0.625rem;
+}
+.source-details > div {
+  display: grid;
+  grid-template-columns: 2.5rem 1fr; /* 이름표 세 글자(이미지)까지 한 줄 */
+  gap: 0.5rem;
+}
+.source-details dt {
+  font-size: 0.75rem;
+  line-height: 1.5rem; /* 본문 첫 줄과 높이를 맞춘다 */
+  color: var(--muted-foreground);
+}
+/* 결과 표 아래 배지 범례 (result-view.tsx BadgeLegend) */
+.badge-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  margin-top: 0.85rem;
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}
+.badge-legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+/* 이유가 여럿이면 줄 사이를 띄워, 두 줄로 넘어간 한 이유와 구분한다 */
+.source-details dd > span + span {
+  margin-top: 0.25rem;
 }

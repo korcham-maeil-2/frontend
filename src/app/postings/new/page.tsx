@@ -21,7 +21,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { api, getHealth } from '@/lib/api/client';
 import type { components } from '@/lib/api/schema';
 import { examplePostings } from './examples';
-import { cellsOf, isImageRead, type Row } from './format';
+import { IMAGE_READ_BADGE, cellsOf, isImageRead, statusBadge, type Row } from './format';
 import { MAX_MESSAGE_CHARS } from './limits';
 import { AgentProgress } from './agent-progress';
 import { LINK_ONLY_ERROR, LinkHint, isLinkOnly } from './link-hint';
@@ -45,6 +45,7 @@ import {
 import { ProfileFormView } from './profile-form';
 import { PostingTabs, companyName } from './posting-tabs';
 import { ResultView, bestRemainingText, isCalculationResult } from './result-view';
+import { BadgeLegend } from './source-badge';
 import { SupportView, isLocalSupport } from './support-view';
 import { ReportView, isReport, type Report } from './report-view';
 import { RowEditor, fieldsToCheck, focusField } from './row-editor';
@@ -891,11 +892,17 @@ export default function NewPosting() {
         <section className="desk-sheet sheet-enter" aria-label="공고 조건 확인">
           {demoNotice}
           <h2 className="sheet-heading">공고 {rows.length}개의 근무 조건</h2>
-          <p className="mb-5 text-sm text-muted-foreground">
-            확인 = 공고에서 읽은 값 · 추정 = 공고와 맞는지 다시 봐야 하는 값 · 입력 = 직접 고친 값 ·
-            공고에 없음 = 공고에 적혀 있지 않은 값
-            {hasImageCells && ' · 이미지에서 읽음 = AI가 이미지 글자를 옮겨 적은 값'}
-          </p>
+          <BadgeLegend
+            className="mb-5"
+            badges={[
+              statusBadge.confirmed,
+              // 이 화면의 추정 = AI가 읽은 값이 공고와 맞는지 다시 볼 값
+              { ...statusBadge.estimated, meaning: '공고와 맞는지 다시 볼 값' },
+              statusBadge.user_input,
+              statusBadge.missing,
+              ...(hasImageCells ? [IMAGE_READ_BADGE] : []),
+            ]}
+          />
           {(visionInputs.length > 0 || ocrInputs.length > 0 || ignoredImages.length > 0) && (
             <div className="salary-notice mb-6">
               <p className="font-semibold">이미지에서 읽은 값은 원본과 한 번 더 비교해 주세요</p>

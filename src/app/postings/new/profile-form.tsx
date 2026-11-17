@@ -3,6 +3,7 @@ import { Plus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatWon, salaryText, statusBadge, type Row } from './format';
+import { SourceBadge } from './source-badge';
 import { CONTROL_CLASS, MoneyInput } from './money-input';
 import { PostingTabs } from './posting-tabs';
 import {
@@ -151,24 +152,41 @@ function moveHousingHelp(aid: number | null | undefined) {
 }
 
 /**
- * 근무지 원룸 월세 시세 한 줄 ('추정' 배지). 비워 두면 서버(calc/summary.py)가 이 값으로 계산한다.
- * 시세에는 관리비가 빠져 있어, 비워 두면 남는 돈이 실제보다 많게 나올 수 있다고 알린다.
+ * 근무지 원룸 월세 시세 ('추정' 배지). 비워 두면 서버(calc/summary.py)가 이 값으로 계산한다.
+ * 줄글 대신 두 줄로: 첫 줄은 금액, 둘째 줄은 꼭 알아야 할 것(비우면 이 값, 관리비 별도)만.
+ * 어디서 낸 값인지(기간·거래 수)는 배지를 누르면 보인다.
  */
 function rentNote(value: Money, rent: RentEstimate | null, pending: boolean): ReactNode {
   if (pending) return '근무지 월세 시세를 불러오는 중이에요…';
   if (rent?.monthly_rent_krw == null) return null;
   const place = rent.region.split(' ').slice(1).join(' ') || rent.region;
-  const badge = statusBadge.estimated;
-  const few = rent.sample_size < FEW_TRADES;
+  const notes = [
+    rent.sample_size < FEW_TRADES && '거래가 적어 참고만 하세요',
+    // 시세에는 관리비가 빠져 있다: 비워 둬서 이 값으로 계산하면 남는 돈이 실제보다 많게 나올 수 있다
+    ...(value == null
+      ? [
+          '비워 두면 이 금액으로 계산해요',
+          '관리비가 빠져 있어 남는 돈이 실제보다 많게 나올 수 있어요',
+        ]
+      : ['관리비는 빠진 금액이에요']),
+  ].filter(Boolean);
   return (
     <>
-      <span className={`status-badge ${badge.className}`}>{badge.label}</span> {place} 원룸 월세{' '}
-      <span className="text-foreground">{formatWon(rent.monthly_rent_krw)}</span> ({rent.period}{' '}
-      국토부 실거래가 {rent.sample_size.toLocaleString('ko-KR')}건 중앙값
-      {few ? ', 거래가 적어 참고만 하세요' : ''}).{' '}
-      {value == null
-        ? '비워 두면 이 금액으로 계산해요. 관리비는 빠져 있어서 남는 돈이 실제보다 많게 나올 수 있어요.'
-        : '관리비는 빠진 금액이에요.'}
+      <span className="block">
+        <SourceBadge
+          badge={statusBadge.estimated}
+          details={[
+            { label: '출처', text: `국토부 실거래가 (${rent.period})` },
+            {
+              label: '계산',
+              text: `원룸 월세 ${rent.sample_size.toLocaleString('ko-KR')}건의 중앙값`,
+            },
+          ]}
+        />{' '}
+        {place} 원룸 월세{' '}
+        <span className="text-foreground">{formatWon(rent.monthly_rent_krw)}</span>
+      </span>
+      <span className="mt-0.5 block">{notes.join(' · ')}</span>
     </>
   );
 }
