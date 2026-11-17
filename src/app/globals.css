@@ -1840,3 +1840,51 @@ section.desk-sheet > .sheet-heading {
   outline-offset: 2px;
   border-radius: 0.25rem;
 }
+
+/* 되묻기 대화 (ask-view.tsx): 에이전트 말풍선 + 답 칸 */
+.ask-box {
+  display: grid;
+  gap: 1rem;
+  margin-block: 1rem;
+  border: 1px solid color-mix(in srgb, var(--primary) 35%, transparent);
+  border-radius: 0.5rem;
+  background: var(--card);
+  padding: 1rem;
+}
+.ask-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 700;
+  color: var(--foreground);
+}
+.ask-title:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.ask-list {
+  display: grid;
+  gap: 1rem;
+}
+.ask-item {
+  display: grid;
+  gap: 0.5rem;
+}
+.ask-bubble {
+  justify-self: start;
+  max-width: min(36rem, 100%);
+  border-radius: 0 0.75rem 0.75rem 0.75rem;
+  background: var(--muted);
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  color: var(--body);
+}
+.ask-answer {
+  max-width: 20rem;
+}
+.ask-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}

@@ -55,6 +55,7 @@ import { ResultView, bestRemainingText, isCalculationResult } from './result-vie
 import { BadgeLegend } from './source-badge';
 import { SupportView, isLocalSupport } from './support-view';
 import { PlanView, isSettlePlan } from './plan-view';
+import { AskView, askQuestionsOf, type AskAnswers, type AskQuestion } from './ask-view';
 import { ReportView, isReport, type Report } from './report-view';
 import { RowEditor, fieldsToCheck, focusField } from './row-editor';
 
@@ -471,6 +472,8 @@ export default function NewPosting() {
       setResult(null);
       setSupport(null);
       setPlan(null);
+      setAsking(null);
+      setAsking(null);
       setReport(null);
       // 새 표: 첫 공고를 고르고 그것만 '본 것'으로 (예전 표에서 연 탭 기록은 버린다)
       setActivePosting(table[0].id);
@@ -567,6 +570,77 @@ export default function NewPosting() {
    *   - '이미 확인을 마침' → 같은 세션에 /recalculate
    *   - '세션이 없음' 등   → 같은 공고 글로 새 세션을 만들어 /confirm (공고를 다시 읽는다)
    */
+  function finishCalculation(
+    data: SessionResponse,
+    id: string,
+    sentRows: Row[],
+    sentProfile: UserProfile,
+  ) {
+    // 되묻기: 계산을 막는 빈 값이 있어 서버가 질문을 보냈다 → 대화 상자를 띄우고 답을 기다린다
+    const questions = data.status === 'awaiting_answer' ? askQuestionsOf(data.pending) : null;
+    if (questions) {
+      setSessionId(id);
+      setAsking({ id, questions });
+      return;
+    }
+    setAsking(null);
+    if (!isCalculationResult(data.result)) {
+      setError(RESULT_ERROR); // 모양이 다르면(예전 백엔드 등) 그리지 않는다
+      return;
+    }
+    const calculatedRows = data.table?.length ? data.table : sentRows;
+    setSessionId(id);
+    setRows(calculatedRows);
+    setCompleted(true);
+    setResult(data.result);
+    setRents((known) => ({ ...known, ...rentsFromResult(data.result?.rent_estimates) }));
+    // 청년 지원은 키가 없거나 예전 백엔드면 오지 않는다 → 없으면 그 영역만 안 그린다
+    setSupport(isLocalSupport(data.local_support) ? data.local_support : null);
+    // 정착 플랜: 예전 백엔드면 오지 않는다 → 없으면 그 영역만 안 그린다
+    setPlan(isSettlePlan(data.plan) ? data.plan : null);
+    // AI 리포트: 검증을 통과했을 때만 글이 온다 (report_check로 상태를 알린다)
+    setReport({ text: data.report ?? null, check: data.report_check ?? null });
+    setResultKey(inputKey(calculatedRows, sentProfile));
+    changeStep('result');
+  }
+
+  // 되묻기 대화 (계산 전에 서버가 빈 값을 물어볼 때)
+  const [asking, setAsking] = useState<{ id: string; questions: AskQuestion[] } | null>(null);
+
+  /** 되묻기에 답하고 계산을 이어 간다. 답한 값은 생활비 칸에도 넣어 둔다 (다시 계산할 때 그대로) */
+  async function answer(answers: AskAnswers) {
+    if (!asking) return;
+    setBusy('confirming');
+    setError('');
+    let form = profile;
+    if (answers.current_housing != null)
+      form = { ...form, currentHousing: answers.current_housing };
+    if (answers.fixed_expenses != null) {
+      form = {
+        ...form,
+        fixedExpenses: answers.fixed_expenses
+          ? [{ name: '고정비 합계', amount: answers.fixed_expenses }]
+          : [],
+      };
+    }
+    setProfile(form);
+    try {
+      const { data, error: failed } = await api.POST('/sessions/{session_id}/answers', {
+        params: { path: { session_id: asking.id } },
+        body: { answers },
+      });
+      if (!data) {
+        setError(failed?.message ?? NETWORK_ERROR);
+        return;
+      }
+      finishCalculation(data, asking.id, rows, toUserProfile(form, rows));
+    } catch {
+      setError(NETWORK_ERROR);
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function calculate() {
     setBusy('confirming');
     setError('');
@@ -584,27 +658,6 @@ export default function NewPosting() {
         body: { table: sentRows, profile: sentProfile },
       });
 
-    function finish(data: SessionResponse, id: string) {
-      if (!isCalculationResult(data.result)) {
-        setError(RESULT_ERROR); // 모양이 다르면(예전 백엔드 등) 그리지 않는다
-        return;
-      }
-      const calculatedRows = data.table?.length ? data.table : sentRows;
-      setSessionId(id);
-      setRows(calculatedRows);
-      setCompleted(true);
-      setResult(data.result);
-      setRents((known) => ({ ...known, ...rentsFromResult(data.result?.rent_estimates) }));
-      // 청년 지원은 키가 없거나 예전 백엔드면 오지 않는다 → 없으면 그 영역만 안 그린다
-      setSupport(isLocalSupport(data.local_support) ? data.local_support : null);
-      // 정착 플랜: 예전 백엔드면 오지 않는다 → 없으면 그 영역만 안 그린다
-      setPlan(isSettlePlan(data.plan) ? data.plan : null);
-      // AI 리포트: 검증을 통과했을 때만 글이 온다 (report_check로 상태를 알린다)
-      setReport({ text: data.report ?? null, check: data.report_check ?? null });
-      setResultKey(inputKey(calculatedRows, sentProfile));
-      changeStep('result');
-    }
-
     try {
       if (sessionId) {
         let response = await (completed ? recalculate(sessionId) : confirm(sessionId));
@@ -612,7 +665,7 @@ export default function NewPosting() {
           response = await recalculate(sessionId);
         }
         if (response.data) {
-          finish(response.data, sessionId);
+          finishCalculation(response.data, sessionId, sentRows, sentProfile);
           return;
         }
         if (!SESSION_LOST.has(errorCode(response.error))) {
@@ -634,7 +687,7 @@ export default function NewPosting() {
         setError(confirmed.error?.message ?? NETWORK_ERROR);
         return;
       }
-      finish(confirmed.data, id);
+      finishCalculation(confirmed.data, id, sentRows, sentProfile);
     } catch {
       setError(NETWORK_ERROR);
     } finally {
@@ -665,6 +718,7 @@ export default function NewPosting() {
     setResult(null);
     setSupport(null);
     setPlan(null);
+    setAsking(null);
     setReport(null);
     setResultKey('');
     setActivePosting('');
@@ -923,6 +977,9 @@ export default function NewPosting() {
                 ))}
               </ul>
             </div>
+          )}
+          {asking && (
+            <AskView questions={asking.questions} busy={busy !== null} onAnswer={answer} />
           )}
           {/* 계산 실패: 빨간 한 줄 대신 눈에 띄는 상자로. 할 일은 오류 문구에, 넣은 값은 그대로라는 것을 함께 */}
           <div role="alert">
