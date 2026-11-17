@@ -302,6 +302,11 @@ export interface components {
        * @description 그 연봉일 때의 세후 월급 (화면이 거꾸로 계산하지 않게)
        */
       net_income_krw: number | null;
+      /**
+       * Net Income Source
+       * @description 그 연봉일 때 세후 월급을 어떻게 계산했는지 (별도 식대·수당 포함, 화면이 문장을 만들지 않게)
+       */
+      net_income_source: string | null;
       /** @description 이 답에 쓴 주거비 (주거지원비가 끝난 뒤 기준) */
       housing: components['schemas']['Item'] | null;
       /** @description 이 답에 쓴 교통비 */
@@ -882,6 +887,8 @@ export interface components {
       } | null;
       /** @description 회사 수당 합계 (교통비·통신비 등). 세후 월급에 이미 들어 있음 */
       allowances: components['schemas']['Item'];
+      /** @description 연봉·월급과 따로 매달 받는 돈 (별도 지급 식대 + 수당). 세후 월급에 이미 들어 있음. 연봉만 보고 비교하면 헷갈리므로 화면이 따로 알린다 */
+      pay_on_top: components['schemas']['Item'] | null;
       fixed_expenses: components['schemas']['Item'];
       /** Scenarios */
       scenarios: components['schemas']['Scenario'][];

@@ -54,6 +54,7 @@ type Tag = { badge: Badge; details: Detail[] };
 type Shown = {
   value: string;
   note?: string;
+  sub?: string; // note 아래 한 줄 더 (연봉 외 수당처럼 값의 뜻을 바꾸는 사실)
   tag?: Tag;
   tone?: 'target' | 'muted' | 'negative';
 };
@@ -146,18 +147,39 @@ function exact(value: number): string {
 const NOT_APPLICABLE: Shown = { value: '해당 없음', tone: 'muted' };
 const UNKNOWN: Shown = { value: '모름', tone: 'muted' };
 
+/**
+ * 연봉·월급과 따로 매달 받는 돈(별도 식대·수당) 안내. 세후 월급에 이미 들어 있어서, 연봉만 보고
+ * 비교하면 '연봉은 더 적은데 세후 월급은 더 많다'가 이상해 보인다 → 연봉 칸 아래에 짧게 알리고
+ * 배지 창에 내역을 보인다. 금액·내역은 백엔드가 계산한 그대로 (식대가 연봉에 포함인지 다시 판단하지 않는다).
+ * 예전 백엔드·저장된 초안에는 pay_on_top이 없다 (배포 순서).
+ */
+function payOnTop(posting: PostingResult): { sub?: string; detail?: Detail } {
+  const item = posting.pay_on_top;
+  if (!item?.value) return {};
+  // label은 백엔드가 계산에 쓴 급여 칸으로 정한 '연봉 외' / '월급 외'
+  return {
+    sub: `${item.label} 매달 ${formatWon(item.value)} 따로`,
+    detail: { label: '따로', text: `${item.source} (세후 월급에 넣어 계산)` },
+  };
+}
+
 /** 표의 '연봉' 줄: 연봉은 금액만, 월급 공고는 '월급 250만원'처럼 종류를 붙인다.
  *  금액이 있으면 공고 원문과 함께 배지를 단다 (조건 확인 화면과 같은 배지). */
-function salaryCell(row: Row | undefined): Shown {
+function salaryCell(row: Row | undefined, posting: PostingResult): Shown {
   if (!row) return { value: '—' };
   const value = salaryText(row).replace(/^연봉 /, '');
   const cell =
     row.salary_type?.value === 'monthly' ? row.monthly_salary_krw : row.annual_salary_krw;
   if (!cell || cell.value == null) return { value };
-  const details = cell.source_text
-    ? [{ label: cell.from_image ? '이미지' : '공고', text: `“${cell.source_text}”` }]
-    : [];
-  return { value, tag: { badge: badgeFor(cell), details } };
+  // 세후 월급을 못 구했으면 '세후 월급에 넣어 계산'이 사실이 아니라 보이지 않는다
+  const extra = posting.net_income.value != null ? payOnTop(posting) : {};
+  const details: Detail[] = [
+    ...(cell.source_text
+      ? [{ label: cell.from_image ? '이미지' : '공고', text: `“${cell.source_text}”` }]
+      : []),
+    ...(extra.detail ? [extra.detail] : []),
+  ];
+  return { value, sub: extra.sub, tag: { badge: badgeFor(cell), details } };
 }
 
 /**
@@ -249,7 +271,7 @@ function buildColumn(
       housing: undefined,
       transport: undefined,
       cells: {
-        salary: salaryCell(row),
+        salary: salaryCell(row, posting),
         net: knownNet,
         housing: NOT_APPLICABLE,
         transport: NOT_APPLICABLE,
@@ -278,7 +300,7 @@ function buildColumn(
   let net: Shown;
   let remaining: Shown;
   if (posting.net_income.value != null) {
-    salary = salaryCell(row);
+    salary = salaryCell(row, posting);
     net = knownNet;
     remaining =
       scenario.monthly_remaining != null
@@ -293,13 +315,19 @@ function buildColumn(
           };
   } else if (solved && be && breakEven) {
     // 연봉 비공개: 기준만큼 남는 최소 연봉과, 그 연봉일 때의 세후 월급·남는 돈 (모두 서버가 계산한 값)
+    // 최소 연봉에는 따로 받는 식대·수당이 빠져 있다 (그 돈은 연봉과 별개로 더 받는다)
+    const extra = payOnTop(posting);
     salary = {
       value: `최소 ${won(be.annual_salary_krw!)}`,
       note: '공고엔 비공개',
+      sub: extra.sub,
       tone: 'target',
       tag: calculated(
         '기준과 같은 금액이 매달 남는 최소 연봉',
-        [{ label: '기준', text: breakEven.baseline.label }],
+        [
+          { label: '기준', text: breakEven.baseline.label },
+          ...(extra.detail ? [extra.detail] : []),
+        ],
         why,
       ),
     };
@@ -313,7 +341,10 @@ function buildColumn(
               [
                 {
                   label: '계산',
-                  text: `연봉 ${won(be.annual_salary_krw!)} ÷ 12 → 4대보험·소득세를 뺀 값`,
+                  // 백엔드가 그 연봉일 때 계산한 문장 (별도 식대·수당 포함). 예전 백엔드엔 없다.
+                  text:
+                    be.net_income_source ??
+                    `연봉 ${won(be.annual_salary_krw!)} ÷ 12 → 4대보험·소득세를 뺀 값`,
                 },
               ],
               NET_WHY,
@@ -326,7 +357,7 @@ function buildColumn(
       tag: calculated(REMAINING_MEANING, [REMAINING_HOW], why),
     });
   } else {
-    salary = { ...salaryCell(row), note: be?.reason ?? undefined };
+    salary = { ...salaryCell(row, posting), note: be?.reason ?? undefined };
     net = { ...UNKNOWN, note: netMissingNote(posting, row) };
     // 연봉 말고도 빈 값이 있으면 그것부터 알려 준다 (그 값이 있어야 최소 연봉도 계산된다)
     const others = be?.missing.length
@@ -383,6 +414,7 @@ function CellContent({ cell, label }: { cell: Shown; label: string }) {
       {cell.note && (
         <small className={cell.tone === 'target' ? 'offer-badge' : 'cell-note'}>{cell.note}</small>
       )}
+      {cell.sub && <small className="cell-note">{cell.sub}</small>}
     </>
   );
 }
@@ -407,7 +439,13 @@ function Breakdown({ column, index }: { column: Column; index: number }) {
     total?: boolean; // 마지막 '매달 남는 돈' 줄
   }[] = [];
   if (slip) {
-    lines.push({ label: '세전 월급', value: exact(slip.gross) });
+    // 세전 월급에 연봉 외 수당이 들어 있으면 무엇인지 그 줄에서 바로 보인다
+    const onTop = posting.pay_on_top?.value ? posting.pay_on_top : null;
+    lines.push({
+      label: '세전 월급',
+      value: exact(slip.gross),
+      note: onTop ? `${onTop.label} ${onTop.source} 포함` : undefined,
+    });
     const deductions: [keyof typeof slip, string][] = [
       ['national_pension', '국민연금'],
       ['health_insurance', '건강보험'],
@@ -428,7 +466,10 @@ function Breakdown({ column, index }: { column: Column; index: number }) {
     lines.push({
       label: '세후 월급',
       value: exact(breakEven.net_income_krw),
-      note: `연봉 ${exact(breakEven.annual_salary_krw!)}일 때 (4대보험·소득세를 뺀 값)`,
+      // 백엔드가 그 연봉일 때 계산한 문장 (별도 식대·수당 포함). 예전 백엔드엔 없다.
+      note:
+        breakEven.net_income_source ??
+        `연봉 ${exact(breakEven.annual_salary_krw!)}일 때 (4대보험·소득세를 뺀 값)`,
       status: 'estimated',
     });
   } else if (netMissingNote(posting, row)) {
@@ -489,6 +530,8 @@ function Breakdown({ column, index }: { column: Column; index: number }) {
 
 /** 연봉 비공개 공고 한 줄 요약: "최소 ○○ 이상이면 매달 ○○ 이상 남아요" */
 function BreakEvenSummary({ be, column }: { be: BreakEven; column: Column | undefined }) {
+  // 최소 연봉에는 따로 받는 식대·수당이 빠져 있다 → 한 줄 요약에도 적는다
+  const onTop = column?.posting.pay_on_top?.value ? column.posting.pay_on_top : null;
   const chosen = column?.breakEven;
   // 회사 이름 뒤 조사(은/는)는 이름마다 달라서, 이름 뒤에 쌍점을 쓴다. 금액은 늘 '원'으로 끝나 '이'.
   const name = <strong>{be.company || be.posting_id}</strong>;
@@ -519,6 +562,7 @@ function BreakEvenSummary({ be, column }: { be: BreakEven; column: Column | unde
       )}
       {chosen.during_support_annual_salary_krw != null &&
         ` 주거지원비를 받는 동안은 최소 ${won(chosen.during_support_annual_salary_krw)}이면 돼요.`}
+      {onTop && ` 이 연봉과 따로 매달 ${formatWon(onTop.value!)}(${onTop.source})을 더 받아요.`}
     </li>
   );
 }
