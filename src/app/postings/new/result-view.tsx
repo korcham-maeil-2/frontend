@@ -9,13 +9,14 @@ import {
   badgeFor,
   formatWon,
   hasSalary,
+  placeName,
   salaryText,
   statusBadge,
   type Badge,
   type Row,
   type Status,
 } from './format';
-import { FEW_TRADES } from './profile';
+import { FEW_TRADES, rentFailed } from './profile';
 import { BadgeLegend, SourceBadge, type Detail } from './source-badge';
 
 // 결과 화면: 공고별 '매달 남는 돈'을 한 표로 비교한다 (DESIGN.md "비교표").
@@ -578,19 +579,46 @@ function BreakdownLines({ lines }: { lines: Line[] }) {
 }
 
 /**
+ * 기준 공고가 주거지원비를 받는 동안 매달 남는 돈. 기준은 지원이 끝난 뒤 금액이라
+ * 표에 보이는 그 공고 금액과 다르다 → 둘이 다를 때만 돌려줘 카드에 함께 적는다.
+ */
+function baselineDuringAid(be: BreakEven, columns: Column[]): number | undefined {
+  const base = columns.find((c) => c.posting.posting_id === be.baseline.posting_id);
+  if (!base?.row?.housing_allowance_monthly_krw?.value) return undefined;
+  const now = base.posting.scenarios.find((s) => s.case === be.baseline.case)?.monthly_remaining;
+  return now != null && now !== be.baseline.monthly_remaining ? now : undefined;
+}
+
+/**
  * 연봉 비공개 공고 요약 카드: 답(최소 연봉)을 크게 먼저, 기준·지원받는 동안·따로 받는 돈은 이름표 붙은 줄로.
  * 문구 '최소 ○○ 이상이면 같은 금액이 남아요'는 이슈 backend#14 완료 조건이라 그대로 둔다.
  */
-function BreakEvenSummary({ be, column }: { be: BreakEven; column: Column | undefined }) {
+function BreakEvenSummary({
+  be,
+  column,
+  baselineDuringAid,
+}: {
+  be: BreakEven;
+  column: Column | undefined;
+  baselineDuringAid: number | undefined;
+}) {
   return (
     <li className="be-item">
       <p className="font-semibold text-foreground">{be.company || be.posting_id}</p>
-      <BreakEvenAnswer be={be} column={column} />
+      <BreakEvenAnswer be={be} column={column} baselineDuringAid={baselineDuringAid} />
     </li>
   );
 }
 
-function BreakEvenAnswer({ be, column }: { be: BreakEven; column: Column | undefined }) {
+function BreakEvenAnswer({
+  be,
+  column,
+  baselineDuringAid,
+}: {
+  be: BreakEven;
+  column: Column | undefined;
+  baselineDuringAid: number | undefined;
+}) {
   const chosen = column?.breakEven;
   if (!column?.scenario) return <p>이 경우는 해당 없어요. 다른 경우를 골라 보세요.</p>;
   if (!chosen || chosen.annual_salary_krw == null) {
@@ -619,6 +647,11 @@ function BreakEvenAnswer({ be, column }: { be: BreakEven; column: Column | undef
           <dt>기준</dt>
           <dd>
             {be.baseline.label} · 매달 {won(be.baseline.monthly_remaining)}
+            {baselineDuringAid != null && (
+              <span className="block text-muted-foreground">
+                주거지원비가 끝난 뒤 기준이에요 (받는 동안은 매달 {won(baselineDuringAid)})
+              </span>
+            )}
           </dd>
         </div>
         {chosen.during_support_annual_salary_krw != null && (
@@ -639,6 +672,28 @@ function BreakEvenAnswer({ be, column }: { be: BreakEven; column: Column | undef
       </dl>
     </>
   );
+}
+
+/**
+ * 공공데이터(국토부 실거래가) 조회에 실패해, 이사할 집 주거비를 시세로 대신하지 못한 공고들.
+ * 그 공고의 '회사 근처로 이사'는 주거비가 비어 계산되지 않는다 → 이유와 할 일을 알린다.
+ */
+function rentFailures(columns: Column[], estimates: RentEstimate[]) {
+  const failed = estimates.filter((e) => e.status === 'unavailable');
+  const codes = failed.map((e) => e.lawd_cd);
+  const byRegion = new Map<string, { place: string; companies: string[] }>();
+  columns.forEach((column, i) => {
+    // 사택·기숙사 공고는 시세를 쓰지 않으니, 주거비가 빈 이유가 시세 실패가 아니다
+    if (!column.row || !rentFailed(column.row, codes)) return;
+    const rent = failed.find((e) => e.lawd_cd === column.row?.location?.value?.lawd_cd)!;
+    const move = column.posting.scenarios.find((s) => s.case === 'move' && s.applicable);
+    if (!move || move.housing.value != null) return;
+    // 같은 지역 공고는 한 안내로 묶는다
+    const entry = byRegion.get(rent.lawd_cd) ?? { place: placeName(rent.region), companies: [] };
+    entry.companies.push(companyOf(column, i));
+    byRegion.set(rent.lawd_cd, entry);
+  });
+  return [...byRegion.entries()].map(([key, entry]) => ({ key, ...entry }));
 }
 
 /**
@@ -663,7 +718,7 @@ function DepositSummary({ columns, estimates }: { columns: Column[]; estimates: 
       <h3 className="mb-2 font-semibold text-foreground">이사하면 처음에 준비할 돈</h3>
       <ul className="space-y-2 text-sm text-body">
         {[...byRegion.values()].map(({ rent, companies }) => {
-          const place = rent.region.split(' ').slice(1).join(' ') || rent.region;
+          const place = placeName(rent.region);
           return (
             <li key={rent.lawd_cd}>
               <strong>{companies.join(', ')}</strong> 근처({place}) 원룸 보증금{' '}
@@ -810,6 +865,22 @@ export function ResultView({ result, rows }: { result: Result; rows: Row[] }) {
         />
       </div>
 
+      {/* '회사 근처로 이사'를 계산하지 못한 이유 (공공데이터 조회 실패): 표 바로 아래에.
+          '더 남는 쪽' 보기에서도 이사 경우를 비교하지 못한 이유라 보이고,
+          '지금 집에서 통근' 보기에서는 이사 경우가 없으니 보이지 않는다 */}
+      {mode !== 'commute' &&
+        rentFailures(columns, result.rent_estimates).map((failure) => (
+          <div key={failure.key} className="salary-notice">
+            <p className="font-semibold">
+              {failure.place} 월세 시세(국토부 실거래가)를 불러오지 못했어요
+            </p>
+            <p>
+              그래서 {failure.companies.join(', ')}의 &lsquo;회사 근처로 이사&rsquo;는 계산하지
+              못했어요. 이사할 집 주거비를 넣거나, 잠시 후 다시 계산하면 시세를 다시 불러와요.
+            </p>
+          </div>
+        ))}
+
       {result.break_even.length > 0 && (
         <div className="rounded-2xl bg-muted p-5">
           <h3 className="mb-2 font-semibold text-foreground">연봉이 공개되지 않은 공고</h3>
@@ -819,6 +890,7 @@ export function ResultView({ result, rows }: { result: Result; rows: Row[] }) {
                 key={be.posting_id}
                 be={be}
                 column={columns.find((c) => c.posting.posting_id === be.posting_id)}
+                baselineDuringAid={baselineDuringAid(be, columns)}
               />
             ))}
           </ul>

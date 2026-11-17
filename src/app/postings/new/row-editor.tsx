@@ -108,7 +108,8 @@ const groups: { title: string; fields: Field[] }[] = [
       { key: 'shuttle_bus', label: '통근버스', kind: 'bool', yes: '있음', no: '없음' },
       {
         key: 'transport_allowance_monthly_krw',
-        label: '교통비 (매달)',
+        // 회사가 주는 수당 ('교통비'만 쓰면 내가 쓰는 교통비로 읽힌다. 백엔드 이름과 같게)
+        label: '교통비 수당 (매달)',
         kind: 'money',
         example: MONTHLY_EXAMPLE,
       },
