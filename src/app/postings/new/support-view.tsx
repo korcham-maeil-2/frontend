@@ -3,7 +3,7 @@
 import { ExternalLink } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { components } from '@/lib/api/schema';
-import type { Row } from './format';
+import { placeName, type Row } from './format';
 
 // 결과 화면의 '근무지별 청년 지원' (백엔드 support/policies.py의 LocalSupport).
 //   근무지(시군구)마다: 신청할 수 있거나 곧 열리는 지역 정책 (끝난 정책은 보여 주지 않는다 —
@@ -145,11 +145,6 @@ function RegionPanel({
   );
 }
 
-/** 시군구 이름 ('전남광주통합특별시 나주시' → '나주시', 세종은 그대로) */
-function placeOf(region: RegionSupport): string {
-  return region.region.split(' ').slice(1).join(' ') || region.region;
-}
-
 /** 이 지역에 근무지가 있는 회사들 ('(가상) 빛가람그리드(주)') */
 function companiesOf(region: RegionSupport, rows: Row[]): string {
   return region.posting_ids
@@ -157,7 +152,16 @@ function companiesOf(region: RegionSupport, rows: Row[]): string {
     .join(', ');
 }
 
-export function SupportView({ support, rows }: { support: LocalSupport; rows: Row[] }) {
+export function SupportView({
+  support,
+  rows,
+  stale = false,
+}: {
+  support: LocalSupport;
+  rows: Row[];
+  /** 오늘 기준으로 다시 고르지 못함 (연결 실패·서버 오류): 계산한 날 기준 목록이라고 알린다 */
+  stale?: boolean;
+}) {
   const thisYear = support.checked_on.slice(0, 4);
   const { regions, national } = support;
   // 근무지 코드를 정하지 못해 목록이 없어도, 그 이유(notes)는 보여 준다
@@ -172,6 +176,11 @@ export function SupportView({ support, rows }: { support: LocalSupport; rows: Ro
         <p className="text-sm text-muted-foreground">
           남는 돈 계산에는 넣지 않았어요. 조건과 일정은 바뀔 수 있으니, 신청 전에 각 신청 페이지에서
           확인해 주세요.
+        </p>
+        {/* 다시 고르기는 화면이 뜬 뒤에 실패한다 → 줄을 늘 두고 글만 넣어야 화면 읽기가 읽어 준다 */}
+        <p role="status" className="text-sm text-muted-foreground">
+          {stale &&
+            `오늘 기준으로 다시 확인하지 못했어요. ${day(support.checked_on, thisYear)} 기준 목록이라 그사이 끝난 정책이 있을 수 있어요.`}
         </p>
         {support.notes.map((note) => (
           <p key={note} className="text-sm text-muted-foreground">
@@ -190,7 +199,7 @@ export function SupportView({ support, rows }: { support: LocalSupport; rows: Ro
               {regions.map((region) => (
                 // 탭은 짧게 시군구만 (회사 이름은 탭 안 첫 줄에)
                 <TabsTrigger key={region.lawd_cd} value={region.lawd_cd}>
-                  {placeOf(region)}
+                  {placeName(region.region)}
                 </TabsTrigger>
               ))}
             </TabsList>

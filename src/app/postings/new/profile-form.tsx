@@ -2,13 +2,14 @@ import { useState, type ReactNode } from 'react';
 import { Plus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { formatWon, salaryText, statusBadge, type Row } from './format';
+import { formatWon, placeName, salaryText, statusBadge, type Row } from './format';
 import { SourceBadge } from './source-badge';
 import { CONTROL_CLASS, MoneyInput } from './money-input';
 import { PostingTabs } from './posting-tabs';
 import {
   AGE_RANGE,
   costsOf,
+  rentFailed,
   rentFor,
   rentPending,
   validAge,
@@ -88,11 +89,15 @@ function MoneyField({
   onChange: (value: Money) => void;
   example: string;
   help?: string;
-  /** 안내 아래 따로 한 줄 (예: 월세 시세) */
+  /**
+   * 안내 아래 따로 한 줄 (예: 월세 시세). 이 칸을 넘기면(null이어도) 줄을 늘 두고
+   * 바뀔 때 화면 읽기가 읽어 준다 (불러오는 중 → 시세·실패)
+   */
   note?: ReactNode;
 }) {
   const hintId = `${id}-hint`;
   const noteId = `${id}-note`;
+  const hasNote = note !== undefined;
   return (
     <div className="row-field profile-field">
       <label htmlFor={id}>
@@ -104,15 +109,15 @@ function MoneyField({
         value={value}
         onChange={onChange}
         example={example}
-        describedBy={note ? `${hintId} ${noteId}` : hintId}
+        describedBy={hasNote ? `${hintId} ${noteId}` : hintId}
       />
       <p id={hintId} className="row-field-hint">
         {value != null && <span className="text-foreground">{formatWon(value)}</span>}
         {value != null && help && ' · '}
         {help}
       </p>
-      {note && (
-        <p id={noteId} className="row-field-hint rent-note">
+      {hasNote && (
+        <p id={noteId} className="row-field-hint rent-note" aria-live="polite">
           {note}
         </p>
       )}
@@ -145,7 +150,11 @@ function Check({
 }
 
 /** '이사할 집 주거비' 칸 안내: 무엇을 넣는 칸인지 (시세는 rentNote로 따로 한 줄) */
-function moveHousingHelp(aid: number | null | undefined) {
+function moveHousingHelp(aid: number | null | undefined, companyHousing: boolean) {
+  // 사택·기숙사 공고: 시세로 대신 채우지 않으니, 본인 부담이 없으면 0을 넣어야 계산된다
+  if (companyHousing) {
+    return '사택·기숙사에 산다면 본인이 내는 돈(없으면 0), 따로 집을 구한다면 월세 + 관리비';
+  }
   const parts = ['월세 + 관리비'];
   if (aid) parts.push(`회사 주거지원비 ${formatWon(aid)}은 빼지 말고 넣어 주세요 (계산할 때 빼요)`);
   return parts.join('. ');
@@ -156,10 +165,32 @@ function moveHousingHelp(aid: number | null | undefined) {
  * 줄글 대신 두 줄로: 첫 줄은 금액, 둘째 줄은 꼭 알아야 할 것(비우면 이 값, 관리비 별도)만.
  * 어디서 낸 값인지(기간·거래 수)는 배지를 누르면 보인다.
  */
-function rentNote(value: Money, rent: RentEstimate | null, pending: boolean): ReactNode {
+function rentNote(
+  value: Money,
+  rent: RentEstimate | null,
+  pending: boolean,
+  failed: boolean,
+  onRetry: () => void,
+): ReactNode {
   if (pending) return '근무지 월세 시세를 불러오는 중이에요…';
+  if (failed) {
+    // 공공데이터(국토부 실거래가) 조회 실패: 비워 두면 시세로 대신 계산할 수 없다는 걸 숨기지 않는다
+    return (
+      <>
+        <span className="block">근무지 월세 시세(국토부 실거래가)를 불러오지 못했어요.</span>
+        <span className="block">
+          {value == null
+            ? '비워 두면 이사한 경우는 계산하지 못해요. 직접 넣거나 '
+            : '넣은 금액으로 계산해요. '}
+          <button type="button" className="inline-link" onClick={onRetry}>
+            다시 불러오기
+          </button>
+        </span>
+      </>
+    );
+  }
   if (rent?.monthly_rent_krw == null) return null;
-  const place = rent.region.split(' ').slice(1).join(' ') || rent.region;
+  const place = placeName(rent.region);
   const notes = [
     rent.sample_size < FEW_TRADES && '거래가 적어 참고만 하세요',
     // 시세에는 관리비가 빠져 있다: 비워 둬서 이 값으로 계산하면 남는 돈이 실제보다 많게 나올 수 있다
@@ -197,6 +228,8 @@ function PostingCosts({
   costs,
   rent,
   rentPending,
+  rentFailed,
+  onRetryRent,
   onChange,
 }: {
   row: Row;
@@ -206,6 +239,10 @@ function PostingCosts({
   rent: RentEstimate | null;
   /** 시세를 불러오는 중인지 */
   rentPending: boolean;
+  /** 시세를 불러오지 못했는지 (공공데이터 조회 실패) */
+  rentFailed: boolean;
+  /** 불러오지 못한 시세를 다시 불러오기 */
+  onRetryRent: () => void;
   onChange: (costs: PostingCostsForm) => void;
 }) {
   const id = (key: string) => `${row.id}-${key}`;
@@ -268,8 +305,13 @@ function PostingCosts({
                 example="50만"
                 value={costs.moveHousing}
                 onChange={(moveHousing) => set({ moveHousing })}
-                help={moveHousingHelp(aid)}
-                note={rentNote(costs.moveHousing, rent, rentPending)}
+                help={moveHousingHelp(aid, row.company_housing?.value === true)}
+                note={rentNote(costs.moveHousing, rent, rentPending, rentFailed, () => {
+                  // '다시 불러오기' 버튼은 불러오는 동안 사라진다 → 포커스를 금액 칸으로 옮겨
+                  // 키보드·화면 읽기 사용자가 위치를 잃지 않게 한다 (결과는 안내 줄이 읽어 준다)
+                  onRetryRent();
+                  document.getElementById(id('move-housing'))?.focus();
+                })}
               />
               <MoneyField
                 id={id('move-transport')}
@@ -297,6 +339,7 @@ export function ProfileFormView({
   askAge,
   rents,
   failedRents,
+  onRetryRents,
 }: {
   form: Form;
   rows: Row[];
@@ -312,6 +355,8 @@ export function ProfileFormView({
   rents: Rents;
   /** 시세를 불러오지 못한 시군구 코드 */
   failedRents: readonly string[];
+  /** 불러오지 못한 시세를 다시 불러오기 */
+  onRetryRents: () => void;
 }) {
   const set = (patch: Partial<Form>) => onChange({ ...form, ...patch });
   const setFixed = (fixedExpenses: Form['fixedExpenses']) => set({ fixedExpenses });
@@ -462,6 +507,8 @@ export function ProfileFormView({
                 costs={costsOf(form, row)}
                 rent={rentFor(row, rents)}
                 rentPending={rentPending(row, rents, failedRents)}
+                rentFailed={rentFailed(row, failedRents)}
+                onRetryRent={onRetryRents}
                 onChange={(costs) => set({ postings: { ...form.postings, [row.id]: costs } })}
               />
             ),
