@@ -83,8 +83,12 @@ export function AgentProgress({ kind }: { kind: ProgressKind }) {
       <div className="agent-bar" aria-hidden>
         <span style={{ width: `${percent}%` }} />
       </div>
-      {/* 화면 읽기 프로그램에는 단계가 바뀔 때만 알린다 (초 단위 숫자는 읽지 않는다) */}
-      <ol className="agent-steps" aria-live="polite">
+      {/* 화면 읽기 프로그램에는 단계가 바뀔 때만 알린다. 초 숫자·6초마다 바뀌는 팁은 알리지 않는다.
+          처음 0.2초는 비워 두었다가 채운다 — 글이 든 채로 나타난 알림 칸은 읽지 않는 프로그램이 있다 */}
+      <p className="sr-only" role="status">
+        {elapsed < 0.2 ? '' : `${plan.title}. ${plan.steps[active]} 중`}
+      </p>
+      <ol className="agent-steps">
         {plan.steps.map((step, i) => {
           const state = i < active ? 'done' : i === active ? 'active' : 'waiting';
           return (

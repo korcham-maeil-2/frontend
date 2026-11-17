@@ -59,6 +59,17 @@ export function cellsOf(row: Row): Cell[] {
   return [...cells, ...(row.other_allowances ?? []).map((a) => a.monthly_krw)];
 }
 
+/**
+ * 개인정보를 가린 표시 (백엔드 privacy.py가 AI로 보내기 전에 바꾼 글자: [이메일]·[번지] 등).
+ * 공고 인용에 이 표시가 보이면 왜 가렸는지 한 줄 알린다 (page.tsx).
+ */
+const MASK_MARK = /\[(이메일|전화번호|주민번호|생년월일|이름|번지|상세주소|식별번호|아이디)\]/;
+
+/** 공고 인용(원문 조각)에 가린 표시가 있는 칸이 하나라도 있는지 */
+export function hasMaskedQuote(rows: Row[]) {
+  return rows.some((row) => cellsOf(row).some((cell) => MASK_MARK.test(cell.source_text ?? '')));
+}
+
 /** 이미지에서 읽은 값: AI가 옮겨 적은 글과만 맞춰 봤으니 원본과 다시 비교해야 한다. */
 export function isImageRead(cell: Cell) {
   return cell.status === 'confirmed' && Boolean(cell.from_image);

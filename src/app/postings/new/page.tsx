@@ -21,7 +21,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { api, getHealth } from '@/lib/api/client';
 import type { components } from '@/lib/api/schema';
 import { examplePostings } from './examples';
-import { IMAGE_READ_BADGE, cellsOf, isImageRead, statusBadge, type Row } from './format';
+import {
+  IMAGE_READ_BADGE,
+  cellsOf,
+  hasMaskedQuote,
+  isImageRead,
+  statusBadge,
+  type Row,
+} from './format';
 import { MAX_MESSAGE_CHARS } from './limits';
 import { AgentProgress } from './agent-progress';
 import { LINK_ONLY_ERROR, LinkHint, isLinkOnly } from './link-hint';
@@ -909,12 +916,11 @@ export default function NewPosting() {
               <Calculator aria-hidden />
             </Button>
           </div>
-          {/* AI 리포트는 쓰고 검증하는 데 시간이 걸린다 (시연 모드는 리포트를 쓰지 않는다) */}
-          <div role="status">
-            {busy === 'confirming' && (
-              <AgentProgress kind={demoMode ? 'calculating-demo' : 'calculating'} />
-            )}
-          </div>
+          {/* AI 리포트는 쓰고 검증하는 데 시간이 걸린다 (시연 모드는 리포트를 쓰지 않는다).
+              화면 읽기 프로그램 알림은 카드 안에서 단계가 바뀔 때만 (agent-progress.tsx) */}
+          {busy === 'confirming' && (
+            <AgentProgress kind={demoMode ? 'calculating-demo' : 'calculating'} />
+          )}
         </form>
       ) : reviewing ? (
         <section className="desk-sheet sheet-enter" aria-label="공고 조건 확인">
@@ -931,6 +937,12 @@ export default function NewPosting() {
               ...(hasImageCells ? [IMAGE_READ_BADGE] : []),
             ]}
           />
+          {hasMaskedQuote(rows) && (
+            <p className="-mt-3 mb-5 text-xs text-muted-foreground">
+              공고 글의 [이메일]·[번지] 같은 표시는 AI에 보내기 전에 개인정보를 가린 자리예요.
+              비교에는 쓰지 않는 값이에요.
+            </p>
+          )}
           {(visionInputs.length > 0 || ocrInputs.length > 0 || ignoredImages.length > 0) && (
             <div className="salary-notice mb-6">
               <p className="font-semibold">이미지에서 읽은 값은 원본과 한 번 더 비교해 주세요</p>
@@ -1137,11 +1149,9 @@ export default function NewPosting() {
               </p>
             </TabsContent>
           </Tabs>
-          <div role="status">
-            {busy === 'reading' && (
-              <AgentProgress kind={mayUseVision ? 'reading-files' : 'reading'} />
-            )}
-          </div>
+          {busy === 'reading' && (
+            <AgentProgress kind={mayUseVision ? 'reading-files' : 'reading'} />
+          )}
           <p id="source-error" role="alert" className="form-hint">
             {error}
           </p>
