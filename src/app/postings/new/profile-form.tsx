@@ -470,11 +470,15 @@ export function ProfileFormView({
 
       <fieldset className="row-group">
         <legend>비교 기준 (선택)</legend>
-        <p className="mb-3 text-sm text-muted-foreground">
-          연봉이 공개되지 않은 공고는 &ldquo;최소 얼마를 받아야 기준만큼 남는지&rdquo;를 계산해요.
-          목표 금액을 넣으면 그 금액이 기준이고, 아니면 연봉이 공개된 공고와 지금 회사 중 매달 더
-          많이 남는 쪽이 기준이에요.
-        </p>
+        <div className="mb-3 text-sm text-muted-foreground">
+          <p>
+            연봉이 공개되지 않은 공고는 &ldquo;최소 얼마를 받아야 기준만큼 남는지&rdquo;를 계산해요.
+          </p>
+          <ul className="bullet-list mt-1 space-y-0.5">
+            <li>목표 금액을 넣으면 그 금액이 기준이에요</li>
+            <li>넣지 않으면 연봉이 공개된 공고와 지금 회사 중 매달 더 많이 남는 쪽이 기준이에요</li>
+          </ul>
+        </div>
         <Check
           id="has-current-job"
           checked={form.hasCurrentJob}

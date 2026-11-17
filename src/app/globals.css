@@ -319,9 +319,10 @@ main.site-shell:has(> .desk-spread) {
   max-width: 20rem;
 }
 .step-track {
+  --step-gap: 0.5rem; /* 단계 사이와 단계 안(선·번호·이름) 간격을 같게: 연결선 앞뒤 간격이 같다 */
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--step-gap);
   margin-bottom: 1.6rem;
   color: var(--muted-foreground);
   font-size: 0.875rem;
@@ -332,7 +333,7 @@ main.site-shell:has(> .desk-spread) {
   min-height: 2.75rem;
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: var(--step-gap);
   white-space: nowrap;
 }
 .step-track button {
@@ -374,8 +375,9 @@ main.site-shell:has(> .desk-spread) {
   font-weight: 400;
   color: var(--muted-foreground);
 }
-/* 두 칸 화면(공고 넣기)은 왼쪽이 좁아서, 지금 단계만 이름을 보이고 나머지는 번호만 (한 줄 유지) */
-.desk-spread:not(.is-wide) .step-track li:not([aria-current]) .step-label {
+/* 두 칸 화면(공고 넣기)은 왼쪽이 좁아서, 지금 단계만 이름을 보이고 나머지는 번호만 (한 줄 유지).
+   이름 칸째 화면에서만 숨긴다: 칸이 줄에 남으면 번호 뒤에 간격이 한 번 더 생긴다 */
+.desk-spread:not(.is-wide) .step-track li:not([aria-current]) .step-text {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -486,6 +488,11 @@ details[open] > summary .when-closed {
 .row-questions ul,
 .salary-notice ul {
   margin-top: 0.25rem;
+}
+/* 점 목록 (안내·결과 화면 공용). 위 여백은 쓰는 곳에서 정한다 */
+.row-questions ul,
+.salary-notice ul,
+.bullet-list {
   padding-inline-start: 1.1rem;
   list-style: disc;
 }
@@ -531,6 +538,10 @@ details[open] > summary .when-closed {
   row-gap: 0.4rem;
   padding-block: 0.6rem;
   border-bottom: 1px solid var(--border);
+}
+/* 묶음의 마지막 칸은 밑줄을 빼서 다음 묶음의 윗줄과 두 줄로 겹치지 않게 */
+.row-group > .row-field:last-child {
+  border-bottom: 0;
 }
 /* 항목 이름 + 배지 한 묶음 (row-editor.tsx). 배지가 이름 바로 옆에 붙는다 */
 .row-field-head {
@@ -920,7 +931,7 @@ section.desk-sheet > .sheet-heading {
   border-radius: 0.5rem;
   padding: 0.75rem 1rem;
 }
-.result-details summary {
+.result-details > summary {
   min-height: 2.75rem;
   display: flex;
   align-items: center;
@@ -1020,11 +1031,9 @@ section.desk-sheet > .sheet-heading {
 }
 /* 좁은 화면의 공고 고르기: 공고가 많으면 넘기지 않고 가로로 밀어 본다 */
 .result-compare .compare-switch {
+  max-width: 100%; /* 탭 줄이 카드 밖으로 나가 페이지가 가로로 밀리지 않게 (줄 안에서 민다) */
   overflow-x: auto;
   justify-content: flex-start;
-}
-.result-compare .compare-switch [role='tab'] {
-  flex: none;
 }
 
 /* ── 2단계부터: 화면 한 장 (desk-spread.is-wide) ──
@@ -1054,19 +1063,21 @@ section.desk-sheet > .sheet-heading {
   padding-bottom: 1rem;
   border-bottom: 1px solid color-mix(in oklab, var(--primary) 18%, transparent);
 }
-.desk-spread.is-wide .step-track li {
-  flex: 1 1 0;
-  min-width: 0;
-}
-.desk-spread.is-wide .step-track li + li::before {
-  display: none;
+@media (min-width: 48rem) {
+  .desk-spread.is-wide .step-track li {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .desk-spread.is-wide .step-track li + li::before {
+    display: none;
+  }
+  .desk-spread.is-wide .step-summary {
+    display: block;
+  }
 }
 .desk-spread.is-wide .step-track button {
   min-width: 0;
   border-radius: 0.375rem;
-}
-.desk-spread.is-wide .step-summary {
-  display: block;
 }
 @media (hover: hover) {
   .desk-spread.is-wide .step-track button:hover .step-label {
@@ -1093,13 +1104,15 @@ section.desk-sheet > .sheet-heading {
   background: linear-gradient(var(--input), var(--input)) bottom / 100% 1px no-repeat;
   scrollbar-width: thin;
 }
+/* 탭은 내용 폭 그대로 (아주 긴 이름만 18rem에서 줄임), 자리가 모자라면 줄을 가로로 민다.
+   줄어들게 하면 폰에서 회사 이름이 통째로 사라질 수 있다 */
 .posting-tabs [role='tab'] {
   flex: none;
+  max-width: 18rem;
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
   min-height: 2.75rem;
-  max-width: 18rem;
   padding: 0.5rem 0.9rem;
   border: 1px solid transparent;
   border-top-width: 2px;
@@ -1229,11 +1242,10 @@ section.desk-sheet > .sheet-heading {
 }
 
 @media (max-width: 47.99rem) {
-  /* 좁은 화면: 단계 요약은 숨기고 지금 단계만 이름을 보여 한 줄을 지킨다 */
-  .desk-spread.is-wide .step-summary {
-    display: none;
-  }
-  .desk-spread.is-wide .step-track li:not([aria-current]) .step-label {
+  /* 좁은 화면 (모든 단계 같은 모양): 지금 단계만 이름을 보이고 나머지는 번호만. 단계 표시가 카드
+     폭을 꽉 채워 ①은 왼쪽 끝, ④는 오른쪽 끝 — 단계마다 내용 폭을 기본으로 남는 폭만 똑같이 나눠
+     가져서, 이름이 붙은 단계가 있어도 연결선 길이가 같다 */
+  .step-track li:not([aria-current]) .step-text {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -1241,17 +1253,19 @@ section.desk-sheet > .sheet-heading {
     clip-path: inset(50%);
     white-space: nowrap;
   }
-  .desk-spread.is-wide .step-track li {
-    flex: none;
-  }
-  .desk-spread.is-wide .step-track li[aria-current] {
+  .step-track li + li {
     flex: 1 1 auto;
+  }
+  .step-track li + li::before {
+    display: block;
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 0.75rem;
   }
   .desk-spread.is-wide .desk-intro {
     padding: 1rem 1.25rem 1.25rem;
   }
   .posting-tabs [role='tab'] {
-    max-width: 13rem;
     font-size: 0.875rem;
   }
 }
@@ -1641,4 +1655,77 @@ section.desk-sheet > .sheet-heading {
 /* 이유가 여럿이면 줄 사이를 띄워, 두 줄로 넘어간 한 이유와 구분한다 */
 .source-details dd > span + span {
   margin-top: 0.25rem;
+}
+
+/* 계산 내역 묶음 (result-view.tsx Breakdown): 월급 / 매달 나가는 돈 (끝에 매달 남는 돈) */
+.breakdown-group {
+  margin-top: 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--foreground); /* 아래 줄 이름(회색)과 구분되는 묶음 제목 */
+}
+/* 세금·4대보험 6줄은 접어 두고 합계만 한 줄로 */
+.breakdown-fold {
+  border-block-end: 1px solid var(--border);
+  font-size: 0.875rem;
+}
+.breakdown-fold > summary {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 2.75rem; /* 누르는 줄: 44px */
+  padding-block: 0.6rem;
+  list-style: none; /* 삼각형 표시 대신 '6개 항목 보기 / 접기' 글자로 알린다 */
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--muted-foreground);
+}
+.breakdown-fold > summary::-webkit-details-marker {
+  display: none;
+}
+.breakdown-fold > summary .tabular-nums {
+  margin-inline-start: auto;
+  font-weight: 400;
+  color: var(--foreground);
+}
+.breakdown-fold-hint {
+  margin-inline-start: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 400;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+.breakdown-fold .breakdown {
+  padding-inline-start: 0.75rem;
+}
+.breakdown-fold .breakdown > div:last-child {
+  border-block-end: 0;
+}
+
+/* 연봉 비공개 공고 요약 카드의 이름표 + 값 (result-view.tsx BreakEvenSummary) */
+.be-facts {
+  margin-top: 0.5rem;
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+}
+.be-facts > div {
+  display: grid;
+  grid-template-columns: 7.5rem minmax(0, 1fr);
+  gap: 0.5rem;
+}
+/* 좁은 화면: 이름표를 값 위로 (값 칸이 좁아져 여러 줄로 꺾이지 않게) */
+@media (max-width: 39.99rem) {
+  .be-facts > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+}
+.be-facts dt {
+  color: var(--muted-foreground);
+}
+
+/* 결과 화면 좁은 화면 명세: 최소 연봉 칸의 '공고엔 비공개' 칩이 바로 앞 신뢰도 배지와 붙지 않게 */
+.result-compare .compare-list .offer-badge {
+  margin-inline-start: 0.375rem;
 }
