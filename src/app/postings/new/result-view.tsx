@@ -431,91 +431,101 @@ function companyOf(column: Column, index: number) {
 function Breakdown({ column, index }: { column: Column; index: number }) {
   const { posting, row, housing, transport, breakEven } = column;
   const slip = posting.payslip;
-  const lines: {
-    label: string;
-    value: string;
-    note?: string | null;
-    status?: Status;
-    total?: boolean; // 마지막 '매달 남는 돈' 줄
-  }[] = [];
-  if (slip) {
-    // 세전 월급에 연봉 외 수당이 들어 있으면 무엇인지 그 줄에서 바로 보인다
-    const onTop = posting.pay_on_top?.value ? posting.pay_on_top : null;
-    lines.push({
-      label: '세전 월급',
-      value: exact(slip.gross),
-      note: onTop ? `${onTop.label} ${onTop.source} 포함` : undefined,
-    });
-    const deductions: [keyof typeof slip, string][] = [
-      ['national_pension', '국민연금'],
-      ['health_insurance', '건강보험'],
-      ['long_term_care', '장기요양보험'],
-      ['employment_insurance', '고용보험'],
-      ['income_tax', '소득세'],
-      ['local_income_tax', '지방소득세'],
-    ];
-    deductions.forEach(([key, label]) => lines.push({ label, value: exact(-(slip[key] ?? 0)) }));
-    lines.push({
-      label: '세후 월급',
-      value: exact(posting.net_income.value ?? 0),
-      note: posting.net_income.source,
-      status: 'estimated', // 표와 같이: 세후 월급은 간이세액표로 낸 예상값
-    });
-  } else if (column.solved && breakEven?.net_income_krw != null) {
-    // 연봉 비공개 공고: 공제 내역 대신, 최소 연봉일 때의 세후 월급 한 줄
-    lines.push({
-      label: '세후 월급',
-      value: exact(breakEven.net_income_krw),
-      // 백엔드가 그 연봉일 때 계산한 문장 (별도 식대·수당 포함). 예전 백엔드엔 없다.
-      note:
-        breakEven.net_income_source ??
-        `연봉 ${exact(breakEven.annual_salary_krw!)}일 때 (4대보험·소득세를 뺀 값)`,
-      status: 'estimated',
-    });
-  } else if (netMissingNote(posting, row)) {
-    // 연봉을 넣었는데 계산하지 않은 이유 (단위 실수 등)
-    lines.push({ label: '세후 월급', value: '모름', note: netMissingNote(posting, row) });
-  }
-  if (housing && transport) {
-    for (const item of [housing, transport, posting.fixed_expenses]) {
-      lines.push({
-        label: item.label,
-        value: item.value == null ? '모름' : exact(-item.value),
-        note: item.source,
-        status: item.status,
-      });
-    }
-    // 내역의 끝: 세후 월급에서 위 비용을 뺀 매달 남는 돈 (표의 마지막 줄과 같은 값, 한 원까지)
-    const remaining = column.solved
-      ? breakEven?.monthly_remaining
-      : column.scenario?.monthly_remaining;
-    lines.push({
-      label: '매달 남는 돈',
-      value: remaining == null ? '계산 못 함' : exact(remaining),
-      note: column.solved ? '최소 연봉일 때' : undefined,
-      total: true,
-    });
-  }
+  // 월급 묶음: 세전 월급 → 세금·4대보험(접어 둠) → 세후 월급
+  const onTop = posting.pay_on_top?.value ? posting.pay_on_top : null;
+  const gross: Line | null = slip
+    ? {
+        label: '세전 월급',
+        value: exact(slip.gross),
+        // 세전 월급에 연봉 외 수당이 들어 있으면 무엇인지 그 줄에서 바로 보인다
+        note: onTop ? `${onTop.label} ${onTop.source} 포함` : undefined,
+      }
+    : null;
+  const missingNote = netMissingNote(posting, row);
+  const net: Line | null = slip
+    ? {
+        label: '세후 월급',
+        value: exact(posting.net_income.value ?? 0),
+        note: posting.net_income.source,
+        status: 'estimated', // 표와 같이: 세후 월급은 간이세액표로 낸 예상값
+      }
+    : column.solved && breakEven?.net_income_krw != null
+      ? {
+          // 연봉 비공개 공고: 공제 내역 대신, 최소 연봉일 때의 세후 월급 한 줄
+          label: '세후 월급',
+          value: exact(breakEven.net_income_krw),
+          // 백엔드가 그 연봉일 때 계산한 문장 (별도 식대·수당 포함). 예전 백엔드엔 없다.
+          note:
+            breakEven.net_income_source ??
+            `연봉 ${exact(breakEven.annual_salary_krw!)}일 때 (4대보험·소득세를 뺀 값)`,
+          status: 'estimated',
+        }
+      : missingNote
+        ? // 연봉을 넣었는데 계산하지 않은 이유 (단위 실수 등)
+          { label: '세후 월급', value: '모름', note: missingNote }
+        : null;
+  // 매달 나가는 돈 묶음 (값마다 출처·신뢰도가 달라 한 줄로 합치지 않는다) + 끝의 매달 남는 돈
+  const remaining = column.solved
+    ? breakEven?.monthly_remaining
+    : column.scenario?.monthly_remaining;
+  const costs: Line[] =
+    housing && transport
+      ? [
+          ...[housing, transport, posting.fixed_expenses].map((item) => ({
+            label: item.label,
+            value: item.value == null ? '모름' : exact(-item.value),
+            note: item.source,
+            status: item.status,
+          })),
+          {
+            // 세후 월급에서 위 비용을 뺀 값 (표의 마지막 줄과 같은 값, 한 원까지)
+            label: '매달 남는 돈',
+            value: remaining == null ? '계산 못 함' : exact(remaining),
+            note: column.solved ? '최소 연봉일 때' : undefined,
+            total: true,
+          },
+        ]
+      : [];
   const notes = [...posting.notes, ...(breakEven?.notes ?? [])];
   return (
     <details className="result-details">
       <summary>{companyOf(column, index)} 계산 내역</summary>
-      {lines.length > 0 && (
-        <dl className="breakdown">
-          {lines.map((line) => (
-            <div key={line.label} className={line.total ? 'breakdown-total' : undefined}>
-              <dt>{line.label}</dt>
-              <dd>
-                <span className="tabular-nums">{line.value}</span>
-                {/* 내역은 출처를 줄마다 글로 보여 주므로, 배지는 뜻만 알려 준다 */}
-                {line.status && line.status !== 'confirmed' && line.status !== 'missing' && (
-                  <SourceBadge badge={statusBadge[line.status]} className="result-badge" />
+      {(gross || net) && (
+        <>
+          <h4 className="breakdown-group">월급</h4>
+          {gross && <BreakdownLines lines={[gross]} />}
+          {slip && (
+            // 공제 6줄은 접어 두고 합계만 (합계는 백엔드가 계산한 payslip.deductions)
+            <details className="breakdown-fold">
+              <summary>
+                <span>
+                  세금·4대보험{' '}
+                  <span className="breakdown-fold-hint">
+                    <span className="when-closed">{DEDUCTIONS.length}개 항목 보기</span>
+                    <span className="when-open">접기</span>
+                  </span>
+                </span>
+                {/* 예전 응답에 합계가 없으면 금액은 비워 둔다 (화면에서 더하지 않는다) */}
+                {slip.deductions != null && (
+                  <span className="tabular-nums">{exact(-slip.deductions)}</span>
                 )}
-                {line.note && <small className="cell-note">{line.note}</small>}
-              </dd>
-            </div>
-          ))}
-        </dl>
+              </summary>
+              <BreakdownLines
+                lines={DEDUCTIONS.map(([key, label]) => ({
+                  label,
+                  value: exact(-(slip[key] ?? 0)),
+                }))}
+              />
+            </details>
+          )}
+          {net && <BreakdownLines lines={[net]} />}
+        </>
+      )}
+      {costs.length > 0 && (
+        <>
+          <h4 className="breakdown-group">매달 나가는 돈</h4>
+          <BreakdownLines lines={costs} />
+        </>
       )}
       {notes.length > 0 && (
         <ul className="result-notes">
@@ -528,42 +538,106 @@ function Breakdown({ column, index }: { column: Column; index: number }) {
   );
 }
 
-/** 연봉 비공개 공고 한 줄 요약: "최소 ○○ 이상이면 매달 ○○ 이상 남아요" */
+/** 세금·4대보험 공제 항목 (payslip 키, 이름) */
+const DEDUCTIONS = [
+  ['national_pension', '국민연금'],
+  ['health_insurance', '건강보험'],
+  ['long_term_care', '장기요양보험'],
+  ['employment_insurance', '고용보험'],
+  ['income_tax', '소득세'],
+  ['local_income_tax', '지방소득세'],
+] as const;
+
+/** 계산 내역 한 줄 */
+type Line = {
+  label: string;
+  value: string;
+  note?: string | null;
+  status?: Status;
+  total?: boolean; // 마지막 '매달 남는 돈' 줄
+};
+
+function BreakdownLines({ lines }: { lines: Line[] }) {
+  return (
+    <dl className="breakdown">
+      {lines.map((line) => (
+        <div key={line.label} className={line.total ? 'breakdown-total' : undefined}>
+          <dt>{line.label}</dt>
+          <dd>
+            <span className="tabular-nums">{line.value}</span>
+            {/* 내역은 출처를 줄마다 글로 보여 주므로, 배지는 뜻만 알려 준다 */}
+            {line.status && line.status !== 'confirmed' && line.status !== 'missing' && (
+              <SourceBadge badge={statusBadge[line.status]} className="result-badge" />
+            )}
+            {line.note && <small className="cell-note">{line.note}</small>}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+/**
+ * 연봉 비공개 공고 요약 카드: 답(최소 연봉)을 크게 먼저, 기준·지원받는 동안·따로 받는 돈은 이름표 붙은 줄로.
+ * 문구 '최소 ○○ 이상이면 같은 금액이 남아요'는 이슈 backend#14 완료 조건이라 그대로 둔다.
+ */
 function BreakEvenSummary({ be, column }: { be: BreakEven; column: Column | undefined }) {
-  // 최소 연봉에는 따로 받는 식대·수당이 빠져 있다 → 한 줄 요약에도 적는다
-  const onTop = column?.posting.pay_on_top?.value ? column.posting.pay_on_top : null;
+  return (
+    <li className="be-item">
+      <p className="font-semibold text-foreground">{be.company || be.posting_id}</p>
+      <BreakEvenAnswer be={be} column={column} />
+    </li>
+  );
+}
+
+function BreakEvenAnswer({ be, column }: { be: BreakEven; column: Column | undefined }) {
   const chosen = column?.breakEven;
-  // 회사 이름 뒤 조사(은/는)는 이름마다 달라서, 이름 뒤에 쌍점을 쓴다. 금액은 늘 '원'으로 끝나 '이'.
-  const name = <strong>{be.company || be.posting_id}</strong>;
-  if (!column?.scenario) {
-    return <li>{name}: 이 경우는 해당 없어요. 다른 경우를 골라 보세요.</li>;
-  }
+  if (!column?.scenario) return <p>이 경우는 해당 없어요. 다른 경우를 골라 보세요.</p>;
   if (!chosen || chosen.annual_salary_krw == null) {
     return (
-      <li>
-        {name}: 이 경우는 최소 연봉을 계산하지 못했어요
-        {chosen?.reason ? ` (${chosen.reason})` : ''}.
-      </li>
+      <p>이 경우는 최소 연봉을 계산하지 못했어요{chosen?.reason ? ` (${chosen.reason})` : ''}.</p>
     );
   }
-  const baseline = `기준: ${be.baseline.label} 매달 ${won(be.baseline.monthly_remaining)}`;
-  const salary = <strong className="text-positive">{won(chosen.annual_salary_krw)}</strong>;
+  // 최소 연봉에는 따로 받는 식대·수당이 빠져 있다 → 요약에도 적는다
+  const onTop = column.posting.pay_on_top?.value ? column.posting.pay_on_top : null;
+  const salary = (
+    <strong className="text-xl font-bold text-positive tabular-nums">
+      {won(chosen.annual_salary_krw)}
+    </strong>
+  );
   return (
-    <li>
-      {chosen.floor === 'minimum_wage' ? (
-        <>
-          {name}: 최저임금 수준({salary})만 받아도 기준보다 많이 남아요 ({baseline}).
-        </>
-      ) : (
-        <>
-          {/* 이슈 backend#14 완료 조건 문구: '최소 ○○만 원 이상이면 같은 금액이 남습니다' */}
-          {name}: 최소 {salary} 이상이면 같은 금액이 남아요 ({baseline}).
-        </>
-      )}
-      {chosen.during_support_annual_salary_krw != null &&
-        ` 주거지원비를 받는 동안은 최소 ${won(chosen.during_support_annual_salary_krw)}이면 돼요.`}
-      {onTop && ` 이 연봉과 따로 매달 ${formatWon(onTop.value!)}(${onTop.source})을 더 받아요.`}
-    </li>
+    <>
+      <p className="mt-0.5">
+        {chosen.floor === 'minimum_wage' ? (
+          <>최저임금 수준인 {salary}만 받아도 기준보다 많이 남아요</>
+        ) : (
+          <>최소 {salary} 이상이면 같은 금액이 남아요</>
+        )}
+      </p>
+      <dl className="be-facts">
+        <div>
+          <dt>기준</dt>
+          <dd>
+            {be.baseline.label} · 매달 {won(be.baseline.monthly_remaining)}
+          </dd>
+        </div>
+        {chosen.during_support_annual_salary_krw != null && (
+          <div>
+            <dt>주거지원비 받는 동안</dt>
+            <dd>최소 {won(chosen.during_support_annual_salary_krw)}이면 돼요</dd>
+          </div>
+        )}
+        {onTop && (
+          <div>
+            {/* 최소 연봉에 안 들어 있는 돈이라는 뜻이 보이게 ('연봉 외' → '연봉과 따로 받는 돈') */}
+            <dt>{onTop.label.replace(/ 외$/, '')}과 따로 받는 돈</dt>
+            <dd>
+              매달 {formatWon(onTop.value!)} 더 받아요 ({onTop.source})
+            </dd>
+          </div>
+        )}
+      </dl>
+    </>
   );
 }
 
@@ -614,10 +688,11 @@ function DepositSummary({ columns, estimates }: { columns: Column[]; estimates: 
           );
         })}
       </ul>
-      <p className="mt-3 text-sm text-body">
-        집마다 보증금 차이가 커요. 보증금은 돌려받는 돈이라 매달 남는 돈에는 넣지 않았어요. 첫
-        달에는 중개보수와 이사비도 따로 들 수 있어요.
-      </p>
+      <ul className="bullet-list mt-3 space-y-1 text-sm text-body">
+        <li>집마다 보증금 차이가 커요</li>
+        <li>보증금은 돌려받는 돈이라 매달 남는 돈에는 넣지 않았어요</li>
+        <li>첫 달에는 중개보수와 이사비도 따로 들 수 있어요</li>
+      </ul>
     </div>
   );
 }
@@ -738,7 +813,7 @@ export function ResultView({ result, rows }: { result: Result; rows: Row[] }) {
       {result.break_even.length > 0 && (
         <div className="rounded-2xl bg-muted p-5">
           <h3 className="mb-2 font-semibold text-foreground">연봉이 공개되지 않은 공고</h3>
-          <ul className="space-y-2 text-sm text-body">
+          <ul className="space-y-3 text-sm text-body">
             {result.break_even.map((be) => (
               <BreakEvenSummary
                 key={be.posting_id}
