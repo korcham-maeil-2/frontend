@@ -1840,3 +1840,28 @@ section.desk-sheet > .sheet-heading {
   outline-offset: 2px;
   border-radius: 0.25rem;
 }
+
+/* 정착 플랜의 참고 칸 (적금·재직자 강의): 점을 비워 계산·일정과 구분한다 */
+.plan-slot.is-extra::before {
+  box-shadow: 0 0 0 2px var(--border);
+}
+.plan-extra-lead {
+  margin-top: 0.25rem;
+  font-size: 0.875rem;
+  color: var(--muted-foreground);
+}
+.plan-extra-source {
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}
+.plan-extra-source a {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+.plan-amount-note {
+  margin-inline-start: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--muted-foreground);
+}
