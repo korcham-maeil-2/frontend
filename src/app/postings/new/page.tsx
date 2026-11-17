@@ -622,14 +622,16 @@ export default function NewPosting() {
     }
   }
 
+  // 결과까지 본 비교를 지우는 일이라 한 번 묻는다. 브라우저 확인 창(window.confirm)은 앱 안
+  // 브라우저(카카오톡 등)에서 막혀 바로 '취소'가 되므로, 화면 안에서 묻는다.
+  const [confirmingRestart, setConfirmingRestart] = useState(false);
+  function requestStartOver() {
+    if (result) setConfirmingRestart(true);
+    else startOver();
+  }
+
   function startOver() {
-    // 결과까지 본 비교를 지우는 일이라 한 번 묻는다.
-    if (
-      result &&
-      !window.confirm('지금 비교를 지우고 새 공고로 시작할까요? 생활비는 그대로 둬요.')
-    ) {
-      return;
-    }
+    setConfirmingRestart(false);
     setTexts(['']);
     setRows([]);
     setOriginalRows([]);
@@ -811,9 +813,35 @@ export default function NewPosting() {
                 <Pencil aria-hidden /> 조건 다시 고치기
               </Button>
             </div>
-            <Button className="main-action" onClick={startOver}>
-              새로 비교하기 <ArrowRight aria-hidden />
-            </Button>
+            {confirmingRestart ? (
+              <div
+                role="alertdialog"
+                aria-labelledby="restart-question"
+                className="restart-confirm"
+              >
+                <p id="restart-question">
+                  지금 비교를 지우고 새 공고로 시작할까요? 생활비는 그대로 둬요.
+                </p>
+                <div className="flex gap-2">
+                  {/* 지우는 일이라 기본 포커스는 '취소' */}
+                  <Button
+                    variant="outline"
+                    className="min-h-11"
+                    autoFocus
+                    onClick={() => setConfirmingRestart(false)}
+                  >
+                    취소
+                  </Button>
+                  <Button className="min-h-11" onClick={startOver}>
+                    새로 시작
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <Button className="main-action" onClick={requestStartOver}>
+                새로 비교하기 <ArrowRight aria-hidden />
+              </Button>
+            )}
           </div>
         </section>
       ) : shown === 'living' ? (

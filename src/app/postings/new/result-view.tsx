@@ -583,7 +583,7 @@ function BreakdownLines({ lines }: { lines: Line[] }) {
  */
 function BreakEvenSummary({ be, column }: { be: BreakEven; column: Column | undefined }) {
   return (
-    <li className="rounded-lg bg-card px-4 py-3">
+    <li className="be-item">
       <p className="font-semibold text-foreground">{be.company || be.posting_id}</p>
       <BreakEvenAnswer be={be} column={column} />
     </li>

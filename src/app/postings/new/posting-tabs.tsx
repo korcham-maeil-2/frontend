@@ -109,9 +109,6 @@ export function PostingTabs({
               tabIndex={selected ? 0 : -1}
               onClick={() => onSelect(row.id)}
             >
-              <span className="posting-tab-number" aria-hidden>
-                {i + 1}
-              </span>
               <span className="posting-tab-name">{companyName(row, i)}</span>
               <span className="posting-tab-status" data-state={state}>
                 {state === 'todo'
