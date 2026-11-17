@@ -23,6 +23,8 @@ import type { components } from '@/lib/api/schema';
 import { examplePostings } from './examples';
 import { cellsOf, isImageRead, type Row } from './format';
 import { MAX_MESSAGE_CHARS } from './limits';
+import { AgentProgress } from './agent-progress';
+import { LINK_ONLY_ERROR, LinkHint, isLinkOnly } from './link-hint';
 import {
   AttachmentList,
   FILE_INPUT_ID,
@@ -369,6 +371,18 @@ export default function NewPosting() {
           : '공고 본문을 붙여 넣거나 파일을 넣어 주세요. 예시 공고로 먼저 해 봐도 돼요.',
         filesGone ? 'files' : 'text',
       );
+      return;
+    }
+    // 링크만 넣은 공고는 읽을 내용이 없다 (링크는 열어 보지 않는다) → 보내지 않고 방법을 알려 준다
+    const linkOnly = texts.findIndex(isLinkOnly);
+    if (linkOnly >= 0) {
+      setError(
+        texts.length > 1
+          ? `공고 ${linkOnly + 1}에는 링크만 있어요. ${LINK_ONLY_ERROR}`
+          : LINK_ONLY_ERROR,
+      );
+      setSourceTab('text');
+      requestAnimationFrame(() => document.getElementById(`posting-text-${linkOnly}`)?.focus());
       return;
     }
     if (message.length > MAX_MESSAGE_CHARS) {
@@ -867,11 +881,11 @@ export default function NewPosting() {
             </Button>
           </div>
           {/* AI 리포트는 쓰고 검증하는 데 시간이 걸린다 (시연 모드는 리포트를 쓰지 않는다) */}
-          <p role="status" className="mt-3 text-sm text-muted-foreground">
-            {busy === 'confirming' && !demoMode
-              ? '계산한 뒤 AI가 설명을 쓰고 검증하는 중이에요. 20초쯤 걸릴 수 있어요.'
-              : ''}
-          </p>
+          <div role="status">
+            {busy === 'confirming' && (
+              <AgentProgress kind={demoMode ? 'calculating-demo' : 'calculating'} />
+            )}
+          </div>
         </form>
       ) : reviewing ? (
         <section className="desk-sheet sheet-enter" aria-label="공고 조건 확인">
@@ -1013,16 +1027,30 @@ export default function NewPosting() {
                   <Textarea
                     ref={i === 0 ? firstTextarea : undefined}
                     id={`posting-text-${i}`}
-                    aria-describedby="source-error"
+                    aria-describedby={
+                      isLinkOnly(text) ? `source-error posting-link-${i}` : 'source-error'
+                    }
                     value={text}
                     onChange={(event) => {
                       setError('');
                       setTexts(texts.map((item, j) => (j === i ? event.target.value : item)));
                     }}
                     rows={5}
-                    placeholder="회사명, 근무지, 급여가 적힌 부분을 복사해 넣으세요."
+                    placeholder="회사명, 근무지, 급여가 적힌 부분을 복사해 넣으세요. 링크는 열어 볼 수 없어요."
                     className="min-h-36 resize-y rounded-md border border-input p-3 text-base leading-relaxed focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-ring"
                   />
+                  {isLinkOnly(text) && (
+                    <LinkHint
+                      id={`posting-link-${i}`}
+                      onUseFiles={() => {
+                        setError('');
+                        setSourceTab('files');
+                        requestAnimationFrame(() =>
+                          document.getElementById(FILE_INPUT_ID)?.focus(),
+                        );
+                      }}
+                    />
+                  )}
                 </div>
               ))}
               <Button
@@ -1074,15 +1102,11 @@ export default function NewPosting() {
               </p>
             </TabsContent>
           </Tabs>
-          <p role="status" className="form-hint">
+          <div role="status">
             {busy === 'reading' && (
-              <span className="text-body">
-                {mayUseVision
-                  ? '파일을 읽고 있어요. 이미지나 스캔한 PDF가 있으면 30초~1분쯤 걸려요.'
-                  : '공고를 읽고 있어요. 10~20초쯤 걸려요.'}
-              </span>
+              <AgentProgress kind={mayUseVision ? 'reading-files' : 'reading'} />
             )}
-          </p>
+          </div>
           <p id="source-error" role="alert" className="form-hint">
             {error}
           </p>
