@@ -1409,3 +1409,131 @@ section.desk-sheet > .sheet-heading {
   font-size: 0.75rem;
   color: var(--muted-foreground);
 }
+
+/* 본문 칸에 링크만 넣었을 때 안내 (link-hint.tsx): PDF로 저장해 올리는 방법 */
+.link-hint {
+  margin-top: 0.5rem;
+  display: grid;
+  gap: 0.5rem;
+  justify-items: start;
+  border-radius: 0.5rem;
+  background: var(--muted);
+  padding: 1rem;
+  font-size: 0.875rem;
+  color: var(--body);
+}
+.link-hint ol {
+  list-style: decimal;
+  padding-inline-start: 1.25rem;
+}
+
+/* AI가 일하는 동안 진행 카드 (agent-progress.tsx) */
+.agent-progress {
+  margin-top: 1rem;
+  display: grid;
+  gap: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: var(--card);
+  padding: 1rem;
+  font-size: 0.875rem;
+  color: var(--body);
+}
+.agent-progress-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.agent-spinner {
+  width: 1.125rem;
+  height: 1.125rem;
+  flex: none;
+  color: var(--primary);
+  animation: agent-spin 0.9s linear infinite;
+}
+.agent-elapsed {
+  margin-inline-start: auto;
+  color: var(--muted-foreground);
+}
+.agent-bar {
+  height: 0.375rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--muted);
+}
+.agent-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--primary);
+  transition: width 0.25s linear;
+}
+.agent-steps {
+  display: grid;
+  gap: 0.5rem;
+}
+.agent-steps li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--muted-foreground);
+}
+.agent-steps li.is-done {
+  color: var(--body);
+}
+.agent-steps li.is-active {
+  font-weight: 600;
+  color: var(--foreground);
+}
+.agent-step-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  flex: none;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 0.75rem;
+}
+.agent-step-mark svg {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+.is-done .agent-step-mark {
+  border-color: var(--confirmed);
+  color: var(--confirmed);
+}
+.is-active .agent-step-mark {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: var(--primary-foreground);
+  animation: agent-pulse 1.4s ease-in-out infinite;
+}
+.agent-tip {
+  border-radius: 0.5rem;
+  background: var(--muted);
+  padding: 0.5rem 0.75rem;
+}
+.agent-note {
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}
+@keyframes agent-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes agent-pulse {
+  50% {
+    box-shadow: 0 0 0 0.25rem color-mix(in oklab, var(--primary) 20%, transparent);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .agent-spinner,
+  .is-active .agent-step-mark {
+    animation: none;
+  }
+  .agent-bar span {
+    transition: none;
+  }
+}
