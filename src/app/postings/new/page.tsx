@@ -41,6 +41,7 @@ import { ProfileFormView } from './profile-form';
 import { PostingTabs, companyName } from './posting-tabs';
 import { ResultView, bestRemainingText, isCalculationResult } from './result-view';
 import { SupportView, isLocalSupport } from './support-view';
+import { ReportView, isReport, type Report } from './report-view';
 import { RowEditor, fieldsToCheck, focusField } from './row-editor';
 
 // 공고 넣기 → (백엔드가 Claude로 비교표를 만듦) → 조건 확인·수정 → 내 생활비 → 매달 남는 돈
@@ -122,6 +123,7 @@ type Draft = {
   profile?: ProfileForm;
   result?: CalculationResult | null;
   support?: LocalSupport | null; // 근무지별 청년 지원 (계산 결과와 같이 받는다)
+  report?: Report | null; // AI 리포트와 검증 결과 (계산 결과와 같이 받는다)
   resultKey?: string;
   activePosting?: string;
   seenPostings?: string[];
@@ -175,6 +177,7 @@ export default function NewPosting() {
   const [profile, setProfile] = useState<ProfileForm>(EMPTY_PROFILE);
   const [result, setResult] = useState<CalculationResult | null>(null);
   const [support, setSupport] = useState<LocalSupport | null>(null);
+  const [report, setReport] = useState<Report | null>(null);
   const [resultKey, setResultKey] = useState('');
   const [busy, setBusy] = useState<'reading' | 'confirming' | null>(null);
   const [error, setError] = useState('');
@@ -217,6 +220,7 @@ export default function NewPosting() {
       setProfile(draft.profile ?? EMPTY_PROFILE);
       setResult(isCalculationResult(draft.result) ? draft.result : null);
       setSupport(isLocalSupport(draft.support) ? draft.support : null);
+      setReport(isReport(draft.report) ? draft.report : null);
       setResultKey(draft.resultKey ?? '');
       setActivePosting(draft.activePosting ?? '');
       setSeenPostings(draft.seenPostings ?? draft.rows.map((row) => row.id));
@@ -256,6 +260,7 @@ export default function NewPosting() {
       profile,
       result,
       support,
+      report,
       resultKey,
       activePosting,
       seenPostings,
@@ -274,6 +279,7 @@ export default function NewPosting() {
     profile,
     result,
     support,
+    report,
     resultKey,
     activePosting,
     seenPostings,
@@ -416,6 +422,7 @@ export default function NewPosting() {
       setProfile((form) => ({ ...form, postings: {} }));
       setResult(null);
       setSupport(null);
+      setReport(null);
       // 새 표: 첫 공고를 고르고 그것만 '본 것'으로 (예전 표에서 연 탭 기록은 버린다)
       setActivePosting(table[0].id);
       setSeenPostings([table[0].id]);
@@ -540,6 +547,8 @@ export default function NewPosting() {
       setResult(data.result);
       // 청년 지원은 키가 없거나 예전 백엔드면 오지 않는다 → 없으면 그 영역만 안 그린다
       setSupport(isLocalSupport(data.local_support) ? data.local_support : null);
+      // AI 리포트: 검증을 통과했을 때만 글이 온다 (report_check로 상태를 알린다)
+      setReport({ text: data.report ?? null, check: data.report_check ?? null });
       setResultKey(inputKey(calculatedRows, sentProfile));
       changeStep('result');
     }
@@ -601,6 +610,7 @@ export default function NewPosting() {
     setProfile((form) => ({ ...form, postings: {} }));
     setResult(null);
     setSupport(null);
+    setReport(null);
     setResultKey('');
     setActivePosting('');
     setSeenPostings([]);
@@ -737,6 +747,7 @@ export default function NewPosting() {
         <section className="desk-sheet sheet-enter" aria-label="매달 남는 돈">
           {demoNotice}
           <h2 className="sheet-heading">공고 {rows.length}개 비교</h2>
+          <ReportView report={report} />
           <ResultView result={freshResult} rows={rows} />
           {support && <SupportView support={support} rows={rows} />}
           <div className="sheet-actions flex-wrap">
@@ -816,6 +827,12 @@ export default function NewPosting() {
               <Calculator aria-hidden />
             </Button>
           </div>
+          {/* AI 리포트는 쓰고 검증하는 데 시간이 걸린다 (시연 모드는 리포트를 쓰지 않는다) */}
+          <p role="status" className="mt-3 text-sm text-muted-foreground">
+            {busy === 'confirming' && !demoMode
+              ? '계산한 뒤 AI가 설명을 쓰고 검증하는 중이에요. 20초쯤 걸릴 수 있어요.'
+              : ''}
+          </p>
         </form>
       ) : reviewing ? (
         <section className="desk-sheet sheet-enter" aria-label="공고 조건 확인">
