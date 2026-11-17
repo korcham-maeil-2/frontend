@@ -11,6 +11,9 @@ export type RentEstimate = components['schemas']['RentEstimate'];
  *  불러오지 못한 것('unavailable')은 담지 않고 다음에 다시 묻는다. */
 export type Rents = Record<string, RentEstimate>;
 
+/** 시세를 낸 거래가 이보다 적으면 '참고만' */
+export const FEW_TRADES = 5;
+
 /** 저장해 둘 만한(확정된) 시세인지 */
 export function isSettledRent(rent: RentEstimate | null | undefined): rent is RentEstimate {
   return !!rent && (rent.status === 'estimated' || rent.status === 'missing');

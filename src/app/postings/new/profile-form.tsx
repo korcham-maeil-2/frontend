@@ -12,6 +12,7 @@ import {
   rentPending,
   validAge,
   type MissingInput,
+  FEW_TRADES,
   type RentEstimate,
   type Rents,
   type Money,
@@ -148,8 +149,6 @@ function moveHousingHelp(aid: number | null | undefined) {
   if (aid) parts.push(`회사 주거지원비 ${formatWon(aid)}은 빼지 말고 넣어 주세요 (계산할 때 빼요)`);
   return parts.join('. ');
 }
-
-const FEW_TRADES = 5; // 거래가 이보다 적으면 '참고만'
 
 /**
  * 근무지 원룸 월세 시세 한 줄 ('추정' 배지). 비워 두면 서버(calc/summary.py)가 이 값으로 계산한다.

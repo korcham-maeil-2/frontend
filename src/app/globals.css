@@ -1397,3 +1397,11 @@ section.desk-sheet > .sheet-heading {
   padding-left: 1.1rem;
   list-style: disc;
 }
+
+/* 결과 화면 '이사하면 처음에 준비할 돈': 보증금 한 줄 아래 출처 */
+.deposit-source {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}

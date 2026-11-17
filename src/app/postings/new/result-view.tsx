@@ -5,6 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { components } from '@/lib/api/schema';
 import '../../landing.css'; // 비교표 모양(.offer-table, .compare-table)을 랜딩과 같이 쓴다
 import { formatWon, hasSalary, salaryText, statusBadge, type Row, type Status } from './format';
+import { FEW_TRADES } from './profile';
 
 // 결과 화면: 공고별 '매달 남는 돈'을 한 표로 비교한다 (DESIGN.md "비교표").
 //   열 = 공고, 행 = 연봉 → 세후 월급 → 집 → 교통비 → 고정비 → 매달 남는 돈
@@ -18,6 +19,7 @@ type Scenario = components['schemas']['Scenario'];
 type BreakEven = components['schemas']['BreakEven'];
 type BreakEvenCase = components['schemas']['BreakEvenCase'];
 type Item = components['schemas']['Item'];
+type RentEstimate = components['schemas']['RentEstimate'];
 type Case = Scenario['case'];
 type Mode = 'best' | Case;
 
@@ -409,6 +411,56 @@ function BreakEvenSummary({ be, column }: { be: BreakEven; column: Column | unde
   );
 }
 
+/**
+ * 이사할 때 처음에 준비할 돈: 근무지 원룸 월세 거래의 보증금 중앙값 (국토부 실거래가, 추정).
+ * 보증금은 매달 나가는 돈이 아니라 '매달 남는 돈'에는 넣지 않는다 — 따로 한 묶음으로 알려 준다.
+ * 이사 경우가 해당되는 공고만, 같은 지역은 한 줄로 묶는다.
+ */
+function DepositSummary({ columns, estimates }: { columns: Column[]; estimates: RentEstimate[] }) {
+  const byRegion = new Map<string, { rent: RentEstimate; companies: string[] }>();
+  columns.forEach((column, i) => {
+    const moves = column.posting.scenarios.some((s) => s.case === 'move' && s.applicable);
+    const code = column.row?.location?.value?.lawd_cd;
+    const rent = estimates.find((e) => e.lawd_cd === code);
+    if (!moves || !code || rent?.status !== 'estimated' || rent.deposit_krw == null) return;
+    const entry = byRegion.get(code) ?? { rent, companies: [] };
+    entry.companies.push(companyOf(column, i));
+    byRegion.set(code, entry);
+  });
+  if (!byRegion.size) return null;
+  const badge = statusBadge.estimated;
+  return (
+    <div className="rounded-2xl bg-muted p-5">
+      <h3 className="mb-2 font-semibold text-foreground">이사하면 처음에 준비할 돈</h3>
+      <ul className="space-y-2 text-sm text-body">
+        {[...byRegion.values()].map(({ rent, companies }) => {
+          const place = rent.region.split(' ').slice(1).join(' ') || rent.region;
+          return (
+            <li key={rent.lawd_cd}>
+              <strong>{companies.join(', ')}</strong> 근처({place}) 원룸 보증금{' '}
+              <strong className="text-foreground tabular-nums">
+                {formatWon(rent.deposit_krw!)}
+              </strong>{' '}
+              <small className={`status-badge result-badge ${badge.className}`}>
+                {badge.label}
+              </small>
+              <small className="deposit-source">
+                {rent.period} 국토부 실거래가 원룸 월세 {rent.sample_size.toLocaleString('ko-KR')}
+                건의 보증금 중앙값
+                {rent.sample_size < FEW_TRADES ? ', 거래가 적어 참고만 하세요' : ''}
+              </small>
+            </li>
+          );
+        })}
+      </ul>
+      <p className="mt-3 text-sm text-body">
+        집마다 보증금 차이가 커요. 보증금은 돌려받는 돈이라 매달 남는 돈에는 넣지 않았어요. 첫
+        달에는 중개보수와 이사비도 따로 들 수 있어요.
+      </p>
+    </div>
+  );
+}
+
 export function ResultView({ result, rows }: { result: Result; rows: Row[] }) {
   const [mode, setMode] = useState<Mode>('best');
   const columns = result.postings.map((posting) =>
@@ -527,6 +579,8 @@ export function ResultView({ result, rows }: { result: Result; rows: Row[] }) {
           </ul>
         </div>
       )}
+
+      {mode !== 'commute' && <DepositSummary columns={columns} estimates={result.rent_estimates} />}
 
       {(result.break_even_note || result.errors.length > 0) && (
         <div role="status" className="salary-notice">
