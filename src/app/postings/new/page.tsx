@@ -1438,7 +1438,8 @@ export default function NewPosting() {
         <Tour
           at={tour}
           shown={shown}
-          paused={busy !== null} // 읽는 중·계산하는 중에는 진행 안내를 가리지 않게 숨긴다
+          // 읽는 중·계산하는 중에는 진행 안내를, 오류가 나면 오류 문구를 가리지 않게 숨긴다
+          paused={busy !== null || error !== ''}
           onNext={() => setTour(tour + 1)}
           onEnd={() => setTour(null)}
         />

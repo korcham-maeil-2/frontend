@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useSyncExternalStore } from 'react';
 import { Popover } from '@base-ui/react/popover';
 import { ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -118,10 +118,21 @@ export function tutorialProfile(form: ProfileForm, rows: Row[]): ProfileForm {
   };
 }
 
-const targetOf = (stop: Stop) => document.querySelector<HTMLElement>(stop.target);
+const SCROLL_ABOVE = 96; // 가리킨 곳 위로 남길 여백(px): 위에 무엇이 있는지 조금 보이게
+
+const targetOf = (stop: Stop | undefined) =>
+  stop ? document.querySelector<HTMLElement>(stop.target) : null;
+
+/** 화면이 바뀔 때마다(요소가 생기고 사라지거나 숨겨질 때) 알린다. 사용법을 보는 동안만 지켜본다 */
+function subscribeToPage(onChange: () => void) {
+  const observer = new MutationObserver(onChange);
+  observer.observe(document.body, { subtree: true, childList: true, attributes: true });
+  return () => observer.disconnect();
+}
 
 /**
- * 지금 말풍선. 그 말풍선의 단계 화면이 아니면(앞 단계로 돌아감, 읽는 중) 숨겨 두고 기다린다.
+ * 지금 말풍선. 그 말풍선의 단계 화면이 아니면(앞 단계로 돌아감, 읽는 중·오류) 숨겨 두고 기다린다.
+ * 가리킬 곳이 화면에 없을 때도 숨긴다 ('파일 첨부' 탭으로 바꿈, 되묻기로 계산 버튼이 바뀜).
  * Esc나 '그만 보기'로 끝낸다. 말풍선 밖을 눌러도 닫지 않는다 (가리킨 버튼을 눌러야 하므로).
  */
 export function Tour({
@@ -138,18 +149,36 @@ export function Tour({
   onEnd: () => void;
 }) {
   const stop = STOPS[at];
-  const open = !!stop && stop.step === shown && !paused;
+  const targetShown = useSyncExternalStore(
+    subscribeToPage,
+    () => (targetOf(stop)?.getClientRects().length ?? 0) > 0, // 숨겨진(display: none) 요소는 0
+    () => false,
+  );
+  const open = !!stop && stop.step === shown && !paused && targetShown;
   const next = useRef<HTMLButtonElement>(null);
 
-  // 가리킨 곳을 화면 가운데로 가져와 테두리로 표시한다. 할 일 말풍선이면 그 버튼에 커서를 둔다 (Enter로 누르게)
+  // 가리킨 곳을 화면으로 가져와 테두리로 표시하고 커서를 둔다: 할 일 말풍선은 그 버튼(Enter로 누르게),
+  // 설명 말풍선은 '다음'에
   useEffect(() => {
     const target = open ? targetOf(stop) : null;
     if (!target) return;
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    target.scrollIntoView({ block: 'center', behavior: reduce ? 'auto' : 'smooth' });
     target.classList.add('tour-target');
-    if (stop.press) target.focus({ preventScroll: true });
-    return () => target.classList.remove('tour-target');
+    // 가리킨 곳을 화면 위쪽(위 여백 SCROLL_ABOVE)으로. 가운데로 두면 큰 칸 아래 말풍선이 좁은 휴대폰
+    // 화면 밖으로 나간다. scrollIntoView는 칸을 감싼 overflow 상자 때문에 위 여백(scroll-margin)을 무시한다
+    window.scrollTo({
+      top: window.scrollY + target.getBoundingClientRect().top - SCROLL_ABOVE,
+      behavior: reduce ? 'auto' : 'smooth',
+    });
+    // 한 프레임 뒤에: 단계가 바뀌면 화면이 제목에 커서를 두는데(page.tsx changeStep), 그다음이어야 한다.
+    // 스크롤 없이 옮긴다 (기본 포커스는 스크롤까지 해서 가리킨 곳이 밀려난다)
+    const frame = requestAnimationFrame(() =>
+      (stop.press ? target : next.current)?.focus({ preventScroll: true }),
+    );
+    return () => {
+      cancelAnimationFrame(frame);
+      target.classList.remove('tour-target');
+    };
   }, [open, stop]);
 
   if (!stop) return null;
@@ -171,7 +200,7 @@ export function Tour({
         >
           <Popover.Popup
             className="tour-popup"
-            initialFocus={stop.press ? false : next}
+            initialFocus={false} // 커서는 위 effect가 옮긴다
             finalFocus={false}
           >
             <Popover.Arrow className="tour-arrow" />
