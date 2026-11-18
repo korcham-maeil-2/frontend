@@ -123,12 +123,23 @@ const SCROLL_ABOVE = 96; // 가리킨 곳 위로 남길 여백(px): 위에 무�
 const targetOf = (stop: Stop | undefined) =>
   stop ? document.querySelector<HTMLElement>(stop.target) : null;
 
-/** 화면이 바뀔 때마다(요소가 생기고 사라지거나 숨겨질 때) 알린다. 사용법을 보는 동안만 지켜본다 */
+/**
+ * 화면이 바뀔 때마다(요소가 생기고 사라지거나 숨겨질 때) 알린다. 사용법을 보는 동안만 지켜본다.
+ * 본문(main)만 본다: body 전체를 보면 말풍선이 스크롤마다 자기 위치(style)를 바꾸는 것까지 잡힌다
+ */
 function subscribeToPage(onChange: () => void) {
   const observer = new MutationObserver(onChange);
-  observer.observe(document.body, { subtree: true, childList: true, attributes: true });
+  observer.observe(document.getElementById('main-content') ?? document.body, {
+    subtree: true,
+    childList: true,
+    attributes: true,
+  });
   return () => observer.disconnect();
 }
+
+/** 사용자가 글을 쓰는 중인지 (그때는 커서·스크롤을 뺏지 않는다) */
+const typing = () =>
+  !!document.activeElement?.matches('input, textarea, select, [contenteditable="true"]');
 
 /**
  * 지금 말풍선. 그 말풍선의 단계 화면이 아니면(앞 단계로 돌아감, 읽는 중·오류) 숨겨 두고 기다린다.
@@ -164,6 +175,8 @@ export function Tour({
     if (!target) return;
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     target.classList.add('tour-target');
+    // 숨었던 말풍선이 글을 고치는 중에 다시 보이면(오류가 풀림) 테두리만: 치던 글자가 버튼으로 가지 않게
+    if (typing()) return () => target.classList.remove('tour-target');
     // 가리킨 곳을 화면 위쪽(위 여백 SCROLL_ABOVE)으로. 가운데로 두면 큰 칸 아래 말풍선이 좁은 휴대폰
     // 화면 밖으로 나간다. scrollIntoView는 칸을 감싼 overflow 상자 때문에 위 여백(scroll-margin)을 무시한다
     window.scrollTo({
