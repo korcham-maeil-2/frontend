@@ -14,66 +14,67 @@ import type { Step } from './steps';
 // 예시 공고 + 예시 생활비라 백엔드는 미리 써 둔 공고 정리·기억해 둔 AI 리포트를 쓴다 (비용 0원).
 // 말풍선이 가리키는 곳(target)은 CSS 선택자다. 따로 id가 없는 버튼·상자에는 data-tour 이름을 붙였다.
 
-type Stop = { step: Step; target: string; title: string; body: string; press?: boolean };
+// lines: 설명은 짧은 줄 1~2개 (한 줄에 하나만, 훑어보면 바로 읽히게. 긴 문장으로 쓰지 않는다)
+type Stop = { step: Step; target: string; title: string; lines: string[]; press?: boolean };
 
 const STOPS: Stop[] = [
   {
     step: 'input',
     target: '#posting-text-0',
-    title: '공고를 붙여 넣는 곳이에요',
-    body: "가상 회사 두 곳의 공고를 넣어 뒀어요. 실제로 쓸 때는 채용 공고 본문을 복사해 넣거나, 위 '파일 첨부'에 캡처·PDF·엑셀을 올리면 돼요.",
+    title: '공고를 넣는 곳이에요',
+    lines: ['지금은 가상 회사 2곳 예시예요', '내 공고는 글 복사 또는 파일로'],
   },
   {
     step: 'input',
     target: '[data-tour="read"]',
     title: "'조건 확인하기'를 눌러 보세요",
-    body: 'AI가 공고마다 연봉·근무지·수당을 찾아 같은 칸으로 정리해요.',
+    lines: ['AI가 연봉·근무지·수당을 정리해요'],
     press: true,
   },
   {
     step: 'review',
     target: '[data-tour="review-todo"]',
     title: 'AI가 읽은 값을 확인해요',
-    body: '칸마다 공고 원문을 같이 보여 줘요. 공고와 맞는지 다시 볼 값은 여기에 모아 둬요. 틀린 값은 그 칸에서 바로 고치면 돼요.',
+    lines: ['다시 볼 값은 이 상자에 모여요', '틀린 값은 그 칸에서 고쳐요'],
   },
   {
     step: 'review',
     target: '[data-tour="review-next"]',
     title: "'다음'을 눌러 보세요",
-    body: '회사 탭을 누르면 다른 회사의 조건도 볼 수 있어요.',
+    lines: ['회사 탭으로 다른 회사도 봐요'],
     press: true,
   },
   {
     step: 'living',
     target: '#current-housing',
-    title: '공고에 없는 내 생활비예요',
-    body: '빈칸에 예시 값을 넣어 뒀어요. 지금 집 월세, 통근 교통비, 고정비처럼 남는 돈을 바꾸는 값이에요. 이사할 집 월세는 비워 두면 그 동네 실거래가로 계산해요.',
+    title: '내 생활비를 넣는 곳이에요',
+    lines: ['빈칸엔 예시 값을 넣어 뒀어요', '이사할 집 월세는 비우면 시세로'],
   },
   {
     step: 'living',
     target: '[data-tour="calculate"]',
     title: "'매달 남는 돈 계산하기'를 눌러 보세요",
-    body: '세금·4대보험과 생활비를 빼고, 회사마다 매달 얼마가 남는지 계산해요.',
+    lines: ['세금·4대보험·생활비를 빼고 계산해요'],
     press: true,
   },
   {
     step: 'result',
     target: '[data-tour="result-modes"]',
     title: '회사마다 매달 남는 돈이에요',
-    body: '지금 집에서 통근할 때와 회사 근처로 이사할 때를 나눠 계산했어요. 이 버튼으로 비교할 경우를 바꿔 볼 수 있어요.',
+    lines: ['통근할 때, 이사할 때 따로 계산해요', '이 버튼으로 바꿔 볼 수 있어요'],
   },
   {
     step: 'result',
     target: '[data-tour="plan-next"]',
     title: "'1년 정착 플랜 보기'를 눌러 보세요",
-    body: '입사하고 1년 동안 챙길 청년 지원·적금·할 일을 모아 줘요.',
+    lines: ['청년 지원·적금·할 일을 모아 줘요'],
     press: true,
   },
   {
     step: 'plan',
     target: '[data-tour="title"]',
     title: '1년 동안 챙길 일이에요',
-    body: '회사마다 받을 수 있는 지원과 할 일을 순서대로 모았어요. 이제 실제 공고로 비교해 보세요.',
+    lines: ['회사마다 지원·할 일을 순서대로', '이제 내 공고로 해 보세요'],
   },
 ];
 
@@ -221,7 +222,11 @@ export function Tour({
               사용법 {at + 1} / {STOPS.length}
             </p>
             <Popover.Title className="tour-title">{stop.title}</Popover.Title>
-            <Popover.Description className="tour-body">{stop.body}</Popover.Description>
+            <Popover.Description render={<ul />} className="tour-body">
+              {stop.lines.map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </Popover.Description>
             <div className="tour-actions">
               {!last && (
                 <Button variant="ghost" className="min-h-11" onClick={onEnd}>
