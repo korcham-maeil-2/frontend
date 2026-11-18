@@ -2511,7 +2511,7 @@ details[open] > summary .when-closed {
   z-index: 60;
 }
 .tour-popup {
-  width: min(22rem, calc(100vw - 2rem));
+  width: min(24rem, calc(100vw - 2rem));
   padding: 1rem 1.125rem 0.75rem;
   border: 1px solid var(--border);
   border-radius: 0.75rem;
@@ -2552,15 +2552,74 @@ details[open] > summary .when-closed {
 }
 .tour-title {
   margin-top: 0.25rem;
+  word-break: keep-all; /* 한글을 낱말 중간에서 자르지 않고 띄어쓰기에서 줄을 바꾼다 */
   font-size: var(--text-base);
   font-weight: 700;
   color: var(--foreground);
 }
+/* 설명은 말풍선의 본문: 회색·작은 글씨가 아니라 본문 크기·진한 색. 한 문장에 한 줄, 앞에 점.
+   핵심 낱말은 굵게, 사용자가 할 일·결론은 형광펜 */
 .tour-body {
-  margin-top: 0.375rem;
+  margin-top: 0.5rem;
+  display: grid;
+  gap: 0.375rem;
+  font-size: var(--text-base);
+  line-height: 1.5;
+  color: var(--foreground);
+  word-break: keep-all;
+}
+.tour-body li {
+  display: flex;
+  gap: 0.5rem;
+}
+.tour-body li::before {
+  content: '';
+  flex: none;
+  width: 0.3rem;
+  height: 0.3rem;
+  margin-top: 0.65em;
+  border-radius: 50%;
+  background: var(--primary);
+}
+.tour-body strong {
+  font-weight: 700;
+}
+.tour-body mark {
+  padding-inline: 0.1em;
+  background: linear-gradient(transparent 50%, #ffe27a 50%);
+  color: inherit;
+  font-weight: 700;
+}
+/* 접은 말풍선: 왼쪽 아래 작은 버튼 (누르면 다시 편다). 오른쪽 아래는 화면마다 주 버튼 자리라 피한다.
+   보이는 동안 페이지 아래에 그만큼 여백을 둬서 맨 아래 버튼이 이 버튼에 가려지지 않게 */
+body:has(.tour-chip) {
+  padding-bottom: 4.5rem;
+}
+.tour-chip {
+  position: fixed;
+  left: max(1rem, env(safe-area-inset-left));
+  bottom: max(1rem, env(safe-area-inset-bottom));
+  z-index: 60;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  min-height: 2.75rem;
+  padding: 0 1rem;
+  border-radius: 999px;
+  background: var(--primary);
+  color: var(--primary-foreground);
   font-size: var(--text-sm);
-  line-height: 1.6;
-  color: var(--body);
+  font-weight: 700;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.2);
+  cursor: pointer;
+}
+.tour-chip svg {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+.tour-chip:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
 }
 .tour-actions {
   margin-top: 0.5rem;

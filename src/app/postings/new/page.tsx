@@ -803,7 +803,7 @@ export default function NewPosting() {
     <div className={shown === 'input' ? 'desk-spread' : 'desk-spread is-wide'}>
       <div className="desk-intro">
         <div className="desk-intro-inner">
-          <ol className="step-track" aria-label="진행 단계">
+          <ol className="step-track" aria-label="진행 단계" data-tour="steps">
             {STEPS.map(({ key, label }, i) => {
               const done = i < shownIndex;
               // 지난 단계, 또는 계산을 마친 뒤 생활비 단계에서 결과로 돌아가기
