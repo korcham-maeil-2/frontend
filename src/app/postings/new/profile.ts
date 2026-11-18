@@ -178,7 +178,8 @@ export function toUserProfile(form: ProfileForm, rows: Row[]): UserProfile {
 }
 
 /** 비어 있는 칸: 화면에 보여 줄 이름과, 누르면 데려갈 입력칸의 id (profile-form.tsx) */
-export type MissingInput = { label: string; fieldId: string; rowId?: string };
+/** effect: 비워 두면 결과에서 무엇이 빠지는지 (화면에 칸 이름 옆에 보여 준다) */
+export type MissingInput = { label: string; fieldId: string; rowId?: string; effect: string };
 
 /**
  * 계산 전에 알려 줄 빈 칸 (막지는 않는다: 빈 경우는 결과에 '계산할 수 없음'으로 나온다).
@@ -192,20 +193,31 @@ export function missingInputs(
 ): MissingInput[] {
   const missing: MissingInput[] = [];
   // rowId: 공고별 칸이면 그 공고 (회사 탭 개수와 '그 탭으로 이동'에 쓴다)
-  const add = (label: string, fieldId: string, rowId?: string) =>
-    missing.push({ label, fieldId, rowId });
+  const add = (label: string, fieldId: string, effect: string, rowId?: string) =>
+    missing.push({ label, fieldId, rowId, effect });
   const anyCommute = rows.some((row) => costsOf(form, row).canCommute);
-  if (anyCommute && form.currentHousing == null) add('지금 집 주거비', 'current-housing');
+  if (anyCommute && form.currentHousing == null) {
+    add('지금 집 주거비', 'current-housing', "비우면 '지금 집에서 통근' 결과가 빠져요");
+  }
   form.fixedExpenses.forEach((item, i) => {
     if (item.name.trim() && item.amount == null) {
-      add(`고정비 ${i + 1}(${item.name.trim()}) 금액`, `fixed-${i}-amount`);
+      add(
+        `고정비 ${i + 1}(${item.name.trim()}) 금액`,
+        `fixed-${i}-amount`,
+        '비우면 모든 회사 결과가 빠져요',
+      );
     }
   });
   rows.forEach((row, i) => {
     const c = costsOf(form, row);
     const name = row.company?.value || `공고 ${i + 1}`;
     if (!c.canCommute && !c.considerMove) {
-      add(`${name}: 통근·이사 중 하나는 골라 주세요`, `${row.id}-can-commute`, row.id);
+      add(
+        `${name}: 통근·이사 중 하나는 골라 주세요`,
+        `${row.id}-can-commute`,
+        '안 고르면 이 회사 결과가 빠져요',
+        row.id,
+      );
     }
     // 공고별 교통비는 비워 두면 서버가 0원(추정)으로 계산하고 '더 들 수 있어요'라고 알리므로 빈칸이 아니다
     // 비워 두면 근무지 월세 시세로 계산하므로 빈칸이 아니다 (불러오는 중에도 경고를 띄우지 않는다)
@@ -215,12 +227,19 @@ export function missingInputs(
       !rentFor(row, rents) &&
       !rentPending(row, rents, failedRents)
     ) {
-      add(`${name} 이사할 집 주거비`, `${row.id}-move-housing`, row.id);
+      add(
+        `${name} 이사할 집 주거비`,
+        `${row.id}-move-housing`,
+        "비우면 이 회사 '이사' 결과가 빠져요",
+        row.id,
+      );
     }
   });
-  if (form.hasCurrentJob && form.currentSalary == null) add('지금 연봉', 'current-salary');
+  // 지금 회사는 연봉 비공개 공고의 비교 기준으로만 쓴다
+  const basis = '비우면 지금 회사를 기준으로 쓰지 못해요';
+  if (form.hasCurrentJob && form.currentSalary == null) add('지금 연봉', 'current-salary', basis);
   if (form.hasCurrentJob && form.currentTransport == null) {
-    add('지금 회사 교통비', 'current-transport');
+    add('지금 회사 교통비', 'current-transport', basis);
   }
   return missing;
 }

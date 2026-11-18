@@ -507,6 +507,11 @@ details[open] > summary .when-closed {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
 }
+/* 빈칸마다 비우면 무엇이 빠지는지 (칸 이름 바로 옆, 옅게) */
+.todo-effect {
+  font-size: 0.9375rem;
+  color: var(--body);
+}
 .review-todo-title {
   font-size: 1.0625rem;
   font-weight: 700;

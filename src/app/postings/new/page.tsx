@@ -1028,8 +1028,8 @@ export default function NewPosting() {
               {/* 빈칸이 다 채워지면 제목만 바뀐다 (화면 읽기 프로그램에 한 번 알림) */}
               <p role="status" className="review-todo-title">
                 {missingProfile.length
-                  ? // 막지는 않는다: 비어 있으면 그 값이 필요한 경우만 '계산 못 함'이 된다
-                    '이 칸이 비어 있으면 일부는 계산하지 못해요'
+                  ? // 막지는 않는다: 비어 있으면 그 값이 필요한 경우만 '계산 못 함'이 된다 (칸마다 무엇이 빠지는지)
+                    '이 칸이 비면 남는 돈 일부가 안 나와요'
                   : '필요한 칸은 다 채웠어요. 계산하면 돼요'}
               </p>
               <ul>
@@ -1043,7 +1043,8 @@ export default function NewPosting() {
                       }
                     >
                       {item.label}
-                    </button>
+                    </button>{' '}
+                    <span className="todo-effect">{item.effect}</span>
                   </li>
                 ))}
               </ul>
