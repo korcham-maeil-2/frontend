@@ -531,6 +531,8 @@ export function ProfileFormView({
         </Button>
       </fieldset>
 
+      {/* 위는 모든 공고에 같은 값, 여기부터는 공고마다 다른 값: 굵은 선과 제목으로 크게 나눈다 */}
+      <h3 className="profile-split">공고마다 다른 값</h3>
       <PostingTabs
         rows={rows}
         activeId={activeId}

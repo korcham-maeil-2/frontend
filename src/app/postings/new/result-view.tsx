@@ -887,7 +887,8 @@ export function ResultView({ result, rows }: { result: Result; rows: Row[] }) {
         ))}
 
       {result.break_even.length > 0 && (
-        <div className="rounded-2xl bg-muted p-5">
+        // 답의 일부라 옅은 파랑 (보증금·계산 내역 같은 참고는 회색)
+        <div className="rounded-2xl bg-accent p-5">
           <h3 className="mb-2 font-semibold text-foreground">연봉이 공개되지 않은 공고</h3>
           <ul className="space-y-3 text-sm text-body">
             {result.break_even.map((be) => (
