@@ -1693,11 +1693,16 @@ details[open] > summary .when-closed {
   color: var(--foreground);
   overflow-wrap: anywhere;
 }
-.report-body ul {
-  display: grid;
-  gap: 0.3rem;
-  padding-left: 1.1rem;
-  list-style: disc;
+/* 칸마다 회사(또는 '참고') 이름표 + 문장, 칸 사이는 가는 선 (점 목록 대신) */
+.report-body > li + li {
+  border-top: 1px solid var(--border);
+  padding-top: 0.6rem;
+}
+.report-item-label {
+  font-weight: 600;
+}
+.report-body strong {
+  font-weight: 700;
 }
 
 /* 결과 화면 '이사하면 처음에 준비할 돈': 거래가 적을 때 보증금 아래 '참고만' 안내 */

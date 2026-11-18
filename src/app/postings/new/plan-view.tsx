@@ -382,6 +382,23 @@ function Rows({ items, twoColumns = false }: { items: PlanItem[]; twoColumns?: b
   );
 }
 
+/** 이사 단계 한 칸: 할 일(카드)과 알아볼 지원(줄)을 나눈다. 지원은 자격을 판단하지 않아 '알아볼' */
+function StepItems({ items }: { items: PlanItem[] }) {
+  const tasks = items.filter((item) => item.kind !== 'policy');
+  const policies = items.filter((item) => item.kind === 'policy');
+  return (
+    <>
+      {tasks.length > 0 && <Rows items={tasks} />}
+      {policies.length > 0 && (
+        <>
+          <p className="plan-step-sub">알아볼 지원 {policies.length}개</p>
+          <Rows items={policies} />
+        </>
+      )}
+    </>
+  );
+}
+
 function PostingPanel({
   plans,
   result,
@@ -445,9 +462,10 @@ function PostingPanel({
     return r != null ? `약 ${won(r)}` : m ? minSalaryText(m) : '';
   };
   const steps = [
-    { label: '집 구하기 전', items: before },
-    { label: '이사하고 14일 안', items: moveMonth.filter((i) => i.kind === 'move_in') },
-    { label: '전입한 뒤', items: moveMonth.filter((i) => i.kind === 'policy') },
+    // 단계 이름에 '14일'을 되풀이하지 않는다 (전입신고 설명 문장에 한 번)
+    { label: '집을 구하기 전에', items: before },
+    { label: '이사한 다음', items: moveMonth.filter((i) => i.kind === 'move_in') },
+    { label: '전입신고를 마친 다음', items: moveMonth.filter((i) => i.kind === 'policy') },
   ].filter((s) => s.items.length);
   return (
     <div className="space-y-4">
@@ -593,30 +611,33 @@ function PostingPanel({
       )}
       {moving && steps.length > 0 && (
         <section className="plan-section">
-          <SectionHead title="이사 순서">날짜와 상관없이 이 순서로 하면 돼요.</SectionHead>
-          {/* 번호 + 세로 선은 순서가 있는 이곳에만 (날짜 목록은 날짜를 앞에, 번호 없음) */}
-          <ol className="plan-steps">
-            {steps.map((s, i) => {
-              const tasks = s.items.filter((item) => item.kind !== 'policy');
-              const policies = s.items.filter((item) => item.kind === 'policy');
-              return (
+          {/* 사택·기숙사면 할 일이 전입신고 하나라 순서(번호·세로 선) 없이 한 칸으로 */}
+          {dorm ? (
+            <SectionHead title="이사하면 할 일">
+              사택·기숙사에 들어가는 것으로 보고 보증금과 집 구하기 지원은 뺐어요. 주소를 옮기는
+              일은 같아요.
+            </SectionHead>
+          ) : (
+            <SectionHead title="이사 순서">
+              입사일이 정해지지 않아도 이 순서대로 하면 돼요.
+            </SectionHead>
+          )}
+          {steps.length === 1 ? (
+            <StepItems items={steps[0].items} />
+          ) : (
+            // 번호 + 세로 선은 순서가 있는 이곳에만 (날짜 목록은 날짜를 앞에, 번호 없음)
+            <ol className="plan-steps">
+              {steps.map((s, i) => (
                 <li key={s.label}>
                   <span aria-hidden className="plan-step-number">
                     {i + 1}
                   </span>
                   <h4 className="plan-slot-label">{s.label}</h4>
-                  {tasks.length > 0 && <Rows items={tasks} />}
-                  {/* 할 일(카드)과 알아볼 지원(줄)을 나눈다: 지원은 자격을 판단하지 않아 '알아볼' */}
-                  {policies.length > 0 && (
-                    <>
-                      <p className="plan-step-sub">알아볼 지원 {policies.length}개</p>
-                      <Rows items={policies} />
-                    </>
-                  )}
+                  <StepItems items={s.items} />
                 </li>
-              );
-            })}
-          </ol>
+              ))}
+            </ol>
+          )}
         </section>
       )}
       {start.length > 0 && (

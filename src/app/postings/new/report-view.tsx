@@ -30,30 +30,48 @@ export function isReport(value: unknown): value is Report {
   );
 }
 
-type Block = { list: boolean; lines: string[] };
+/** 리포트 한 칸: 회사(또는 '참고') 이름표 + 문장. 이름표가 없는 줄은 문장만 */
+type Item = { label: string | null; text: string };
 
 const LIST_ITEM = /^\s*(?:[-•*]|\d+[.)])\s+/;
+// '- (주)한결푸드텍: 매달 …' → 이름표와 문장 (백엔드 report/agent.py 형식 규칙 10)
+const LABELED = /^([^:：]{1,40})[:：]\s+(.+)$/;
 
-/** 리포트 글 → 문단·목록. 줄 단위로 본다: 목록 줄('- ', '1. ')이 이어지면 목록, 나머지는 문단.
- *  AI가 규칙을 어기고 마크다운 굵게(**)를 쓰면 기호만 지운다. */
-function blocks(text: string): Block[] {
-  const out: Block[] = [];
+/**
+ * 리포트 글 → 칸 목록. 목록 줄('- ', '1. ')은 줄마다 한 칸, 그 밖의 줄은 빈 줄까지 이어 한 칸.
+ * AI가 규칙을 어기고 마크다운 굵게(**)를 쓰면 기호만 지운다.
+ */
+function items(text: string): Item[] {
+  const out: Item[] = [];
+  let paragraph: string[] = [];
+  const push = (line: string) => {
+    const m = LABELED.exec(line);
+    out.push(m ? { label: m[1].trim(), text: m[2].trim() } : { label: null, text: line });
+  };
+  const flush = () => {
+    if (paragraph.length) push(paragraph.join(' '));
+    paragraph = [];
+  };
   for (const raw of text.replace(/\*\*/g, '').split('\n')) {
     const line = raw.trim();
-    if (!line) {
-      out.push({ list: false, lines: [] }); // 빈 줄 = 문단 나눔
-      continue;
-    }
-    const list = LIST_ITEM.test(line);
-    const last = out.at(-1);
-    const content = list ? line.replace(LIST_ITEM, '') : line;
-    if (last && last.list === list && last.lines.length > 0) last.lines.push(content);
-    else out.push({ list, lines: [content] });
+    if (!line) flush();
+    else if (LIST_ITEM.test(line)) {
+      flush();
+      push(line.replace(LIST_ITEM, ''));
+    } else paragraph.push(line);
   }
-  return out.filter((block) => block.lines.length > 0);
+  flush();
+  return out;
 }
 
-const PREVIEW_BLOCKS = 2; // 처음에는 두 묶음만 보여 주고 '더 보기' (휴대폰에서 숫자 표가 밀리지 않게)
+// 금액 글자 ('약 224만원', '3,798만원', '1억 2,000만원', '7,770원', '−31만원'): 굵게 해서 숫자만 훑어도 읽히게
+const MONEY = /((?:약 )?−?\d[\d,]*(?:억(?: [\d,]+만)?원?|만 [\d,]+원|만원|원))/;
+
+function withMoney(text: string) {
+  return text.split(MONEY).map((part, i) => (i % 2 ? <strong key={i}>{part}</strong> : part));
+}
+
+const PREVIEW_ITEMS = 3; // 처음에는 세 칸만 보여 주고 '더 보기' (휴대폰에서 숫자 표가 밀리지 않게)
 
 export function ReportView({ report }: { report: Report | null }) {
   const [open, setOpen] = useState(false);
@@ -70,9 +88,9 @@ export function ReportView({ report }: { report: Report | null }) {
     return <p className="salary-notice report-notice">{why}</p>;
   }
 
-  const all = blocks(report.text);
-  const shown = open ? all : all.slice(0, PREVIEW_BLOCKS);
-  const more = all.length > PREVIEW_BLOCKS;
+  const all = items(report.text);
+  const shown = open ? all : all.slice(0, PREVIEW_ITEMS);
+  const hidden = all.length - PREVIEW_ITEMS;
 
   return (
     <section className="report-section" aria-labelledby="report-title">
@@ -85,20 +103,15 @@ export function ReportView({ report }: { report: Report | null }) {
           금액 검증 통과
         </p>
       </div>
-      <div className="report-body" id="report-body">
-        {shown.map((block, i) =>
-          block.list ? (
-            <ul key={i}>
-              {block.lines.map((line, j) => (
-                <li key={j}>{line}</li>
-              ))}
-            </ul>
-          ) : (
-            <p key={i}>{block.lines.join(' ')}</p>
-          ),
-        )}
-      </div>
-      {more && (
+      <ul className="report-body" id="report-body">
+        {shown.map((item, i) => (
+          <li key={i}>
+            {item.label && <p className="report-item-label">{item.label}</p>}
+            <p>{withMoney(item.text)}</p>
+          </li>
+        ))}
+      </ul>
+      {hidden > 0 && (
         <button
           type="button"
           className="question-link report-more"
@@ -106,7 +119,7 @@ export function ReportView({ report }: { report: Report | null }) {
           aria-controls="report-body"
           onClick={() => setOpen((v) => !v)}
         >
-          {open ? '설명 접기' : '설명 더 보기'}
+          {open ? '설명 접기' : `설명 더 보기 (${hidden}개)`}
           <ChevronDown aria-hidden className={`size-4 ${open ? 'rotate-180' : ''}`} />
         </button>
       )}
