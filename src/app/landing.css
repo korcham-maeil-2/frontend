@@ -194,9 +194,9 @@ main.site-shell:has(> .landing) {
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
-/* 공고에 없는 연봉 대신 계산한 최소 연봉: 초록은 '남는 돈' 전용이라 기본 글자색 (굵기로만 강조) */
+/* 공고에 없는 연봉 대신 계산한 최소 연봉: 제목의 녹색 숫자와 같은 값이라 같은 색 */
 .cell-value.is-target {
-  color: var(--foreground);
+  color: var(--positive);
 }
 .offer-badge {
   display: inline-block;

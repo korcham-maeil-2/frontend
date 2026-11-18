@@ -1862,6 +1862,11 @@ section.desk-sheet > .sheet-heading {
   margin-inline-start: 0.375rem;
 }
 
+/* 결과 화면의 최소 연봉: 초록은 '남는 돈' 전용이라 기본 글자색 (굵기로만 강조). 소개 페이지 표는 그대로 */
+.result-compare .cell-value.is-target {
+  color: var(--foreground);
+}
+
 /* 표 위 '연봉 비공개 공고의 기준' 한 줄 (result-view.tsx) */
 .compare-basis {
   margin-top: -0.75rem;
