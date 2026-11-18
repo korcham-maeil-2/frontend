@@ -23,9 +23,6 @@ type TrainingList = components['schemas']['TrainingList'];
 type Course = components['schemas']['Course'];
 type CalculationResult = components['schemas']['CalculationResult'];
 
-/** 적금 예시 금액 (매달). 남는 돈보다 많은 것은 빼고 보여 준다 */
-const DEPOSITS = [100_000, 300_000, 500_000, 1_000_000];
-
 /** 서버·초안의 값이 이 화면이 아는 모양인지 (예전 백엔드·예전 초안이면 그리지 않는다) */
 export function isSettlePlan(value: unknown): value is SettlePlan {
   const v = value as Partial<SettlePlan> | null | undefined;
@@ -129,19 +126,20 @@ function SavingsSlot({
   remaining: number | null;
   moving: boolean;
 }) {
-  const options = remaining != null ? DEPOSITS.filter((d) => d <= remaining) : [];
+  // 12개월 뒤 금액은 백엔드가 계산해 보낸다 (estimates). 화면은 남는 돈 안의 금액만 고르게 한다
+  const options = (savings.estimates ?? []).filter(
+    (e) => remaining != null && e.monthly_krw <= remaining,
+  );
   // 처음 고른 금액: 남는 돈의 30% 안에서 가장 큰 것 (없으면 가장 작은 것)
   const [deposit, setDeposit] = useState(
-    () => options.filter((d) => d <= (remaining ?? 0) * 0.3).at(-1) ?? options[0],
+    () =>
+      (options.filter((e) => e.monthly_krw <= (remaining ?? 0) * 0.3).at(-1) ?? options[0])
+        ?.monthly_krw,
   );
   if (savings.status !== 'ok' || !savings.products.length) return null;
   const disclosed = month(savings.disclosed_month);
-  // 고른 금액이 공시 한도 안인 상품 중 금리 1위
-  const top =
-    savings.products.find((p) => p.limit_krw == null || p.limit_krw >= (deposit ?? 0)) ??
-    savings.products[0];
-  // 12개월 적금 세전 이자 (단리, 매달 같은 금액): 금액 × 연이율 × (12+11+…+1)/12 = × 6.5
-  const interest = deposit ? Math.round((deposit * (top.rate / 100) * 6.5) / 1000) * 1000 : 0;
+  const top = savings.products[0]; // 계산 기준: 기본금리 1위 (한도는 월·총액이 상품마다 달라 비교하지 않는다)
+  const chosen = options.find((e) => e.monthly_krw === deposit);
   return (
     <li className="plan-slot is-extra">
       <h4 className="plan-slot-label">
@@ -152,12 +150,12 @@ function SavingsSlot({
         {disclosed && <span className="support-category">{disclosed} 공시</span>}
         <span className="support-category">가입 권유 아님</span>
       </p>
-      {deposit != null && remaining != null && (
+      {chosen && remaining != null && (
         <div className="savings-calc">
           <p className="savings-line">
             매달
             <span className="inline-flex flex-wrap gap-1" role="group" aria-label="매달 넣을 금액">
-              {options.map((d) => (
+              {options.map(({ monthly_krw: d }) => (
                 <Button
                   key={d}
                   type="button"
@@ -174,14 +172,14 @@ function SavingsSlot({
             <ArrowRight aria-hidden className="size-4 text-muted-foreground" />
             12개월 뒤
             <strong className="savings-total">
-              약 {formatWon(Math.round((deposit * 12 + interest) / 10_000) * 10_000)}
+              약 {formatWon(Math.round(chosen.total_krw / 10_000) * 10_000)}
             </strong>
           </p>
           <p className="savings-note">
             {moving ? '이사하면' : '통근하면'} 매달 남는 돈 약{' '}
             {formatWon(Math.round(remaining / 10_000) * 10_000)} 기준 · 원금{' '}
-            {formatWon(deposit * 12)} + 세전 이자 약 {formatWon(interest)} · {top.bank} 연{' '}
-            {rate(top.rate)} · 실제 금리는 은행에서 확인
+            {formatWon(chosen.principal_krw)} + 세전 이자 약 {formatWon(chosen.interest_krw)} ·{' '}
+            {top.bank} 연 {rate(top.rate)} · 실제 금리는 은행에서 확인
           </p>
         </div>
       )}
