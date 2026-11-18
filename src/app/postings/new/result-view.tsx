@@ -464,10 +464,11 @@ function answerSentence(be: BreakEven, columns: Column[], own: Case, floor: bool
   let here = HERE[own];
   if (be.baseline.kind === 'posting') {
     const name = baselinePosting(be, columns) ?? '기준 공고';
-    const go = be.baseline.case === 'move' ? `${name} 근처로 이사해서` : `${name}에 집에서`;
+    const baseCase = be.baseline.case ?? 'commute'; // 예전 결과엔 경우가 없을 수 있다 (통근으로 읽는다)
+    const go = baseCase === 'move' ? `${name} 근처로 이사해서` : `${name}에 집에서`;
     when = `${go} 다닐 때`;
     fact = `${go} 다니면 매달 ${monthly}이 남아요.`;
-    if (be.baseline.case === own) here = '여기서도';
+    if (baseCase === own) here = '여기서도';
   }
   return floor
     ? `최저임금 수준만 받아도 ${when}보다 많이 남아요.`

@@ -153,8 +153,8 @@ function MetaLines({ lines }: { lines: (string | false | null | undefined)[] }) 
     <span className="plan-row-meta">
       {lines
         .filter((line): line is string => !!line)
-        .map((line) => (
-          <span key={line} className="block">
+        .map((line, i) => (
+          <span key={i} className="block">
             {line}
           </span>
         ))}
@@ -327,7 +327,8 @@ function TrainingSlot({
 }
 
 /** 연봉 비공개 공고: 이 경우(이사·통근)에 같은 돈이 남으려면 받아야 할 최소 연봉 */
-type MinSalary = { salary: number; monthly: number | null; basis: string };
+/** floor: 최저임금으로 올린 답 (4단계 카드처럼 '이상' 없이 '최저임금 수준') */
+type MinSalary = { salary: number; monthly: number | null; floor: boolean };
 type Case = 'commute' | 'move';
 type Scenario = CalculationResult['postings'][number]['scenarios'][number];
 
@@ -353,7 +354,7 @@ function minSalaryOf(result: CalculationResult, id: string, c: Case): MinSalary 
     ? {
         salary: x.annual_salary_krw,
         monthly: x.monthly_remaining ?? null,
-        basis: be.baseline.label,
+        floor: x.floor === 'minimum_wage',
       }
     : null;
 }
@@ -452,8 +453,12 @@ function PostingPanel({
             <button key={c} type="button" aria-pressed={c === chosen} onClick={() => setPicked(c)}>
               {CASE_LABEL[c]}
               {/* 금액은 보통 굵기로 띄워 붙인다 (' · '로 잇지 않는다). 폰에서는 아랫줄로 */}
+              {/* 앞 공백은 화면 읽기용 (눈에는 margin으로 띄운다) */}
               {amountOf(c) && (
-                <span className="block font-normal sm:ml-2 sm:inline">{amountOf(c)}</span>
+                <>
+                  {' '}
+                  <span className="block font-normal sm:ml-1 sm:inline">{amountOf(c)}</span>
+                </>
               )}
             </button>
           ))}
@@ -513,11 +518,16 @@ function PostingPanel({
           // 연봉 비공개: 4단계 '면접에서 확인할 연봉' 카드와 같은 말 ('… 이상', 그만큼 받으면 매달 얼마)
           <div>
             <span>받아야 할 최소 연봉</span>
-            <strong>{formatWon(minSalary.salary)} 이상</strong>
+            <strong>
+              {formatWon(minSalary.salary)}
+              {!minSalary.floor && ' 이상'}
+            </strong>
             <small>
-              {minSalary.monthly != null
-                ? `그만큼 받으면 매달 약 ${won(minSalary.monthly)}이 남아요`
-                : '공고에 연봉이 없어 계산했어요'}
+              {minSalary.floor
+                ? '최저임금 수준만 받아도 기준보다 많이 남아요'
+                : minSalary.monthly != null
+                  ? `그만큼 받으면 매달 약 ${won(minSalary.monthly)}이 남아요`
+                  : '공고에 연봉이 없어 계산했어요'}
             </small>
           </div>
         ) : salaryHidden ? (
