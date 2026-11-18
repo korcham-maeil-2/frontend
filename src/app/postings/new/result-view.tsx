@@ -194,7 +194,7 @@ function aidNote(row: Row | undefined): string | undefined {
   const aid = row?.housing_allowance_monthly_krw?.value;
   const months = row?.housing_allowance_months?.value;
   if (!aid || months === 0) return undefined;
-  return months ? `주거지원비 뺌 · ${months}개월간` : '주거지원비 뺌 · 기간 모름';
+  return months ? `주거지원비 ${months}개월 뺌` : '주거지원비 뺌 (기간 모름)';
 }
 
 /** 세후 월급을 못 구한 이유. 연봉을 넣었는데 거절된 경우(단위 실수 등) 서버가 이유를 준다. */
@@ -398,7 +398,7 @@ function buildColumn(
           ? cost(housing, '주거지원비가 끝난 뒤')
           : cost(housing, chosen === 'move' ? aidNote(row) : undefined),
       // 비워 둬서 0원으로 계산한 교통비: 긴 출처 대신 짧게 (출처 전문은 계산 내역에)
-      transport: assumedTransport ? cost(transport, '비워 둠 · 더 들 수 있어요') : cost(transport),
+      transport: assumedTransport ? cost(transport, '비워 둬서 0원') : cost(transport),
       fixed: cost(fixed),
       remaining,
     },
@@ -428,7 +428,20 @@ function CellContent({ cell, label }: { cell: Shown; label: string }) {
 }
 
 function rowClass(key: RowKey) {
-  return key === 'salary' ? 'offer-salary' : key === 'remaining' ? 'compare-result' : undefined;
+  if (key === 'salary') return 'offer-salary';
+  if (key === 'remaining') return 'compare-result';
+  // 빠지는 돈(주거비·교통비·고정비)은 보통 굵기·회청색: 세후 월급(굵게)과 남는 돈(초록)이 먼저 읽히게
+  return key === 'housing' || key === 'transport' || key === 'fixed' ? 'is-cost' : undefined;
+}
+
+/** 연봉 비공개 공고의 비교 기준을 한 덩어리로: '(가상) 이음데이터랩(주) 통근 시 매달 약 242만원' */
+function baselineText(be: BreakEven, columns: Column[]): string {
+  const base = columns.find((c) => c.posting.posting_id === be.baseline.posting_id);
+  const who =
+    base && be.baseline.kind === 'posting'
+      ? `${base.posting.company || be.baseline.label} ${be.baseline.case === 'move' ? '이사 시' : '통근 시'}`
+      : be.baseline.label;
+  return `${who} 매달 ${won(be.baseline.monthly_remaining)}`;
 }
 
 function companyOf(column: Column, index: number) {
@@ -603,27 +616,30 @@ function baselineDuringAid(be: BreakEven, columns: Column[]): number | undefined
 function BreakEvenSummary({
   be,
   column,
+  baseline,
   baselineDuringAid,
 }: {
   be: BreakEven;
   column: Column | undefined;
+  /** 비교 기준 한 덩어리 (baselineText) */
+  baseline: string;
   baselineDuringAid: number | undefined;
 }) {
   return (
     <li className="be-item">
       <p className="font-semibold text-foreground">{be.company || be.posting_id}</p>
-      <BreakEvenAnswer be={be} column={column} baselineDuringAid={baselineDuringAid} />
+      <BreakEvenAnswer column={column} baseline={baseline} baselineDuringAid={baselineDuringAid} />
     </li>
   );
 }
 
 function BreakEvenAnswer({
-  be,
   column,
+  baseline,
   baselineDuringAid,
 }: {
-  be: BreakEven;
   column: Column | undefined;
+  baseline: string;
   baselineDuringAid: number | undefined;
 }) {
   const chosen = column?.breakEven;
@@ -653,7 +669,7 @@ function BreakEvenAnswer({
         <div>
           <dt>기준</dt>
           <dd>
-            {be.baseline.label} · 매달 {won(be.baseline.monthly_remaining)}
+            {baseline}
             {baselineDuringAid != null && (
               <span className="block text-muted-foreground">
                 주거지원비가 끝난 뒤 기준이에요 (받는 동안은 매달 {won(baselineDuringAid)})
@@ -729,20 +745,23 @@ function DepositSummary({ columns, estimates }: { columns: Column[]; estimates: 
           return (
             <li key={rent.lawd_cd}>
               <strong>{companies.join(', ')}</strong> 근처({place}) 원룸 보증금{' '}
-              <strong className="text-foreground tabular-nums">
-                {formatWon(rent.deposit_krw!)}
-              </strong>{' '}
-              <SourceBadge
-                badge={statusBadge.estimated}
-                className="result-badge"
-                details={[
-                  { label: '출처', text: `국토부 실거래가 (${rent.period})` },
-                  {
-                    label: '계산',
-                    text: `원룸 월세 ${rent.sample_size.toLocaleString('ko-KR')}건의 보증금 중앙값`,
-                  },
-                ]}
-              />
+              {/* 금액과 배지는 한 덩어리로 (좁아도 배지만 다음 줄로 떨어지지 않게) */}
+              <span className="whitespace-nowrap">
+                <strong className="text-foreground tabular-nums">
+                  {formatWon(rent.deposit_krw!)}
+                </strong>{' '}
+                <SourceBadge
+                  badge={statusBadge.estimated}
+                  className="result-badge"
+                  details={[
+                    { label: '출처', text: `국토부 실거래가 (${rent.period})` },
+                    {
+                      label: '계산',
+                      text: `원룸 월세 ${rent.sample_size.toLocaleString('ko-KR')}건의 보증금 중앙값`,
+                    },
+                  ]}
+                />
+              </span>
               {rent.sample_size < FEW_TRADES && (
                 <small className="deposit-source">거래가 적어 참고만 하세요</small>
               )}
@@ -792,14 +811,11 @@ export function ResultView({ result, rows }: { result: Result; rows: Row[] }) {
       </div>
 
       {/* 연봉 비공개 공고의 최소 연봉이 무엇에 맞춘 값인지 표 위에서 먼저 (이사 탭에서 옆 열 금액과 헷갈리지 않게) */}
-      {[...new Set(result.break_even.map((be) => be.baseline.label))].map((label) => {
-        const be = result.break_even.find((b) => b.baseline.label === label)!;
-        return (
-          <p key={label} className="compare-basis">
-            연봉 비공개 공고의 기준: {label} · 매달 {won(be.baseline.monthly_remaining)}
-          </p>
-        );
-      })}
+      {[...new Set(result.break_even.map((be) => baselineText(be, columns)))].map((text) => (
+        <p key={text} className="compare-basis">
+          연봉 비공개 공고의 기준: {text}
+        </p>
+      ))}
       <div className="compare-view result-compare">
         <div className="result-scroll">
           <table className="offer-table compare-table result-table" style={tableWidth}>
@@ -897,24 +913,30 @@ export function ResultView({ result, rows }: { result: Result; rows: Row[] }) {
           </div>
         ))}
 
-      {result.break_even.length > 0 && (
-        // 답의 일부라 옅은 파랑 (보증금·계산 내역 같은 참고는 회색)
-        <div className="rounded-2xl bg-accent p-5">
-          <h3 className="mb-2 font-semibold text-foreground">연봉이 공개되지 않은 공고</h3>
-          <ul className="space-y-3 text-sm text-body">
-            {result.break_even.map((be) => (
-              <BreakEvenSummary
-                key={be.posting_id}
-                be={be}
-                column={columns.find((c) => c.posting.posting_id === be.posting_id)}
-                baselineDuringAid={baselineDuringAid(be, columns)}
-              />
-            ))}
-          </ul>
-        </div>
-      )}
+      {/* 표 아래 상자: 넓은 화면에서는 나란히 (답=연봉 비공개는 파랑, 참고=보증금은 회색) */}
+      <div className="result-boxes">
+        {result.break_even.length > 0 && (
+          // 답의 일부라 옅은 파랑 (보증금·계산 내역 같은 참고는 회색)
+          <div className="rounded-2xl bg-accent p-5">
+            <h3 className="mb-2 font-semibold text-foreground">연봉이 공개되지 않은 공고</h3>
+            <ul className="space-y-3 text-sm text-body">
+              {result.break_even.map((be) => (
+                <BreakEvenSummary
+                  key={be.posting_id}
+                  be={be}
+                  column={columns.find((c) => c.posting.posting_id === be.posting_id)}
+                  baseline={baselineText(be, columns)}
+                  baselineDuringAid={baselineDuringAid(be, columns)}
+                />
+              ))}
+            </ul>
+          </div>
+        )}
 
-      {mode !== 'commute' && <DepositSummary columns={columns} estimates={result.rent_estimates} />}
+        {mode !== 'commute' && (
+          <DepositSummary columns={columns} estimates={result.rent_estimates} />
+        )}
+      </div>
 
       {(result.break_even_note || result.errors.length > 0) && (
         <div role="status" className="salary-notice">
@@ -925,7 +947,8 @@ export function ResultView({ result, rows }: { result: Result; rows: Row[] }) {
         </div>
       )}
 
-      <div className="space-y-2">
+      {/* 공고마다 계산 내역: 넓은 화면에서는 표의 열처럼 나란히 */}
+      <div className="result-folds">
         {columns.map((column, i) => (
           <Breakdown key={column.posting.posting_id} column={column} index={i} />
         ))}

@@ -1953,6 +1953,30 @@ section.desk-sheet > .sheet-heading {
   color: var(--foreground);
 }
 
+/* 결과 표의 빠지는 돈 줄: 보통 굵기·회청색 (세후 월급은 굵게, 남는 돈만 초록) */
+.compare-table .is-cost .cell-value,
+.compare-list .is-cost .cell-value {
+  font-weight: 400;
+  color: var(--body);
+}
+/* 표 아래 상자들과 계산 내역 접기: 좁으면 위아래, 넓으면 나란히 (하나뿐이면 한 줄 전체) */
+.result-boxes,
+.result-folds {
+  display: grid;
+  gap: 1rem;
+  align-items: start;
+}
+.result-folds {
+  gap: 0.5rem 1rem;
+}
+@media (min-width: 64rem) {
+  .result-boxes {
+    grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr));
+  }
+  .result-folds {
+    grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr));
+  }
+}
 /* 표 위 '연봉 비공개 공고의 기준' 한 줄 (result-view.tsx) */
 .compare-basis {
   margin-top: -0.75rem;
@@ -2225,6 +2249,16 @@ section.desk-sheet > .sheet-heading {
 }
 .plan-fold[open] > summary::before {
   content: '▾';
+}
+/* 미리보기 칩은 흰 바탕 (상자의 옅은 파랑 위에서 칩으로 보이게) */
+.plan-preview .support-category {
+  background: var(--card);
+}
+.plan-preview-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.5rem;
 }
 .plan-preview {
   flex-basis: 100%;

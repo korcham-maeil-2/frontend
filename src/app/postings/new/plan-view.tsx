@@ -580,22 +580,27 @@ export function PlanPreview({ plan, result }: { plan: SettlePlan; result: Calcul
     const c = defaultCase(result, plans);
     const items = plans[c]!.slots.flatMap((s) => s.items);
     const deposit = items.find((i) => i.kind === 'deposit')?.amount_krw;
-    const line = [
-      p.company || p.posting_id,
+    // 회사 이름 + 사실 칩 (' · '로 잇지 않는다)
+    const facts = [
       c === 'move' ? '이사' : '통근',
       result.break_even?.some((b) => b.posting_id === p.posting_id) ? '연봉 비공개' : '',
       deposit != null ? `보증금 ${formatWon(deposit)}` : '',
       `지원 ${items.filter((i) => i.kind === 'policy').length}개`,
-    ]
-      .filter(Boolean)
-      .join(' · ');
-    return { id: p.posting_id, line };
+    ].filter(Boolean);
+    return { id: p.posting_id, name: p.company || p.posting_id, facts };
   });
   return (
     <div className="plan-preview">
       <p className="font-semibold text-foreground">다음: 1년 정착 플랜</p>
-      {lines.map(({ id, line }) => (
-        <p key={id}>{line}</p>
+      {lines.map(({ id, name, facts }) => (
+        <p key={id} className="plan-preview-line">
+          <span className="text-foreground">{name}</span>
+          {facts.map((fact) => (
+            <span key={fact} className="support-category">
+              {fact}
+            </span>
+          ))}
+        </p>
       ))}
       {plan.postings.length > 3 && <p>외 {plan.postings.length - 3}개</p>}
     </div>
