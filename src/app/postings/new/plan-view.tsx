@@ -611,11 +611,11 @@ function PostingPanel({
       )}
       {moving && steps.length > 0 && (
         <section className="plan-section">
-          {/* 사택·기숙사면 할 일이 전입신고 하나라 순서(번호·세로 선) 없이 한 칸으로 */}
-          {dorm ? (
+          {/* 할 일이 한 칸뿐이면(사택·기숙사 등) 순서(번호·세로 선) 없이 '이사하면 할 일' 한 칸으로 */}
+          {steps.length === 1 ? (
             <SectionHead title="이사하면 할 일">
-              사택·기숙사에 들어가는 것으로 보고 보증금과 집 구하기 지원은 뺐어요. 주소를 옮기는
-              일은 같아요.
+              {dorm &&
+                '사택·기숙사에 들어가는 것으로 보고 보증금과 집 구하기 지원은 뺐어요. 주소를 옮기는 일은 같아요.'}
             </SectionHead>
           ) : (
             <SectionHead title="이사 순서">

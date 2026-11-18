@@ -355,9 +355,11 @@ export default function NewPosting() {
     if (next === 'review' && markActiveSeen && activeId) markSeen(activeId);
     if (next === 'living') {
       retryFailedRents(); // 불러오지 못했던 지역은 다시 묻는다
-      // 생활비는 첫 공고부터 (조건 확인에서 마지막에 본 공고로 시작하면 앞 공고를 건너뛰기 쉽다).
-      // 채울 칸이 있는 공고가 있으면 그 공고부터
-      setActivePosting(missingProfile.find((item) => item.rowId)?.rowId ?? rows[0]?.id ?? '');
+      // 조건 확인에서 넘어올 때만: 생활비는 첫 공고부터 (마지막에 본 공고로 시작하면 앞 공고를 건너뛰기 쉽다).
+      // 채울 칸이 있는 공고가 있으면 그 공고부터. 결과·플랜에서 돌아올 때는 보던 회사를 그대로 둔다
+      if (step === 'review') {
+        setActivePosting(missingProfile.find((item) => item.rowId)?.rowId ?? rows[0]?.id ?? '');
+      }
     }
     setStep(next);
     // 넓은 화면에서는 왼쪽 제목이 따라다녀서(sticky) 포커스만으로는 위로 안 올라간다.
