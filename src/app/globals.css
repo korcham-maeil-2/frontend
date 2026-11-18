@@ -1907,7 +1907,7 @@ details[open] > summary .when-closed {
   color: var(--foreground);
 }
 .salary-answer-title {
-  font-size: 0.9375rem;
+  font-size: 1.375rem; /* 다른 구역 제목(.plan-section-title)과 같은 크기: 눈썹 글씨처럼 작으면 옆이 애매하게 빈다 */
   font-weight: 700;
 }
 .salary-answer li {
