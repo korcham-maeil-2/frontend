@@ -37,11 +37,21 @@ export function askTargetId(question: AskQuestion, emptyFixedIndex: number): str
 }
 
 /** 칸 위에 붙는 에이전트 질문 (말풍선). 질문 칸의 aria-describedby로 이어 화면 읽기도 읽는다 */
-export function AskBubble({ question, id }: { question: AskQuestion; id: string }) {
+export function AskBubble({
+  question,
+  id,
+  order,
+}: {
+  question: AskQuestion;
+  id: string;
+  /** 질문이 여럿일 때 '1/2' (몇 번째인지) */
+  order?: string;
+}) {
   return (
     <div id={id} className="ask-bubble" role="note">
       <p className="ask-bubble-title">
         <MessageCircleQuestion aria-hidden className="size-4 shrink-0" />
+        {order && <span className="ask-order">질문 {order}</span>}
         {question.question}
       </p>
       <p>

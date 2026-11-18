@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { ExternalLink } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { api } from '@/lib/api/client';
 import type { components } from '@/lib/api/schema';
@@ -20,6 +21,10 @@ type PlanItem = components['schemas']['PlanItem'];
 type SavingsList = components['schemas']['SavingsList'];
 type TrainingList = components['schemas']['TrainingList'];
 type Course = components['schemas']['Course'];
+type CalculationResult = components['schemas']['CalculationResult'];
+
+/** 적금 예시 금액 (매달). 남는 돈보다 많은 것은 빼고 보여 준다 */
+const DEPOSITS = [100_000, 300_000, 500_000, 1_000_000];
 
 /** 서버·초안의 값이 이 화면이 아는 모양인지 (예전 백엔드·예전 초안이면 그리지 않는다) */
 export function isSettlePlan(value: unknown): value is SettlePlan {
@@ -103,9 +108,28 @@ function month(yyyymm: string | null | undefined): string | null {
 }
 
 /** 첫 월급부터 모으기: 은행 적금 12개월 기본금리 높은 순 (금감원 공시). 가입을 권하지 않는다. */
-function SavingsSlot({ savings }: { savings: SavingsList }) {
+function SavingsSlot({
+  savings,
+  remaining,
+  moving,
+}: {
+  savings: SavingsList;
+  remaining: number | null;
+  moving: boolean;
+}) {
+  const options = remaining != null ? DEPOSITS.filter((d) => d <= remaining) : [];
+  // 처음 고른 금액: 남는 돈의 30% 안에서 가장 큰 것 (없으면 가장 작은 것)
+  const [deposit, setDeposit] = useState(
+    () => options.filter((d) => d <= (remaining ?? 0) * 0.3).at(-1) ?? options[0],
+  );
   if (savings.status !== 'ok' || !savings.products.length) return null;
   const disclosed = month(savings.disclosed_month);
+  // 고른 금액을 넣을 수 있는(공시 한도가 없거나 그 이상인) 상품 중 금리가 가장 높은 것
+  const top =
+    savings.products.find((p) => p.limit_krw == null || p.limit_krw >= (deposit ?? 0)) ??
+    savings.products[0];
+  // 12개월 적금 세전 이자 (단리, 매달 같은 금액): 금액 × 연이율 × (12+11+…+1)/12 = × 6.5
+  const interest = deposit ? Math.round((deposit * (top.rate / 100) * 6.5) / 1000) * 1000 : 0;
   return (
     <li className="plan-slot is-extra">
       <h4 className="plan-slot-label">
@@ -115,6 +139,39 @@ function SavingsSlot({ savings }: { savings: SavingsList }) {
         은행 적금 12개월 기본금리 높은 순이에요{disclosed && ` (${disclosed} 공시)`}. 가입을 권하는
         게 아니에요. 우대금리 조건과 실제 금리는 가입 전에 은행에서 확인해 주세요.
       </p>
+      {deposit != null && remaining != null && (
+        <div className="savings-calc">
+          <p>
+            {moving ? '이사하면' : '지금 집에서 통근하면'} 매달 남는 돈 약{' '}
+            {formatWon(Math.round(remaining / 10_000) * 10_000)} 중
+          </p>
+          <div className="flex flex-wrap gap-2" role="group" aria-label="매달 넣을 금액">
+            {options.map((d) => (
+              <Button
+                key={d}
+                type="button"
+                size="sm"
+                className="min-h-9 px-3"
+                variant={d === deposit ? 'default' : 'outline'}
+                aria-pressed={d === deposit}
+                onClick={() => setDeposit(d)}
+              >
+                {formatWon(d).replace(/원$/, '')}
+              </Button>
+            ))}
+          </div>
+          <p>
+            씩 12개월 넣으면{' '}
+            <strong className="savings-total">
+              약 {formatWon(Math.round((deposit * 12 + interest) / 10_000) * 10_000)}
+            </strong>
+          </p>
+          <p className="savings-note">
+            원금 {formatWon(deposit * 12)} + 세전 이자 약 {formatWon(interest)} · {top.bank} 연{' '}
+            {rate(top.rate)} 기본금리 기준
+          </p>
+        </div>
+      )}
       <ul className="plan-items">
         {savings.products.map((p) => (
           <li key={`${p.bank}-${p.name}`} className="plan-item">
@@ -148,7 +205,7 @@ function SavingsSlot({ savings }: { savings: SavingsList }) {
   );
 }
 
-function CourseItem({ course }: { course: Course }) {
+function CourseItem({ course, jobNcs }: { course: Course; jobNcs: string | null }) {
   return (
     <li className="plan-item">
       <p className="plan-item-head">
@@ -161,6 +218,9 @@ function CourseItem({ course }: { course: Course }) {
         ) : (
           <span className="plan-item-title">{course.title}</span>
         )}
+        {jobNcs && course.ncs?.startsWith(jobNcs) && (
+          <span className="support-category">직무 관련</span>
+        )}
         {course.weekend && <span className="support-category">주말반</span>}
       </p>
       <p className="support-meta">
@@ -170,15 +230,25 @@ function CourseItem({ course }: { course: Course }) {
         {/* 컨소시엄은 '무료'만 보이면 누구나 들을 수 있다고 오해한다 → 대상(중소기업 재직자)도 함께 */}
         <span>{course.kind_label}</span>
         {course.fee_krw === 0 && <span>무료</span>}
-        {course.institute && <span className="support-agency">{course.institute}</span>}
+        {/* 강의는 어디서 듣는지가 중요해서 좁은 화면에서도 기관을 보인다
+            (support-agency는 청년 지원 목록용으로, 좁은 화면에서 숨겨진다) */}
+        {course.institute && <span>{course.institute}</span>}
       </p>
     </li>
   );
 }
 
 /** 일하면서 배우기: 근무지 근처 재직자 오프라인 강의 (고용24). 자격은 상세 페이지에서 확인. */
-function TrainingSlot({ training }: { training: TrainingList | undefined }) {
+function TrainingSlot({
+  training,
+  jobNcs,
+}: {
+  training: TrainingList | undefined;
+  jobNcs: string | null;
+}) {
   if (!training || training.status !== 'ok' || !training.courses.length) return null;
+  // 직무에 맞는 과정이 하나라도 있을 때만 '직무 관련 먼저'라고 알린다
+  const matched = !!jobNcs && training.courses.some((c) => c.ncs?.startsWith(jobNcs));
   const where = training.region ? placeName(training.region) : '근무지';
   const scope =
     training.scope === 'sido'
@@ -190,12 +260,16 @@ function TrainingSlot({ training }: { training: TrainingList | undefined }) {
         일하면서 배우기<small>근무지 근처 재직자 강의</small>
       </h4>
       <p className="plan-extra-lead">
-        {scope} 주말반을 먼저 보여 줘요. 수강 자격(재직 여부, 내일배움카드 등)과 장소는 과정 상세
-        페이지에서 확인해 주세요.
+        {scope} {matched ? '공고 직무와 관련된 과정과 주말반을' : '주말반을'} 먼저 보여 줘요. 수강
+        자격(재직 여부, 내일배움카드 등)과 장소는 과정 상세 페이지에서 확인해 주세요.
       </p>
       <ul className="plan-items">
         {training.courses.map((course) => (
-          <CourseItem key={`${course.title}-${course.start}-${course.institute}`} course={course} />
+          <CourseItem
+            key={`${course.title}-${course.start}-${course.institute}`}
+            course={course}
+            jobNcs={jobNcs}
+          />
         ))}
       </ul>
       <p className="plan-extra-source">출처: {training.source}</p>
@@ -207,10 +281,13 @@ function PostingPanel({
   posting,
   savings,
   training,
+  remaining,
 }: {
   posting: PostingPlan;
   savings: SavingsList | null;
   training: TrainingList | undefined;
+  /** 이 플랜의 경우(이사·통근)에 매달 남는 돈. 모르면 null */
+  remaining: number | null;
 }) {
   if (!posting.slots.length) {
     return <p className="support-empty">지금 넣을 할 일을 찾지 못했어요.</p>;
@@ -236,8 +313,16 @@ function PostingPanel({
             </ul>
           </li>
         ))}
-        {savings && <SavingsSlot savings={savings} />}
-        <TrainingSlot training={training} />
+        {/* 남는 돈이 바뀌면(다시 계산) 고른 금액도 새로 정한다 */}
+        {savings && (
+          <SavingsSlot
+            key={remaining}
+            savings={savings}
+            remaining={remaining}
+            moving={posting.moving}
+          />
+        )}
+        <TrainingSlot training={training} jobNcs={posting.ncs ?? null} />
       </ol>
       {posting.notes.map((note) => (
         <p key={note} className="text-sm text-muted-foreground">
@@ -248,24 +333,39 @@ function PostingPanel({
   );
 }
 
+/** 재직자 강의를 받을 열쇠: 근무지 시군구 코드와 직무 분류 ('41135:20'). 근무지를 모르면 null */
+function trainingKey(posting: PostingPlan): string | null {
+  return posting.lawd_cd ? `${posting.lawd_cd}:${posting.ncs ?? ''}` : null;
+}
+
 /**
- * 적금(전국 같음)과 근무지별 재직자 강의를 불러온다. 정착 플랜과 따로 받는 참고 정보라,
+ * 적금(전국 같음)과 근무지·직무별 재직자 강의를 불러온다. 정착 플랜과 따로 받는 참고 정보라,
  * 못 받거나 키가 없으면(status off·unavailable) 그 칸만 그리지 않는다.
  */
-function usePlanExtras(codes: string[]) {
+function usePlanExtras(keys: string[]) {
   const [savings, setSavings] = useState<SavingsList | null>(null);
   const [training, setTraining] = useState<Record<string, TrainingList>>({});
-  const key = codes.join(',');
+  const key = keys.join(',');
+  // 적금은 전국이 같아서 한 번만 받는다 (근무지 목록이 바뀌어도 다시 받지 않는다)
   useEffect(() => {
     let cancelled = false;
     api
       .GET('/plan/savings')
       .then(({ data }) => !cancelled && data && setSavings(data))
       .catch(() => {});
-    for (const code of key ? key.split(',') : []) {
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  useEffect(() => {
+    let cancelled = false;
+    for (const k of key ? key.split(',') : []) {
+      const [code, ncs] = k.split(':');
       api
-        .GET('/plan/training/{lawd_cd}', { params: { path: { lawd_cd: code } } })
-        .then(({ data }) => !cancelled && data && setTraining((t) => ({ ...t, [code]: data })))
+        .GET('/plan/training/{lawd_cd}', {
+          params: { path: { lawd_cd: code }, query: ncs ? { ncs } : {} },
+        })
+        .then(({ data }) => !cancelled && data && setTraining((t) => ({ ...t, [k]: data })))
         .catch(() => {});
     }
     return () => {
@@ -275,16 +375,23 @@ function usePlanExtras(codes: string[]) {
   return { savings, training };
 }
 
-export function PlanView({ plan }: { plan: SettlePlan }) {
+export function PlanView({ plan, result }: { plan: SettlePlan; result: CalculationResult }) {
   const postings = plan.postings.filter((p) => p.slots.length > 0);
-  const codes = [...new Set(postings.map((p) => p.lawd_cd).filter((c): c is string => !!c))].sort();
-  const { savings, training } = usePlanExtras(codes);
+  const keys = [...new Set(postings.map(trainingKey).filter((k): k is string => !!k))].sort();
+  const { savings, training } = usePlanExtras(keys);
+  /** 플랜의 경우(이사하면 이사, 아니면 통근)에 매달 남는 돈 */
+  const remainingFor = (posting: PostingPlan) =>
+    result.postings
+      .find((p) => p.posting_id === posting.posting_id)
+      ?.scenarios.find((s) => s.case === (posting.moving ? 'move' : 'commute'))
+      ?.monthly_remaining ?? null;
   if (!postings.length) return null;
   const panel = (posting: PostingPlan) => (
     <PostingPanel
       posting={posting}
       savings={savings}
-      training={posting.lawd_cd ? training[posting.lawd_cd] : undefined}
+      training={training[trainingKey(posting) ?? '']}
+      remaining={remainingFor(posting)}
     />
   );
   return (

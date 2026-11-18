@@ -84,6 +84,7 @@ function MoneyField({
   help,
   note,
   ask,
+  askOrder,
 }: {
   id: string;
   label: string;
@@ -98,6 +99,8 @@ function MoneyField({
   note?: ReactNode;
   /** 되묻기: 에이전트가 이 칸의 값을 물었으면 칸 위에 질문을 붙인다 */
   ask?: AskQuestion;
+  /** 질문이 여럿일 때 몇 번째인지 ('1/2') */
+  askOrder?: string;
 }) {
   const hintId = `${id}-hint`;
   const noteId = `${id}-note`;
@@ -135,7 +138,7 @@ function MoneyField({
   // 되묻기: 질문을 칸 바로 위에 두고 둘을 함께 강조한다 (칸 안은 자리를 정해 둔 격자라 밖에 둔다)
   return (
     <div className="ask-wrap">
-      <AskBubble question={ask} id={askId} />
+      <AskBubble question={ask} id={askId} order={askOrder} />
       {field}
     </div>
   );
@@ -357,6 +360,7 @@ export function ProfileFormView({
   failedRents,
   onRetryRents,
   asking = [],
+  askFixedIndex = -1,
 }: {
   form: Form;
   rows: Row[];
@@ -376,12 +380,19 @@ export function ProfileFormView({
   onRetryRents: () => void;
   /** 되묻기: 에이전트가 물은 값들 (원래 칸 위에 질문을 붙인다) */
   asking?: AskQuestion[];
+  /** 되묻기: 고정비 질문을 붙일 줄 (질문이 온 때 정한 값. 없으면 -1) */
+  askFixedIndex?: number;
 }) {
   const set = (patch: Partial<Form>) => onChange({ ...form, ...patch });
   const askFor = (key: AskQuestion['key']) => asking.find((q) => q.key === key);
+  const askOrder = (key: AskQuestion['key']) =>
+    asking.length > 1
+      ? `${asking.findIndex((q) => q.key === key) + 1}/${asking.length}`
+      : undefined;
   const askFixed = askFor('fixed_expenses');
-  // 고정비 질문은 금액이 빈 첫 줄 위에 붙인다 (서버는 금액이 빈 줄이 있을 때만 고정비를 묻는다)
-  const askFixedIndex = askFixed ? form.fixedExpenses.findIndex((x) => x.amount == null) : -1;
+  // 고정비 질문은 이름은 있고 금액이 빈 첫 줄 위에 붙인다 (서버는 그런 줄이 있을 때만 고정비를 묻는다.
+  // 이름도 금액도 빈 줄은 보내지 않으므로 고르지 않는다)
+  const fixedAskRow = askFixed ? askFixedIndex : -1;
   const setFixed = (fixedExpenses: Form['fixedExpenses']) => set({ fixedExpenses });
   /** 고정비 줄을 하나 더하고, 이름이 있으면 금액 칸·없으면 이름 칸으로 커서를 옮긴다. */
   const addFixed = (name = '') => {
@@ -404,6 +415,7 @@ export function ProfileFormView({
           onChange={(currentHousing) => set({ currentHousing })}
           help="월세 + 관리비. 본가라면 생활비로 드리는 돈"
           ask={askFor('current_housing')}
+          askOrder={askOrder('current_housing')}
         />
         <div className="row-field profile-field">
           <label htmlFor="family">가족 수 (본인 포함)</label>
@@ -436,7 +448,7 @@ export function ProfileFormView({
           {form.fixedExpenses.map((item, i) => (
             <Fragment key={i}>
               {/* 되묻기: 금액이 빈 이 줄 위에 질문 (줄 안은 칸 순서로 자리를 잡아서 따로 둔다) */}
-              {askFixed && i === askFixedIndex && (
+              {askFixed && i === fixedAskRow && (
                 <li className="fixed-ask">
                   <AskBubble
                     // 서버는 '고정비 합계'로 묻지만, 화면은 금액이 빈 그 줄에서 답하므로 그 이름으로 묻는다
@@ -445,10 +457,11 @@ export function ProfileFormView({
                       question: `${item.name.trim() || `고정비 ${i + 1}`} 금액은 매달 얼마인가요?`,
                     }}
                     id={`fixed-${i}-ask`}
+                    order={askOrder('fixed_expenses')}
                   />
                 </li>
               )}
-              <li className={`fixed-expense${i === askFixedIndex ? ' is-asked' : ''}`}>
+              <li className={`fixed-expense${i === fixedAskRow ? ' is-asked' : ''}`}>
                 <Input
                   id={`fixed-${i}-name`}
                   aria-label={`고정비 ${i + 1} 이름`}
@@ -466,7 +479,7 @@ export function ProfileFormView({
                 <MoneyInput
                   id={`fixed-${i}-amount`}
                   label={`고정비 ${i + 1} 금액 (단위: 원)`}
-                  describedBy={askFixed && i === askFixedIndex ? `fixed-${i}-ask` : undefined}
+                  describedBy={askFixed && i === fixedAskRow ? `fixed-${i}-ask` : undefined}
                   value={item.amount}
                   example="5만"
                   onChange={(amount) =>
