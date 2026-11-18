@@ -615,6 +615,11 @@ export interface components {
        * @description 고용24 과정 상세 (신청·장소·자격 확인)
        */
       url: string | null;
+      /**
+       * Ncs
+       * @description 직무 분류 코드 (NCS, 앞 2자리가 대분류)
+       */
+      ncs: string | null;
     };
     /**
      * CurrentJob
@@ -1073,6 +1078,11 @@ export interface components {
        * @description 근무지 시군구 코드 (화면이 재직자 강의를 찾을 때 쓴다)
        */
       lawd_cd: string | null;
+      /**
+       * Ncs
+       * @description 직무 분류 (NCS 대분류 2자리, 재직자 강의를 직무에 맞게 고를 때)
+       */
+      ncs: string | null;
       /**
        * Moving
        * @description 이사하는 경우를 넣었는지 (이사 경우가 해당될 때)
@@ -2255,7 +2265,10 @@ export interface operations {
   };
   get_training_plan_training__lawd_cd__get: {
     parameters: {
-      query?: never;
+      query?: {
+        /** @description 직무 NCS 대분류 */
+        ncs?: string | null;
+      };
       header?: never;
       path: {
         lawd_cd: string;

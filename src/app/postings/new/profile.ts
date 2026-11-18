@@ -130,6 +130,14 @@ function toFixedExpenses(items: FixedExpenseForm[]) {
   }));
 }
 
+/**
+ * 고정비를 '모름'으로 만든 줄: 이름은 있고 금액이 빈 첫 줄 (없으면 -1).
+ * 이름·금액이 다 빈 줄은 toFixedExpenses가 버리므로 고르지 않는다.
+ */
+export function blankFixedIndex(items: FixedExpenseForm[]): number {
+  return items.findIndex((item) => item.name.trim() && item.amount == null);
+}
+
 /** 화면 입력 → 백엔드 UserProfile. 빈 칸은 null로 보내 서버가 '모름'으로 계산한다 (0원으로 채우지 않는다). */
 export function toUserProfile(form: ProfileForm, rows: Row[]): UserProfile {
   const age = validAge(form.age);

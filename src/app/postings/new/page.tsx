@@ -41,6 +41,7 @@ import {
 } from './posting-files';
 import {
   EMPTY_PROFILE,
+  blankFixedIndex,
   isSettledRent,
   missingInputs,
   rentsFromResult,
@@ -579,7 +580,8 @@ export default function NewPosting() {
     const questions = data.status === 'awaiting_answer' ? askQuestionsOf(data.pending) : null;
     if (questions) {
       setSessionId(id);
-      setAsking({ id, questions });
+      // 고정비 질문 줄은 질문이 온 때 정한다 (답을 치는 동안 말풍선이 옮겨 가지 않게)
+      setAsking({ id, questions, fixedIndex: blankFixedIndex(profile.fixedExpenses) });
       return;
     }
     setAsking(null);
@@ -604,15 +606,19 @@ export default function NewPosting() {
   }
 
   // 되묻기 대화 (계산 전에 서버가 빈 값을 물어볼 때)
-  const [asking, setAsking] = useState<{ id: string; questions: AskQuestion[] } | null>(null);
+  const [asking, setAsking] = useState<{
+    id: string;
+    questions: AskQuestion[];
+    fixedIndex: number;
+  } | null>(null);
+  const askIds = asking?.questions.map((q) => askTargetId(q, asking.fixedIndex)) ?? [];
   // 질문이 뜨면 첫 질문의 원래 칸으로 스크롤하고 커서를 넣는다 (바로 답할 수 있게).
   // 계산 중에는 입력칸이 잠겨 있어(fieldset disabled) 커서가 안 들어가므로, 계산이 끝난 뒤 한 번만.
   const focusedAsk = useRef<object | null>(null);
   useEffect(() => {
     if (!asking || busy !== null || focusedAsk.current === asking) return;
     focusedAsk.current = asking;
-    const fixedIndex = profile.fixedExpenses.findIndex((x) => x.amount == null);
-    const field = document.getElementById(askTargetId(asking.questions[0], fixedIndex));
+    const field = document.getElementById(askIds[0]);
     field?.scrollIntoView({ block: 'center', behavior: 'smooth' });
     field?.focus({ preventScroll: true });
     // 질문이 새로 왔을 때만 (답을 치는 동안 폼이 바뀌어도 커서를 옮기지 않는다)
@@ -871,7 +877,7 @@ export default function NewPosting() {
           {support && (
             <SupportView support={support} rows={rows} stale={support.checked_on === staleFor} />
           )}
-          {plan && <PlanView plan={plan} />}
+          {plan && <PlanView plan={plan} result={freshResult} />}
           <div className="sheet-actions flex-wrap">
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" className="min-h-11" onClick={() => changeStep('living')}>
@@ -917,7 +923,28 @@ export default function NewPosting() {
           className="desk-sheet sheet-enter"
           aria-label="내 생활비"
           aria-busy={busy === 'confirming'}
-          onKeyDown={enterMovesToNextField}
+          onKeyDown={(event) => {
+            // 되묻기: 질문 칸에서 Enter는 다음 질문 칸, 마지막이면 계산
+            const at = askIds.indexOf((event.target as HTMLElement).id);
+            const composing = event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229;
+            if (at < 0 || event.key !== 'Enter' || composing) {
+              enterMovesToNextField(event);
+              return;
+            }
+            event.preventDefault();
+            // 답이 없으면 그대로 (보내면 같은 질문이 다시 온다)
+            const empty =
+              asking?.questions[at].key === 'current_housing'
+                ? profile.currentHousing == null
+                : profile.fixedExpenses[asking?.fixedIndex ?? -1]?.amount == null;
+            if (empty) return;
+            const next = askIds
+              .slice(at + 1)
+              .map((id) => document.getElementById(id))
+              .find((el) => el instanceof HTMLInputElement);
+            if (next) next.focus();
+            else event.currentTarget.requestSubmit();
+          }}
           onSubmit={(event) => {
             event.preventDefault();
             calculate();
@@ -939,6 +966,7 @@ export default function NewPosting() {
               failedRents={failedRents}
               onRetryRents={retryFailedRents}
               asking={asking?.questions}
+              askFixedIndex={asking?.fixedIndex}
             />
           </fieldset>
           {/* 되묻기 중에는 질문이 칸 위에 있으니 '비어 있는 값' 목록은 숨긴다 */}

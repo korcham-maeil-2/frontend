@@ -1865,6 +1865,32 @@ section.desk-sheet > .sheet-heading {
   font-weight: 400;
   color: var(--muted-foreground);
 }
+/* 적금 참고: 매달 남는 돈에서 얼마씩 넣으면 1년 뒤 얼마가 되는지 */
+.savings-calc {
+  margin-top: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  border-radius: 0.5rem;
+  background: color-mix(in srgb, var(--primary) 6%, var(--card));
+  padding: 0.75rem;
+  font-size: 0.875rem;
+  color: var(--body);
+}
+.savings-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem 0.5rem;
+}
+.savings-total {
+  font-size: 1.125rem;
+  color: var(--foreground);
+}
+.savings-note {
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}
 /* 되묻기 (ask-view.tsx): 에이전트가 물은 원래 칸 위에 질문을 붙이고, 질문과 칸을 함께 강조한다 */
 .ask-wrap,
 .fixed-expense.is-asked {
@@ -1886,6 +1912,13 @@ section.desk-sheet > .sheet-heading {
   padding: 0.75rem;
   font-size: 0.875rem;
   color: var(--body);
+}
+.ask-order {
+  flex-shrink: 0;
+  border-radius: 0.25rem;
+  background: color-mix(in srgb, var(--primary) 15%, var(--card));
+  padding: 0 0.375rem;
+  font-size: 0.75rem;
 }
 .ask-bubble-title {
   display: flex;
