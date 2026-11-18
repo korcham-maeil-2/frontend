@@ -581,6 +581,8 @@ details[open] > summary .when-closed {
   flex-wrap: wrap;
   align-items: center;
   gap: 0.25rem 0.5rem;
+  /* 배지 끝을 입력칸 끝에 맞춘다 (단위 자리만큼 덜 간다) */
+  width: calc(100% - var(--unit-slot));
 }
 .row-field > label,
 .row-field-head > label {
@@ -650,26 +652,42 @@ details[open] > summary .when-closed {
   font-size: 0.9375rem;
   color: var(--body);
 }
-@media (min-width: 64rem) {
-  .row-field {
-    grid-template-columns: 11.5rem minmax(0, 1fr) 5.5rem;
+/* 넓은 화면(≥48rem): 칸 이름은 늘 위, 짧은 칸은 한 줄에 둘 (조건 확인·내 생활비 공통).
+   칸이 아닌 것(묶음 제목·안내·체크·고정비 줄·질문 말풍선)과 넓은 칸(.is-wide)은 한 줄 전체.
+   화면 폭 기준: 입력 두 칸은 48rem, 글이 긴 목록 두 칸(정착 플랜 등)은 64rem */
+@media (min-width: 48rem) {
+  .row-group {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+    column-gap: 2rem;
   }
-  /* 조건 확인 화면(이름 + 배지 묶음이 있는 칸)만 이름 칸을 넓혀 배지를 그 끝에 둔다.
-     내 생활비 화면(profile-form.tsx)은 배지가 없어 원래 칸 나눔 그대로 */
-  .row-field:has(> .row-field-head) {
-    grid-template-columns: 15rem minmax(0, 1fr);
+  .row-group > * {
+    grid-column: 1 / -1;
   }
-  /* 넓은 화면: 배지를 이름 칸 오른쪽 끝(입력칸 바로 앞)에 세로로 줄 맞춘다 — '확인할 칸'을 위아래로 훑기 쉽게.
-     이름과 배지가 한 줄에 안 들어가면('이미지에서 읽음' 등) 배지가 아랫줄 오른쪽으로 내려간다 */
+  .row-group > .row-field:not(.is-wide) {
+    grid-column: auto;
+  }
+  /* 배지는 칸 이름 줄의 오른쪽 끝: 위아래 칸끼리 배지가 한 줄로 맞는다 */
   .row-field-head > .status-badge {
     margin-inline-start: auto;
   }
-  .row-field > :is(input, select, .unit-input) {
-    grid-row: 1;
-    grid-column: 2;
+}
+/* 내 생활비: 공고마다 '지금 집에서 다니기'와 '회사 근처로 이사하기'를 나란히 (통근·이사 비교와 같은 모양).
+   각 묶음 안은 한 칸이다 */
+@media (min-width: 64rem) {
+  .cost-cases {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+    column-gap: 2.5rem;
   }
-  .row-field-hint {
-    grid-column: 2 / -1;
+  .cost-cases > .row-group {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .cost-cases > .row-group + .row-group {
+    padding-top: 0;
+    border-top: 0;
   }
 }
 .desk-sheet {

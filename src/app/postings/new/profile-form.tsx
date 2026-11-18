@@ -285,7 +285,7 @@ function PostingCosts({
           <p className="row-card-meta">{[place, salaryText(row)].filter(Boolean).join(' · ')}</p>
         </div>
       </header>
-      <div className="row-card-body">
+      <div className="row-card-body cost-cases">
         <fieldset className="row-group">
           <legend>지금 집에서 다니기</legend>
           <Check

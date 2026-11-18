@@ -706,7 +706,11 @@ function FieldRow({
   }
 
   return (
-    <div className="row-field" data-check={check || undefined}>
+    // 근무지는 글이 길어 넓은 화면에서도 한 줄 전체 (나머지 칸은 둘씩)
+    <div
+      className={field.kind === 'location' ? 'row-field is-wide' : 'row-field'}
+      data-check={check || undefined}
+    >
       {/* 배지는 항목 이름 바로 옆에 둔다 (이름과 배지 사이로 눈을 멀리 옮기지 않게) */}
       <div className="row-field-head">
         <label htmlFor={id}>
