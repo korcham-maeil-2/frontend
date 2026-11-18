@@ -95,7 +95,7 @@ function enterMovesToNextField(event: KeyboardEvent<HTMLFormElement>) {
     ...event.currentTarget.querySelectorAll<HTMLElement>(
       'input:not([type=hidden]):not(:disabled), select:not(:disabled)',
     ),
-  ];
+  ].filter((field) => !field.closest('details:not([open])')); // 접힌 선택 항목으로는 가지 않는다
   const next = fields[fields.indexOf(target) + 1];
   (next ?? event.currentTarget.querySelector<HTMLElement>('button[type=submit]'))?.focus();
 }
@@ -887,13 +887,11 @@ export default function NewPosting() {
         >
           {shown === 'result' ? (
             <>
-              <h2 className="sheet-heading">공고 {rows.length}개 비교</h2>
               <ReportView report={report} />
               <ResultView result={freshResult} rows={rows} />
             </>
           ) : (
             <>
-              <h2 className="sheet-heading">공고 {rows.length}개의 정착 플랜</h2>
               {plan && (
                 <PlanView
                   plan={plan}
@@ -1024,7 +1022,6 @@ export default function NewPosting() {
             calculate();
           }}
         >
-          <h2 className="sheet-heading">공고 {rows.length}개에 필요한 값</h2>
           {/* 계산을 막는 빈칸을 맨 위에 (오류처럼 보이지 않게 '할 일' 상자로). 되묻기 중에는 질문이 칸 위에 있으니 숨긴다 */}
           {!asking && (
             <div className="review-todo">
@@ -1059,7 +1056,7 @@ export default function NewPosting() {
               onChange={setProfile}
               activeId={activeId}
               onSelectPosting={selectPosting}
-              missingFor={(row) => missingProfile.filter((item) => item.rowId === row.id)}
+              missing={missingProfile}
               askAge={supportEnabled}
               rents={rents}
               failedRents={failedRents}

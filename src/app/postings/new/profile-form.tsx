@@ -7,7 +7,7 @@ import { SourceBadge } from './source-badge';
 import { AskBubble, type AskQuestion } from './ask-view';
 import { CONTROL_CLASS, MoneyInput } from './money-input';
 import { PostingTabs } from './posting-tabs';
-import { salaryLeftBlank } from './row-editor';
+import { focusField, salaryLeftBlank } from './row-editor';
 import {
   AGE_RANGE,
   costsOf,
@@ -86,6 +86,7 @@ function MoneyField({
   note,
   ask,
   askOrder,
+  need = false,
 }: {
   id: string;
   label: string;
@@ -102,6 +103,8 @@ function MoneyField({
   ask?: AskQuestion;
   /** 질문이 여럿일 때 몇 번째인지 ('1/2') */
   askOrder?: string;
+  /** 계산에 꼭 필요한데 비어 있음 (파란 테두리) */
+  need?: boolean;
 }) {
   const hintId = `${id}-hint`;
   const noteId = `${id}-note`;
@@ -109,7 +112,7 @@ function MoneyField({
   const hasNote = note !== undefined;
   const describedBy = [ask && askId, hintId, hasNote && noteId].filter(Boolean).join(' ');
   const field = (
-    <div className="row-field profile-field">
+    <div className={need ? 'row-field profile-field is-need' : 'row-field profile-field'}>
       <label htmlFor={id}>
         {label}
         <span className="sr-only"> (단위: 원)</span>
@@ -143,6 +146,12 @@ function MoneyField({
       {field}
     </div>
   );
+}
+
+/** 묶음 제목 오른쪽 칩: 비어 있는 필수 칸 수, 또는 '선택'. 둘 다 아니면 없음 ('다 넣음'은 선택 칸이 0원이 돼 거짓이 될 수 있다) */
+function GroupChip({ count, optional = false }: { count: number; optional?: boolean }) {
+  if (count > 0) return <span className="group-chip is-need">필수 {count}칸</span>;
+  return optional ? <span className="group-chip">선택</span> : null;
 }
 
 function Check({
@@ -245,6 +254,8 @@ function rentNote(
 }
 
 function PostingCosts({
+  need,
+  currentHousing,
   row,
   index,
   costs,
@@ -254,6 +265,10 @@ function PostingCosts({
   onRetryRent,
   onChange,
 }: {
+  /** 계산에 꼭 필요한데 비어 있는 칸 id */
+  need: ReadonlySet<string>;
+  /** 위 '나와 지금 사는 곳'에서 넣은 지금 집 주거비 (통근 쪽 주거비 줄에 보기만) */
+  currentHousing: Money;
   row: Row;
   index: number;
   costs: PostingCostsForm;
@@ -286,8 +301,11 @@ function PostingCosts({
         </div>
       </header>
       <div className="row-card-body cost-cases">
-        <fieldset className="row-group">
-          <legend>지금 집에서 다니기</legend>
+        <div role="group" aria-labelledby={id('commute-title')} className="row-group">
+          <h4 id={id('commute-title')} className="row-group-title">
+            지금 집에서 다니기
+            <GroupChip count={need.has(id('can-commute')) ? 1 : 0} />
+          </h4>
           <Check
             id={id('can-commute')}
             checked={costs.canCommute}
@@ -295,6 +313,27 @@ function PostingCosts({
           >
             지금 집에서 다닐 수 있어요
           </Check>
+          {/* 이사 쪽 '이사할 집 주거비'와 같은 줄: 통근은 지금 집 주거비를 그대로 쓴다 (넣는 곳은 위) */}
+          {costs.canCommute && (
+            <div className="row-field profile-field">
+              <p className="readonly-label">지금 집 주거비 (매달)</p>
+              <p className="readonly-value">
+                {currentHousing != null ? (
+                  formatWon(currentHousing)
+                ) : (
+                  // 비어 있으면 넣는 곳(위)으로 데려간다
+                  <button
+                    type="button"
+                    className="inline-link"
+                    onClick={() => focusField('current-housing')}
+                  >
+                    위에서 넣기
+                  </button>
+                )}
+              </p>
+              <p className="row-field-hint">위 &lsquo;나와 지금 사는 곳&rsquo;에서 넣은 값</p>
+            </div>
+          )}
           {costs.canCommute && (
             <MoneyField
               id={id('commute-transport')}
@@ -309,9 +348,12 @@ function PostingCosts({
               }
             />
           )}
-        </fieldset>
-        <fieldset className="row-group">
-          <legend>회사 근처로 이사하기</legend>
+        </div>
+        <div role="group" aria-labelledby={id('move-title')} className="row-group">
+          <h4 id={id('move-title')} className="row-group-title">
+            회사 근처로 이사하기
+            <GroupChip count={need.has(id('move-housing')) ? 1 : 0} />
+          </h4>
           <Check
             id={id('consider-move')}
             checked={costs.considerMove}
@@ -323,6 +365,7 @@ function PostingCosts({
             <>
               <MoneyField
                 id={id('move-housing')}
+                need={need.has(id('move-housing'))}
                 label="이사할 집 주거비 (매달)"
                 // 예시는 실제로 들어갈 시세로 (예시와 비울 때 값이 달라 헷갈리지 않게)
                 example={
@@ -351,7 +394,7 @@ function PostingCosts({
               />
             </>
           )}
-        </fieldset>
+        </div>
       </div>
     </section>
   );
@@ -363,7 +406,7 @@ export function ProfileFormView({
   onChange,
   activeId,
   onSelectPosting,
-  missingFor,
+  missing,
   askAge,
   rents,
   failedRents,
@@ -377,8 +420,8 @@ export function ProfileFormView({
   /** 회사 탭에서 고른 공고 (조건 확인 화면과 같은 값) */
   activeId: string;
   onSelectPosting: (id: string) => void;
-  /** 이 공고에서 아직 비어 있는 칸 (profile.ts의 missingInputs 중 이 공고 것) */
-  missingFor: (row: Row) => MissingInput[];
+  /** 계산에 꼭 필요한데 비어 있는 칸 (profile.ts의 missingInputs) */
+  missing: MissingInput[];
   /** 나이 칸을 보일지 (서버가 청년 지원을 찾을 수 있을 때만. 나이는 그것에만 쓴다) */
   askAge: boolean;
   /** 근무지(시군구 코드)별 월세 시세. 이사할 집 주거비를 비우면 이 값으로 계산된다 */
@@ -393,6 +436,9 @@ export function ProfileFormView({
   askFixedIndex?: number;
 }) {
   const set = (patch: Partial<Form>) => onChange({ ...form, ...patch });
+  const missingFor = (row: Row) => missing.filter((item) => item.rowId === row.id);
+  const need = new Set(missing.map((item) => item.fieldId));
+  const needIn = (test: (id: string) => boolean) => [...need].filter(test).length;
   const askFor = (key: AskQuestion['key']) => asking.find((q) => q.key === key);
   const askOrder = (key: AskQuestion['key']) =>
     asking.length > 1
@@ -413,10 +459,14 @@ export function ProfileFormView({
   return (
     <div className="space-y-8">
       <fieldset className="row-group">
-        <legend>나와 지금 사는 곳</legend>
+        <legend>
+          나와 지금 사는 곳
+          <GroupChip count={needIn((id) => id === 'current-housing')} />
+        </legend>
         <MoneyField
           id="current-housing"
           label="지금 집 주거비 (매달)"
+          need={need.has('current-housing')}
           example="52만"
           value={form.currentHousing}
           onChange={(currentHousing) => set({ currentHousing })}
@@ -447,7 +497,10 @@ export function ProfileFormView({
       </fieldset>
 
       <fieldset className="row-group">
-        <legend>매달 나가는 고정비</legend>
+        <legend>
+          매달 나가는 고정비
+          <GroupChip count={needIn((id) => id.startsWith('fixed-'))} />
+        </legend>
         <p className="mb-3 text-sm text-muted-foreground">
           학자금·통신비·보험료처럼 어느 회사에 가든 똑같이 나가는 돈이에요.
         </p>
@@ -468,7 +521,15 @@ export function ProfileFormView({
                   />
                 </li>
               )}
-              <li className={`fixed-expense${i === fixedAskRow ? ' is-asked' : ''}`}>
+              <li
+                className={[
+                  'fixed-expense',
+                  i === fixedAskRow && 'is-asked',
+                  need.has(`fixed-${i}-amount`) && 'is-need',
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
+              >
                 <Input
                   id={`fixed-${i}-name`}
                   aria-label={`고정비 ${i + 1} 이름`}
@@ -563,6 +624,8 @@ export function ProfileFormView({
           (row, i) =>
             row.id === activeId && (
               <PostingCosts
+                need={need}
+                currentHousing={form.currentHousing}
                 key={row.id}
                 row={row}
                 index={i}
@@ -579,55 +642,71 @@ export function ProfileFormView({
 
       {/* 연봉 비공개 공고가 있을 때만: 최소 연봉을 무엇에 맞춰 계산할지 */}
       {rows.some(salaryLeftBlank) && (
-        <fieldset className="row-group">
-          <legend>비교 기준 (선택)</legend>
-          <div className="mb-3 text-sm text-muted-foreground">
-            <p>연봉 비공개 공고는 이 기준만큼 남으려면 얼마를 받아야 하는지 계산해요.</p>
-            <p>비우면 다른 공고 중 매달 더 많이 남는 쪽이 기준이에요.</p>
-          </div>
-          <Check
-            id="has-current-job"
-            checked={form.hasCurrentJob}
-            onChange={(hasCurrentJob) => set({ hasCurrentJob })}
-          >
-            지금 다니는 회사가 있어요 (지금 회사와 비교하기)
-          </Check>
-          {form.hasCurrentJob && (
-            <>
-              <MoneyField
-                id="current-salary"
-                label="지금 연봉 (세전)"
-                example="3800만"
-                value={form.currentSalary}
-                onChange={(currentSalary) => set({ currentSalary })}
-                help="성과급·연장근로수당을 뺀 고정연봉"
-              />
-              <MoneyField
-                id="current-meal"
-                label="그중 식대 (매달)"
-                example="20만"
-                value={form.currentMeal}
-                onChange={(currentMeal) => set({ currentMeal })}
-                help="급여명세서의 비과세 식대 (없으면 비워 두세요)"
-              />
-              <MoneyField
-                id="current-transport"
-                label="지금 회사 교통비 (매달)"
-                example="6만"
-                value={form.currentTransport}
-                onChange={(currentTransport) => set({ currentTransport })}
-              />
-            </>
-          )}
-          <MoneyField
-            id="target"
-            label="매달 이만큼은 남았으면 (선택)"
-            example="150만"
-            value={form.target}
-            onChange={(target) => set({ target })}
-            help="넣으면 이 금액을 기준으로 계산해요"
-          />
-        </fieldset>
+        // 선택 항목은 접어 둔다 (값을 넣어 둔 적이 있으면 펼친 채로: 돌아왔을 때 넣은 값이 숨지 않게)
+        <details
+          className="optional-group"
+          open={form.hasCurrentJob || form.target != null || undefined}
+        >
+          <summary>
+            비교 기준
+            <GroupChip
+              count={needIn((id) => id.startsWith('current-') && id !== 'current-housing')}
+              optional
+            />
+          </summary>
+          <fieldset className="row-group">
+            {/* 보이는 제목은 접기 줄(summary). 묶음 이름은 화면 읽기용으로 남긴다 */}
+            <legend className="sr-only">비교 기준</legend>
+            <div className="mb-3 text-sm text-muted-foreground">
+              <p>연봉 비공개 공고는 이 기준만큼 남으려면 얼마를 받아야 하는지 계산해요.</p>
+              <p>비우면 다른 공고 중 매달 더 많이 남는 쪽이 기준이에요.</p>
+            </div>
+            <Check
+              id="has-current-job"
+              checked={form.hasCurrentJob}
+              onChange={(hasCurrentJob) => set({ hasCurrentJob })}
+            >
+              지금 다니는 회사가 있어요 (지금 회사와 비교하기)
+            </Check>
+            {form.hasCurrentJob && (
+              <>
+                <MoneyField
+                  id="current-salary"
+                  need={need.has('current-salary')}
+                  label="지금 연봉 (세전)"
+                  example="3800만"
+                  value={form.currentSalary}
+                  onChange={(currentSalary) => set({ currentSalary })}
+                  help="성과급·연장근로수당을 뺀 고정연봉"
+                />
+                <MoneyField
+                  id="current-meal"
+                  label="그중 식대 (매달)"
+                  example="20만"
+                  value={form.currentMeal}
+                  onChange={(currentMeal) => set({ currentMeal })}
+                  help="급여명세서의 비과세 식대 (없으면 비워 두세요)"
+                />
+                <MoneyField
+                  id="current-transport"
+                  need={need.has('current-transport')}
+                  label="지금 회사 교통비 (매달)"
+                  example="6만"
+                  value={form.currentTransport}
+                  onChange={(currentTransport) => set({ currentTransport })}
+                />
+              </>
+            )}
+            <MoneyField
+              id="target"
+              label="매달 이만큼은 남았으면 (선택)"
+              example="150만"
+              value={form.target}
+              onChange={(target) => set({ target })}
+              help="넣으면 이 금액을 기준으로 계산해요"
+            />
+          </fieldset>
+        </details>
       )}
     </div>
   );

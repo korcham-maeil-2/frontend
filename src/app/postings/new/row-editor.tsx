@@ -373,8 +373,7 @@ function RowQuestions({
       {optional.length > 0 && (
         <div className="row-questions">
           <p className="row-questions-title">
-            알면 더 정확해요
-            <span className="row-questions-sub">· 몰라도 계산돼요</span>
+            알면 더 정확해요 <span className="row-questions-sub">(선택)</span>
           </p>
           <QuestionList questions={optional} />
         </div>
@@ -512,41 +511,52 @@ export function RowEditor({
       <div className="row-card-body">
         <RowQuestions row={row} questions={questions} onConfirmImage={confirmImageValues} />
         {/* 다시 볼 칸은 노란 바탕 (탭·위 상자와 같은 기준: fieldsToCheck) */}
-        {groups.map((group) => (
-          <fieldset key={group.title} className="row-group">
-            <legend>{group.title}</legend>
-            {group.fields
-              .filter((field) => !hidden(row, field.key))
-              .map((field) => (
-                <FieldRow
-                  key={field.key}
-                  id={fieldId(row, field.key)}
-                  field={{ ...field, label: labelOf(row, field) } as Field}
-                  cell={cellOf(row, field.key)}
-                  check={toCheck.has(fieldId(row, field.key))}
-                  onChange={(value) => set(field.key, value)}
-                  onConfirm={() => confirm(field.key)}
-                />
-              ))}
-            {group.title === '급여' &&
-              row.other_allowances?.map((allowance, i) => (
-                <FieldRow
-                  key={`other-${allowance.name}`}
-                  id={fieldId(row, `other-${i}`)}
-                  field={{
-                    key: 'company',
-                    label: `${allowance.name} (매달)`,
-                    kind: 'money',
-                    example: MONTHLY_EXAMPLE,
-                  }}
-                  cell={allowance.monthly_krw}
-                  check={toCheck.has(fieldId(row, `other-${i}`))}
-                  onChange={(value) => setAllowance(i, (_, first) => changed(first, value))}
-                  onConfirm={() => setAllowance(i, (cell) => confirmed(cell))}
-                />
-              ))}
-          </fieldset>
-        ))}
+        {groups.map((group) => {
+          // 이 묶음에서 다시 볼 칸 수 (탭·위 상자와 같은 기준). 없으면 칩을 달지 않는다 ('다 봄'은 확인할 수 없는 말)
+          const ids = group.fields.map((field) => fieldId(row, field.key));
+          if (group.title === '급여') {
+            row.other_allowances?.forEach((_, i) => ids.push(fieldId(row, `other-${i}`)));
+          }
+          const toReview = ids.filter((id) => toCheck.has(id)).length;
+          return (
+            <fieldset key={group.title} className="row-group">
+              <legend>
+                {group.title}
+                {toReview > 0 && <span className="group-chip is-need">다시 볼 값 {toReview}</span>}
+              </legend>
+              {group.fields
+                .filter((field) => !hidden(row, field.key))
+                .map((field) => (
+                  <FieldRow
+                    key={field.key}
+                    id={fieldId(row, field.key)}
+                    field={{ ...field, label: labelOf(row, field) } as Field}
+                    cell={cellOf(row, field.key)}
+                    check={toCheck.has(fieldId(row, field.key))}
+                    onChange={(value) => set(field.key, value)}
+                    onConfirm={() => confirm(field.key)}
+                  />
+                ))}
+              {group.title === '급여' &&
+                row.other_allowances?.map((allowance, i) => (
+                  <FieldRow
+                    key={`other-${allowance.name}`}
+                    id={fieldId(row, `other-${i}`)}
+                    field={{
+                      key: 'company',
+                      label: `${allowance.name} (매달)`,
+                      kind: 'money',
+                      example: MONTHLY_EXAMPLE,
+                    }}
+                    cell={allowance.monthly_krw}
+                    check={toCheck.has(fieldId(row, `other-${i}`))}
+                    onChange={(value) => setAllowance(i, (_, first) => changed(first, value))}
+                    onConfirm={() => setAllowance(i, (cell) => confirmed(cell))}
+                  />
+                ))}
+            </fieldset>
+          );
+        })}
       </div>
     </section>
   );

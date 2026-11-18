@@ -685,7 +685,7 @@ export function PlanView({
         panel(postings[0])
       ) : (
         <Tabs defaultValue={first.posting_id} className="min-w-0">
-          <TabsList aria-label="볼 회사" className="posting-tabs max-w-full justify-start">
+          <TabsList aria-label="볼 회사" className="posting-tabs">
             {postings.map((posting) => (
               <TabsTrigger key={posting.posting_id} value={posting.posting_id}>
                 <span className="posting-tab-name">{posting.company || posting.posting_id}</span>
