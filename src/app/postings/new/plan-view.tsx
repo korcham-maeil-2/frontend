@@ -120,11 +120,13 @@ function month(yyyymm: string | null | undefined): string | null {
 function SavingsSlot({
   savings,
   remaining,
-  moving,
+  basis,
 }: {
   savings: SavingsList;
+  /** 계산에 쓸 매달 남는 돈 (연봉 비공개면 최소 연봉일 때 금액). 모르면 null */
   remaining: number | null;
-  moving: boolean;
+  /** 그 금액이 무엇 기준인지 ('이사하면', '최소 연봉 3,963만원을 받는다면') */
+  basis: string;
 }) {
   // 12개월 뒤 금액은 백엔드가 계산해 보낸다 (estimates). 화면은 남는 돈 안의 금액만 고르게 한다
   const options = (savings.estimates ?? []).filter(
@@ -141,15 +143,18 @@ function SavingsSlot({
   const top = savings.products[0]; // 계산 기준: 기본금리 1위 (한도는 월·총액이 상품마다 달라 비교하지 않는다)
   const chosen = options.find((e) => e.monthly_krw === deposit);
   return (
-    <li className="plan-slot is-extra">
-      <h4 className="plan-slot-label">
-        첫 월급 받은 뒤<small>남는 돈을 모으고 싶다면</small>
-      </h4>
-      <p className="plan-chips">
-        <span className="support-category">12개월 기본금리 순</span>
-        {disclosed && <span className="support-category">{disclosed} 공시</span>}
-        <span className="support-category">가입 권유 아님</span>
+    <section className="plan-section">
+      <h3 className="plan-section-title">
+        남는 돈 모으기 <span className="support-category">참고</span>
+      </h3>
+      <p className="plan-section-desc">
+        은행 적금 12개월 기본금리 높은 순{disclosed && ` · ${disclosed} 공시`}
       </p>
+      {remaining == null && (
+        <p className="plan-section-desc">
+          매달 남는 돈을 계산하면 여기서 모으는 금액을 볼 수 있어요.
+        </p>
+      )}
       {chosen && remaining != null && (
         <div className="savings-calc">
           <p className="savings-line">
@@ -176,8 +181,7 @@ function SavingsSlot({
             </strong>
           </p>
           <p className="savings-note">
-            {moving ? '이사하면' : '통근하면'} 매달 남는 돈 약{' '}
-            {formatWon(Math.round(remaining / 10_000) * 10_000)} 기준 · 원금{' '}
+            {basis} 매달 남는 돈 약 {formatWon(Math.round(remaining / 10_000) * 10_000)} 기준 · 원금{' '}
             {formatWon(chosen.principal_krw)} + 세전 이자 약 {formatWon(chosen.interest_krw)} ·{' '}
             {top.bank} 연 {rate(top.rate)} · 실제 금리는 은행에서 확인
           </p>
@@ -208,9 +212,10 @@ function SavingsSlot({
         <a href={savings.source_url} target="_blank" rel="noopener noreferrer">
           {savings.source}
           <span className="sr-only"> (새 창)</span>
-        </a>
+        </a>{' '}
+        · 가입을 권하는 게 아니에요
       </p>
-    </li>
+    </section>
   );
 }
 
@@ -256,20 +261,14 @@ function TrainingSlot({
   const matched = !!jobNcs && training.courses.some((c) => c.ncs?.startsWith(jobNcs));
   const where = training.region ? placeName(training.region) : '근무지';
   return (
-    <li className="plan-slot is-extra">
-      <h4 className="plan-slot-label">
-        일하면서 배우기<small>근무지 근처 재직자 강의</small>
-      </h4>
-      <p className="plan-chips">
-        <span className="support-category">
-          {training.scope === 'sido' ? `${where} 인근(시도) · 시군구엔 과정 없음` : where}
-        </span>
-        <span className="support-category">3개월 안 시작</span>
-        <span className="support-category">
-          {matched ? '직무 관련·주말반 먼저' : '주말반 먼저'}
-        </span>
+    <section className="plan-section">
+      <h3 className="plan-section-title">
+        일하면서 배우기 <span className="support-category">참고</span>
+      </h3>
+      <p className="plan-section-desc">
+        {training.scope === 'sido' ? `${where} 인근(시도, 시군구엔 과정이 없어요)` : where} 재직자
+        강의 · 3개월 안에 시작 · {matched ? '직무 관련과 주말반 먼저' : '주말반 먼저'}
       </p>
-      <p className="plan-extra-lead">수강 자격·장소는 과정 페이지에서 확인해 주세요.</p>
       <ul className="plan-items">
         {training.courses.map((course) => (
           <CourseItem
@@ -279,22 +278,31 @@ function TrainingSlot({
           />
         ))}
       </ul>
-      <p className="plan-extra-source">출처: {training.source}</p>
-    </li>
+      <p className="plan-extra-source">
+        출처: {training.source} · 수강 자격·장소는 과정 페이지에서 확인해 주세요
+      </p>
+    </section>
   );
 }
+
+/** 연봉 비공개 공고: 이 플랜의 경우(이사·통근)에 같은 돈이 남으려면 받아야 할 최소 연봉 */
+type MinSalary = { salary: number; monthly: number | null; basis: string };
 
 function PostingPanel({
   posting,
   savings,
   training,
   remaining,
+  minSalary,
+  onEditLiving,
 }: {
   posting: PostingPlan;
   savings: SavingsList | null;
   training: TrainingList | undefined;
   /** 이 플랜의 경우(이사·통근)에 매달 남는 돈. 모르면 null */
   remaining: number | null;
+  minSalary: MinSalary | null;
+  onEditLiving: () => void;
 }) {
   if (!posting.slots.length) {
     return <p className="support-empty">지금 넣을 할 일을 찾지 못했어요.</p>;
@@ -303,6 +311,8 @@ function PostingPanel({
   const deposit = items.find((i) => i.kind === 'deposit');
   const deadlines = items.filter((i) => i.kind === 'policy' && i.when && i.when !== '상시');
   const showSavings = savings?.status === 'ok' && savings.products.length > 0;
+  const caseText = posting.moving ? '이사하면' : '지금 집에서 통근하면';
+  const won = (v: number) => formatWon(Math.round(v / 10_000) * 10_000);
   const showTraining = training?.status === 'ok' && training.courses.length > 0;
   return (
     <div className="space-y-4">
@@ -321,21 +331,41 @@ function PostingPanel({
             <small>원룸 보증금 시세 (추정)</small>
           </div>
         )}
-        <div>
-          <span>{posting.moving ? '이사하면' : '지금 집에서 통근하면'} 매달 남는 돈</span>
-          <strong className={remaining != null && remaining >= 0 ? 'is-good' : undefined}>
-            {remaining != null
-              ? `약 ${formatWon(Math.round(remaining / 10_000) * 10_000)}`
-              : '계산 못 함'}
-          </strong>
-          {remaining == null && <small>연봉이나 빈 값 때문에 계산하지 못했어요</small>}
-        </div>
+        {/* 남는 돈을 알면 그 금액, 연봉 비공개면 받아야 할 최소 연봉, 빈 값이면 채우러 가는 길 */}
+        {remaining != null ? (
+          <div>
+            <span>{caseText} 매달 남는 돈</span>
+            <strong className={remaining >= 0 ? 'is-good' : 'is-bad'}>약 {won(remaining)}</strong>
+          </div>
+        ) : minSalary ? (
+          <div>
+            <span>연봉 비공개 · 받아야 할 최소 연봉 (추정)</span>
+            <strong>최소 {formatWon(minSalary.salary)}</strong>
+            <small>
+              {minSalary.monthly != null &&
+                `이 이상이면 매달 약 ${won(minSalary.monthly)} 남아요 · `}
+              기준: {minSalary.basis}
+            </small>
+          </div>
+        ) : (
+          <div>
+            <span>{caseText} 매달 남는 돈</span>
+            <strong>아직 계산 전</strong>
+            <small>
+              생활비 빈칸을 채우면 계산돼요 ·{' '}
+              <button type="button" className="inline-link" onClick={onEditLiving}>
+                내 생활비로 가기
+              </button>
+            </small>
+          </div>
+        )}
         <div>
           <span>마감 있는 지원</span>
           <strong>{deadlines.length ? `${deadlines.length}건` : '없음'}</strong>
           <small>{deadlines[0]?.when ?? '지원은 모두 상시 신청이에요'}</small>
         </div>
       </div>
+      <h3 className="plan-section-title plan-section">언제 무엇을</h3>
       <ol className="plan-timeline">
         {posting.slots.map((slot) => {
           const list = (
@@ -369,32 +399,28 @@ function PostingPanel({
           {note}
         </p>
       ))}
-      {/* 할 일이 아닌 참고 정보: 타임라인(순서) 밖에 둔다 */}
-      {(showSavings || showTraining) && (
-        <section className="plan-ref" aria-labelledby={`plan-ref-${posting.posting_id}`}>
-          <h4 id={`plan-ref-${posting.posting_id}`} className="plan-ref-title">
-            참고
-          </h4>
-          <ul>
-            {/* 남는 돈이 바뀌면(다시 계산) 고른 금액도 새로 정한다 */}
-            {showSavings && (
-              <SavingsSlot
-                key={remaining}
-                savings={savings}
-                remaining={remaining}
-                moving={posting.moving}
-              />
-            )}
-            <TrainingSlot training={training} jobNcs={posting.ncs ?? null} />
-          </ul>
-        </section>
+      {/* 할 일이 아닌 참고 정보: 타임라인(순서) 밖에 섹션으로. 남는 돈이 바뀌면 고른 금액도 새로 */}
+      {showSavings && (
+        <SavingsSlot
+          key={remaining ?? minSalary?.monthly}
+          savings={savings}
+          remaining={remaining ?? minSalary?.monthly ?? null}
+          basis={
+            remaining == null && minSalary
+              ? `최소 연봉 ${formatWon(minSalary.salary)}을 받는다면`
+              : posting.moving
+                ? '이사하면'
+                : '통근하면'
+          }
+        />
       )}
+      {showTraining && <TrainingSlot training={training} jobNcs={posting.ncs ?? null} />}
     </div>
   );
 }
 
 /** 남는 돈 단계 맨 아래: 다음 단계(정착 플랜)에 무엇이 있는지 공고마다 한 줄 (최대 3개) */
-export function PlanPreview({ plan }: { plan: SettlePlan }) {
+export function PlanPreview({ plan, result }: { plan: SettlePlan; result: CalculationResult }) {
   const postings = plan.postings.filter((p) => p.slots.length > 0);
   // 적금·강의를 미리 불러 둔다: 정착 플랜 단계에 들어가면 서버에 담아 둔 결과가 바로 온다
   usePlanExtras(extrasKeys(postings));
@@ -404,6 +430,7 @@ export function PlanPreview({ plan }: { plan: SettlePlan }) {
     const deposit = items.find((i) => i.kind === 'deposit')?.amount_krw;
     const line = [
       posting.company || posting.posting_id,
+      result.break_even?.some((b) => b.posting_id === posting.posting_id) ? '연봉 비공개' : '',
       deposit != null ? `보증금 ${formatWon(deposit)}` : '',
       `지원 ${items.filter((i) => i.kind === 'policy').length}개`,
     ]
@@ -469,7 +496,15 @@ function usePlanExtras(keys: string[]) {
   return { savings, training };
 }
 
-export function PlanView({ plan, result }: { plan: SettlePlan; result: CalculationResult }) {
+export function PlanView({
+  plan,
+  result,
+  onEditLiving,
+}: {
+  plan: SettlePlan;
+  result: CalculationResult;
+  onEditLiving: () => void;
+}) {
   const postings = plan.postings.filter((p) => p.slots.length > 0);
   const { savings, training } = usePlanExtras(extrasKeys(postings));
   const remainingFor = (posting: PostingPlan) =>
@@ -477,6 +512,17 @@ export function PlanView({ plan, result }: { plan: SettlePlan; result: Calculati
       .find((p) => p.posting_id === posting.posting_id)
       ?.scenarios.find((s) => s.case === (posting.moving ? 'move' : 'commute'))
       ?.monthly_remaining ?? null;
+  const minSalaryFor = (posting: PostingPlan): MinSalary | null => {
+    const be = result.break_even?.find((b) => b.posting_id === posting.posting_id);
+    const c = be?.cases.find((x) => x.case === (posting.moving ? 'move' : 'commute'));
+    return be && c?.annual_salary_krw != null
+      ? {
+          salary: c.annual_salary_krw,
+          monthly: c.monthly_remaining ?? null,
+          basis: be.baseline.label,
+        }
+      : null;
+  };
   if (!postings.length) return null;
   // 처음 여는 탭: 매달 더 많이 남는 회사 (같으면 첫 공고)
   const first = postings.reduce((a, b) =>
@@ -488,6 +534,8 @@ export function PlanView({ plan, result }: { plan: SettlePlan; result: Calculati
       savings={savings}
       training={training[trainingKey(posting) ?? '']}
       remaining={remainingFor(posting)}
+      minSalary={minSalaryFor(posting)}
+      onEditLiving={onEditLiving}
     />
   );
   return (

@@ -1930,8 +1930,21 @@ section.desk-sheet > .sheet-heading {
 .plan-conclusion strong.is-good {
   color: var(--positive, var(--primary));
 }
-/* 폰: 결론 세 칸을 한 줄씩 (이름 왼쪽, 숫자 오른쪽) */
+.plan-conclusion strong.is-bad {
+  color: var(--destructive);
+}
+.plan-conclusion small {
+  font-size: 0.75rem;
+}
+/* 할 일 카드 제목은 칸 제목('이사 전')보다 작게 */
+.plan-item .plan-item-head {
+  font-size: 0.9375rem;
+}
+/* 폰: 결론 세 칸을 한 줄씩 (이름 왼쪽, 숫자 오른쪽). 2+1로 접히지 않게 한 열로 */
 @media (max-width: 39.99rem) {
+  .plan-conclusion {
+    grid-template-columns: minmax(0, 1fr);
+  }
   .plan-conclusion > div {
     flex-direction: row;
     flex-wrap: wrap;
@@ -1948,23 +1961,34 @@ section.desk-sheet > .sheet-heading {
     text-align: end;
   }
 }
-.plan-ref {
+/* 섹션: 2·3단계 입력 화면과 같은 규칙 (위 구분선 + 넉넉한 간격, 제목 1.125rem). 카드로 감싸지 않는다 */
+.plan-section {
   border-top: 1px solid var(--border);
-  padding-top: 1rem;
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
 }
-.plan-ref-title {
-  font-size: 0.875rem;
+.plan-section-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.125rem;
   font-weight: 700;
+  color: var(--foreground);
+}
+.plan-section-desc {
+  margin-top: 0.25rem;
+  font-size: 0.875rem;
   color: var(--muted-foreground);
 }
-/* 참고는 순서(타임라인)가 아니라 점을 찍지 않는다 */
-.plan-ref .plan-slot::before {
-  display: none;
+.plan-section > .plan-items,
+.plan-section > .savings-calc {
+  margin-top: 0.75rem;
 }
-.plan-ref > ul {
-  display: grid;
-  gap: 1.25rem;
-  margin-top: 0.5rem;
+/* 접힌 청년 지원 안: 바깥 섹션이 선을 그으니 안쪽 선은 뺀다 */
+.result-details .support-section {
+  margin-top: 0.75rem;
+  border-top: 0;
+  padding-top: 0;
 }
 .plan-row {
   display: flex;
@@ -2033,7 +2057,7 @@ section.desk-sheet > .sheet-heading {
   content: '▾';
 }
 .plan-preview {
-  margin-top: 1.5rem;
+  flex-basis: 100%;
   display: grid;
   gap: 0.125rem;
   border-radius: 0.5rem;

@@ -909,13 +909,19 @@ export default function NewPosting() {
               <h2 className="sheet-heading">공고 {rows.length}개 비교</h2>
               <ReportView report={report} />
               <ResultView result={freshResult} rows={rows} />
-              {hasPlan && plan && <PlanPreview plan={plan} />}
             </>
           ) : (
             <>
-              {plan && <PlanView plan={plan} result={freshResult} />}
+              <h2 className="sheet-heading">공고 {rows.length}개의 정착 플랜</h2>
+              {plan && (
+                <PlanView
+                  plan={plan}
+                  result={freshResult}
+                  onEditLiving={() => changeStep('living')}
+                />
+              )}
               {support && (
-                <details className="result-details mt-6">
+                <details className="result-details plan-section">
                   <summary>
                     근무지별 청년 지원 전체 보기 (
                     {support.regions
@@ -934,6 +940,10 @@ export default function NewPosting() {
             </>
           )}
           <div className="sheet-actions flex-wrap">
+            {/* 다음 단계 미리보기는 버튼 줄과 한 덩어리로 */}
+            {shown === 'result' && hasPlan && plan && (
+              <PlanPreview plan={plan} result={freshResult} />
+            )}
             <div className="flex flex-wrap gap-2">
               {shown === 'plan' ? (
                 <Button variant="outline" className="min-h-11" onClick={() => changeStep('result')}>
