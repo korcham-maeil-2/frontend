@@ -659,7 +659,14 @@ function SalaryAnswer({ result, columns }: { result: Result; columns: Column[] }
   return (
     <section
       aria-labelledby="salary-answer-title"
-      className={result.break_even.length >= 3 ? 'salary-answer is-many' : 'salary-answer'}
+      // 하나면 넓은 화면에서 제목·회사·금액을 왼쪽에 모으고 문장을 오른쪽 가운데에 (위 오른쪽이 비지 않게)
+      className={
+        result.break_even.length === 1
+          ? 'salary-answer is-single'
+          : result.break_even.length >= 3
+            ? 'salary-answer is-many'
+            : 'salary-answer'
+      }
     >
       <h3 id="salary-answer-title" className="salary-answer-title">
         면접에서 확인할 연봉

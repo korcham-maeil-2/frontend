@@ -1936,10 +1936,10 @@ details[open] > summary .when-closed {
 .salary-answer.is-many .salary-answer-amount strong {
   font-size: 1.375rem;
 }
-/* 짧은 문장들: 본문색, 마지막 단어만 다음 줄로 떨어지지 않게 */
+/* 짧은 문장들: 읽어야 하는 글이라 본문 크기(17px)·본문색, 마지막 단어만 다음 줄로 떨어지지 않게 */
 .salary-answer-text {
   margin-top: 0.25rem;
-  font-size: 0.9375rem;
+  font-size: 1.0625rem;
   line-height: 1.6;
   color: var(--body);
   text-wrap: pretty;
@@ -1960,6 +1960,29 @@ details[open] > summary .when-closed {
   }
   .salary-answer-why {
     margin-top: 0;
+  }
+  /* 공고 하나: 왼쪽에 제목·회사·금액, 오른쪽에 문장을 위아래 가운데로 (ul·li는 자리만 비켜 준다) */
+  .salary-answer.is-single {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr); /* 왼쪽은 제목 폭만큼, 남는 폭은 문장에 */
+    align-items: center;
+    column-gap: 2rem;
+  }
+  .salary-answer.is-single :is(ul, li) {
+    display: contents;
+  }
+  /* 문장 쪽이 더 길면 남는 높이가 두 줄에 나뉜다 → 제목은 아래로, 회사·금액은 위로 붙여 한 덩어리로 */
+  .salary-answer.is-single .salary-answer-title {
+    align-self: end;
+  }
+  .salary-answer.is-single .salary-answer-head {
+    grid-column: 1;
+    align-self: start;
+    margin-top: 0.75rem;
+  }
+  .salary-answer.is-single .salary-answer-why {
+    grid-column: 2;
+    grid-row: 1 / span 2;
   }
 }
 
