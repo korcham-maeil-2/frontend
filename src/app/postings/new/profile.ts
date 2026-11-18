@@ -117,25 +117,15 @@ const userInput = (value: Money) =>
   value == null ? null : { value, status: 'user_input' as const };
 
 /**
- * 고정비 목록 → 서버 모양. 이 화면에서 고정비를 물었으므로 하나도 안 넣었으면 '없음'([])이다.
- * 금액만 넣고 이름을 비우면 '고정비 n'으로 이름을 붙인다.
- * 이름만 넣고 금액을 비운 줄이 있으면 '모름'(null)으로 보낸다 — 0원으로 치면 남는 돈이 부풀려진다.
+ * 고정비 목록 → 서버 모양. 고정비는 선택 항목이라 늘 목록으로 보낸다 (하나도 없으면 '없음' []).
+ * 금액을 비운 줄은 빼고 보낸다 — 고정비 하나 때문에 모든 회사 결과가 '계산 못 함'이 되지 않게
+ * (화면에 '넣지 않으면 0원으로 계산해요'라고 알린다). 이름을 비우면 '고정비 n'으로 붙인다.
  */
 function toFixedExpenses(items: FixedExpenseForm[]) {
-  const used = items.filter((item) => item.name.trim() || item.amount != null);
-  if (used.some((item) => item.amount == null)) return null;
-  return used.map((item, i) => ({
-    name: item.name.trim() || `고정비 ${i + 1}`,
-    monthly_krw: item.amount as number,
-  }));
-}
-
-/**
- * 고정비를 '모름'으로 만든 줄: 이름은 있고 금액이 빈 첫 줄 (없으면 -1).
- * 이름·금액이 다 빈 줄은 toFixedExpenses가 버리므로 고르지 않는다.
- */
-export function blankFixedIndex(items: FixedExpenseForm[]): number {
-  return items.findIndex((item) => item.name.trim() && item.amount == null);
+  return items
+    .map((item, i) => ({ name: item.name.trim() || `고정비 ${i + 1}`, amount: item.amount }))
+    .filter((item) => item.amount != null)
+    .map((item) => ({ name: item.name, monthly_krw: item.amount as number }));
 }
 
 /** 화면 입력 → 백엔드 UserProfile. 빈 칸은 null로 보내 서버가 '모름'으로 계산한다 (0원으로 채우지 않는다). */
@@ -199,15 +189,6 @@ export function missingInputs(
   if (anyCommute && form.currentHousing == null) {
     add('지금 집 주거비', 'current-housing', "비우면 '지금 집에서 통근' 결과가 빠져요");
   }
-  form.fixedExpenses.forEach((item, i) => {
-    if (item.name.trim() && item.amount == null) {
-      add(
-        `고정비 ${i + 1}(${item.name.trim()}) 금액`,
-        `fixed-${i}-amount`,
-        '비우면 모든 회사 결과가 빠져요',
-      );
-    }
-  });
   rows.forEach((row, i) => {
     const c = costsOf(form, row);
     const name = row.company?.value || `공고 ${i + 1}`;

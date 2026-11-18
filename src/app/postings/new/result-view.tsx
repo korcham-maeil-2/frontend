@@ -399,7 +399,8 @@ function buildColumn(
           : cost(housing, chosen === 'move' ? aidNote(row) : undefined),
       // 비워 둬서 0원으로 계산한 교통비: 긴 출처 대신 짧게 (출처 전문은 배지 안에)
       transport: assumedTransport ? cost(transport, '비워 둬서 0원') : cost(transport),
-      fixed: cost(fixed),
+      // 고정비는 선택 항목: 넣지 않았으면 0원으로 계산했다는 걸 숨기지 않는다 (교통비와 같은 말투)
+      fixed: cost(fixed, fixed.value === 0 ? '넣지 않아서 0원' : undefined),
       remaining,
     },
   };

@@ -1332,6 +1332,29 @@ section.desk-sheet > .sheet-heading {
   font-weight: 700;
   color: var(--foreground);
 }
+.optional-group > summary::-webkit-details-marker {
+  display: none; /* 삼각형 대신 오른쪽 '펼치기 ⌄' (profile-form.tsx FoldSummary) */
+}
+.fold-side {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.fold-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--primary);
+}
+.fold-chevron {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+.optional-group[open] > summary .fold-chevron {
+  rotate: 180deg;
+}
 .optional-group > .row-group {
   margin-top: 0.5rem;
 }
@@ -1407,8 +1430,7 @@ section.desk-sheet > .sheet-heading {
   color: var(--foreground);
 }
 /* 계산에 꼭 필요한 빈칸: 파란 테두리 (채우면 사라진다) */
-.row-field.is-need input,
-.fixed-expense.is-need .unit-input input {
+.row-field.is-need input {
   border-color: var(--primary);
   box-shadow: inset 0 0 0 1px var(--primary);
 }
@@ -2353,19 +2375,10 @@ section.desk-sheet > .sheet-heading {
   color: var(--muted-foreground);
 }
 /* 되묻기 (ask-view.tsx): 에이전트가 물은 원래 칸 위에 질문을 붙이고, 질문과 칸을 함께 강조한다 */
-.ask-wrap,
-.fixed-expense.is-asked {
+.ask-wrap {
   border-radius: 0.5rem;
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 45%, transparent);
-}
-.ask-wrap {
   padding: 0.5rem 0.75rem 0;
-}
-.fixed-expense.is-asked {
-  padding: 0.5rem;
-}
-.fixed-ask {
-  list-style: none;
 }
 .ask-bubble {
   border-radius: 0.5rem;

@@ -1,5 +1,5 @@
-import { Fragment, useState, type ReactNode } from 'react';
-import { Plus, X } from 'lucide-react';
+import { useState, type ReactNode } from 'react';
+import { ChevronDown, Plus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatWon, placeName, salaryText, statusBadge, type Row } from './format';
@@ -190,6 +190,26 @@ function GroupChip({ count, optional = false }: { count: number; optional?: bool
       선택
     </span>
   ) : null;
+}
+
+/**
+ * 선택 항목 접기 줄: 제목 + 오른쪽에 칩과 '펼치기/접기' (접혀 있어도 눌러서 열 수 있다는 게 보이게).
+ * 펼침 상태는 details가 화면 읽기에 알려 주므로 '펼치기' 글자는 숨긴다.
+ */
+function FoldSummary({ title, chip }: { title: string; chip: ReactNode }) {
+  return (
+    <summary>
+      {title}
+      <span className="fold-side">
+        {chip}
+        <span aria-hidden className="fold-toggle">
+          <span className="when-closed">펼치기</span>
+          <span className="when-open">접기</span>
+          <ChevronDown className="fold-chevron" />
+        </span>
+      </span>
+    </summary>
+  );
 }
 
 /** '6명 이상'의 숫자 칸 (6~20명). 치는 동안은 글자를 그대로 두고(지웠다 다시 칠 수 있게), 칸을 떠나면 맞는 값으로 */
@@ -461,7 +481,6 @@ export function ProfileFormView({
   failedRents,
   onRetryRents,
   asking = [],
-  askFixedIndex = -1,
 }: {
   form: Form;
   rows: Row[];
@@ -481,12 +500,11 @@ export function ProfileFormView({
   onRetryRents: () => void;
   /** 되묻기: 에이전트가 물은 값들 (원래 칸 위에 질문을 붙인다) */
   asking?: AskQuestion[];
-  /** 되묻기: 고정비 질문을 붙일 줄 (질문이 온 때 정한 값. 없으면 -1) */
-  askFixedIndex?: number;
 }) {
   const set = (patch: Partial<Form>) => onChange({ ...form, ...patch });
   // 비교 기준 접기는 처음 그릴 때만 정한다 (넣어 둔 값이 있으면 펼친 채로). 체크를 풀어도 접히지 않게
   const [basisOpen] = useState(() => form.hasCurrentJob || form.target != null);
+  const [fixedOpen] = useState(() => form.fixedExpenses.length > 0);
   const missingFor = (row: Row) => missing.filter((item) => item.rowId === row.id);
   const need = new Set(missing.map((item) => item.fieldId));
   const needIn = (test: (id: string) => boolean) => [...need].filter(test).length;
@@ -495,8 +513,6 @@ export function ProfileFormView({
     asking.length > 1
       ? `${asking.findIndex((q) => q.key === key) + 1}/${asking.length}`
       : undefined;
-  const askFixed = askFor('fixed_expenses');
-  const fixedAskRow = askFixed ? askFixedIndex : -1;
   const setFixed = (fixedExpenses: Form['fixedExpenses']) => set({ fixedExpenses });
   /** 고정비 줄을 하나 더하고, 이름이 있으면 금액 칸·없으면 이름 칸으로 커서를 옮긴다. */
   const addFixed = (name = '') => {
@@ -555,40 +571,18 @@ export function ProfileFormView({
         {askAge && <AgeField age={form.age ?? null} onChange={(age) => set({ age })} />}
       </fieldset>
 
-      <fieldset className="row-group">
-        <legend>
-          매달 나가는 고정비
-          <GroupChip count={needIn((id) => id.startsWith('fixed-'))} />
-        </legend>
-        <p className="group-desc">
-          학자금·통신비·보험료처럼 어느 회사에 가든 똑같이 나가는 돈이에요.
-        </p>
-        <ul className="space-y-3">
-          {form.fixedExpenses.map((item, i) => (
-            <Fragment key={i}>
-              {/* 되묻기: 금액이 빈 이 줄 위에 질문 (줄 안은 칸 순서로 자리를 잡아서 따로 둔다) */}
-              {askFixed && i === fixedAskRow && (
-                <li className="fixed-ask">
-                  <AskBubble
-                    // 서버는 '고정비 합계'로 묻지만, 화면은 금액이 빈 그 줄에서 답하므로 그 이름으로 묻는다
-                    question={{
-                      ...askFixed,
-                      question: `${item.name.trim() || `고정비 ${i + 1}`} 금액은 매달 얼마인가요?`,
-                    }}
-                    id={`fixed-${i}-ask`}
-                    order={askOrder('fixed_expenses')}
-                  />
-                </li>
-              )}
-              <li
-                className={[
-                  'fixed-expense',
-                  i === fixedAskRow && 'is-asked',
-                  need.has(`fixed-${i}-amount`) && 'is-need',
-                ]
-                  .filter(Boolean)
-                  .join(' ')}
-              >
+      {/* 선택 항목이라 접어 둔다 (넣어 둔 줄이 있으면 펼친 채로). 금액을 비운 줄은 빼고 계산한다 */}
+      <details className="optional-group" open={fixedOpen || undefined}>
+        <FoldSummary title="매달 나가는 고정비" chip={<GroupChip count={0} optional />} />
+        <fieldset className="row-group">
+          <legend className="sr-only">매달 나가는 고정비</legend>
+          <p className="group-desc">
+            학자금·통신비·보험료처럼 어느 회사에 가든 똑같이 나가는 돈이에요. 넣지 않으면 0원으로
+            계산해요.
+          </p>
+          <ul className="space-y-3">
+            {form.fixedExpenses.map((item, i) => (
+              <li key={i} className="fixed-expense">
                 <Input
                   id={`fixed-${i}-name`}
                   aria-label={`고정비 ${i + 1} 이름`}
@@ -606,9 +600,9 @@ export function ProfileFormView({
                 <MoneyInput
                   id={`fixed-${i}-amount`}
                   label={`고정비 ${i + 1} 금액 (단위: 원)`}
-                  describedBy={askFixed && i === fixedAskRow ? `fixed-${i}-ask` : undefined}
                   value={item.amount}
                   example="5만"
+                  placeholder="비우면 0원"
                   onChange={(amount) =>
                     setFixed(form.fixedExpenses.map((x, j) => (j === i ? { ...x, amount } : x)))
                   }
@@ -633,32 +627,32 @@ export function ProfileFormView({
                   </p>
                 )}
               </li>
-            </Fragment>
-          ))}
-        </ul>
-        <div className="mt-3 flex flex-wrap gap-2" aria-label="자주 넣는 고정비">
-          {COMMON_FIXED.filter((name) => !used.has(name)).map((name) => (
-            <Button
-              key={name}
-              type="button"
-              variant="secondary"
-              className="min-h-11"
-              onClick={() => addFixed(name)}
-            >
-              <Plus aria-hidden /> {name}
-            </Button>
-          ))}
-        </div>
-        <Button
-          type="button"
-          id="add-fixed"
-          variant="outline"
-          className="mt-3 min-h-11 w-full"
-          onClick={() => addFixed()}
-        >
-          <Plus aria-hidden /> 다른 고정비 넣기
-        </Button>
-      </fieldset>
+            ))}
+          </ul>
+          <div className="mt-3 flex flex-wrap gap-2" aria-label="자주 넣는 고정비">
+            {COMMON_FIXED.filter((name) => !used.has(name)).map((name) => (
+              <Button
+                key={name}
+                type="button"
+                variant="secondary"
+                className="min-h-11"
+                onClick={() => addFixed(name)}
+              >
+                <Plus aria-hidden /> {name}
+              </Button>
+            ))}
+          </div>
+          <Button
+            type="button"
+            id="add-fixed"
+            variant="outline"
+            className="mt-3 min-h-11 w-full"
+            onClick={() => addFixed()}
+          >
+            <Plus aria-hidden /> 다른 고정비 넣기
+          </Button>
+        </fieldset>
+      </details>
 
       {/* 위는 모든 공고에 같은 값, 여기부터는 공고마다 다른 값: 굵은 선과 제목으로 크게 나눈다 */}
       <h3 className="profile-split">공고마다 다른 값</h3>
@@ -703,13 +697,15 @@ export function ProfileFormView({
       {rows.some(salaryLeftBlank) && (
         // 선택 항목은 접어 둔다 (값을 넣어 둔 적이 있으면 펼친 채로: 돌아왔을 때 넣은 값이 숨지 않게)
         <details className="optional-group" open={basisOpen || undefined}>
-          <summary>
-            비교 기준
-            <GroupChip
-              count={needIn((id) => id.startsWith('current-') && id !== 'current-housing')}
-              optional
-            />
-          </summary>
+          <FoldSummary
+            title="비교 기준"
+            chip={
+              <GroupChip
+                count={needIn((id) => id.startsWith('current-') && id !== 'current-housing')}
+                optional
+              />
+            }
+          />
           <fieldset className="row-group">
             {/* 보이는 제목은 접기 줄(summary). 묶음 이름은 화면 읽기용으로 남긴다 */}
             <legend className="sr-only">비교 기준</legend>
