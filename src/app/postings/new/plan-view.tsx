@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useEffect, useState } from 'react';
+import { Fragment, useEffect, useState, type ReactNode } from 'react';
 import { ArrowRight, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -44,17 +44,23 @@ function ItemTitle({ item }: { item: PlanItem }) {
   );
 }
 
+/** 근무지 지역 지원에만 '지역' 칩 (대부분 전국이라 '전국' 칩은 달지 않는다) */
+function LocalChip({ item }: { item: PlanItem }) {
+  return item.scope && item.scope !== 'national' ? (
+    <span className="support-category">지역</span>
+  ) : null;
+}
+
 function Item({ item }: { item: PlanItem }) {
-  // 지원 정책은 한 줄 (설명·조건은 아래 '근무지별 청년 지원'에), 할 일(보증금·전입신고)만 카드
+  // 지원 정책은 한 줄 (설명·조건은 아래 '근무지별 청년 지원'에), 할 일(보증금·전입신고)만 카드.
+  // 원문 요약(detail)은 잘린 원문이라 어색해서 줄에 넣지 않는다
   if (item.kind === 'policy') {
     return (
       <li className="plan-row">
-        <ItemTitle item={item} />
-        {item.scope && (
-          <span className="support-category">{item.scope === 'national' ? '전국' : '지역'}</span>
-        )}
-        {/* 상시는 대부분이라 표시하지 않는다: 마감·시작일이 있는 것만 눈에 띄게 */}
+        {/* 날짜가 있으면 줄 앞에 (날짜순 목록을 세로로 훑을 수 있게). 상시는 대부분이라 쓰지 않는다 */}
         {item.when && item.when !== '상시' && <span className="support-open">{item.when}</span>}
+        <ItemTitle item={item} />
+        <LocalChip item={item} />
       </li>
     );
   }
@@ -62,9 +68,7 @@ function Item({ item }: { item: PlanItem }) {
     <li className="plan-item">
       <p className="plan-item-head">
         <ItemTitle item={item} />
-        {item.scope && (
-          <span className="support-category">{item.scope === 'national' ? '전국' : '지역'}</span>
-        )}
+        <LocalChip item={item} />
       </p>
       {item.amount_krw != null && (
         <p className="plan-amount">
@@ -110,6 +114,54 @@ function month(yyyymm: string | null | undefined): string | null {
     : null;
 }
 
+/**
+ * 구역 머리: 제목 왼쪽 + 회색 칩(최대 2개) 오른쪽, 아래에 읽어야 하는 설명 한두 문장 (17px 본문색).
+ * 사실을 ' · '로 이어 붙이지 않는다 — 문장은 문장으로, 짧은 사실은 칩으로 (DESIGN.md).
+ */
+function SectionHead({
+  title,
+  chips = [],
+  children,
+}: {
+  title: string;
+  chips?: (string | false | null | undefined)[];
+  children?: ReactNode;
+}) {
+  const shown = chips.filter((c): c is string => !!c);
+  return (
+    <>
+      <h3 className="plan-section-title">
+        {title}
+        {shown.length > 0 && (
+          <span className="plan-section-chips">
+            {shown.map((chip) => (
+              <span key={chip} className="support-category">
+                {chip}
+              </span>
+            ))}
+          </span>
+        )}
+      </h3>
+      {children && <p className="plan-section-desc">{children}</p>}
+    </>
+  );
+}
+
+/** 줄 끝 참고 사실들: ' · '로 잇지 않고 한 줄에 하나씩 */
+function MetaLines({ lines }: { lines: (string | false | null | undefined)[] }) {
+  return (
+    <span className="plan-row-meta">
+      {lines
+        .filter((line): line is string => !!line)
+        .map((line) => (
+          <span key={line} className="block">
+            {line}
+          </span>
+        ))}
+    </span>
+  );
+}
+
 /** 첫 월급부터 모으기: 은행 적금 12개월 기본금리 높은 순 (금감원 공시). 가입을 권하지 않는다. */
 function SavingsSlot({
   savings,
@@ -138,12 +190,9 @@ function SavingsSlot({
   const chosen = options.find((e) => e.monthly_krw === deposit);
   return (
     <section className="plan-section">
-      <h3 className="plan-section-title">
-        남는 돈 모으기 <span className="support-category">참고</span>
-      </h3>
-      <p className="plan-section-desc">
-        은행 적금 12개월 기본금리 높은 순{disclosed && ` · ${disclosed} 공시`}
-      </p>
+      <SectionHead title="남는 돈 모으기" chips={['참고', disclosed && `${disclosed} 공시`]}>
+        은행 적금을 12개월 기본금리가 높은 순으로 모았어요.
+      </SectionHead>
       {remaining == null && (
         <p className="plan-section-desc">
           매달 남는 돈을 계산하면 여기서 모으는 금액을 볼 수 있어요.
@@ -195,15 +244,13 @@ function SavingsSlot({
             </span>
             <strong className="tabular-nums">연 {rate(p.rate)}</strong>
             {/* 우대·가입 방법·공시 최고 한도(월 한도인지 총액인지는 상품마다 달라 공시 이름 그대로) */}
-            <span className="plan-row-meta">
-              {[
+            <MetaLines
+              lines={[
                 p.max_rate != null && p.max_rate > p.rate && `우대 최고 ${rate(p.max_rate)}`,
                 p.join_way?.replaceAll(',', '·'),
                 p.limit_krw != null && `공시 최고 한도 ${formatWon(p.limit_krw)}`,
-              ]
-                .filter(Boolean)
-                .join(' · ')}
-            </span>
+              ]}
+            />
           </li>
         ))}
       </ul>
@@ -212,8 +259,8 @@ function SavingsSlot({
         <a href={savings.source_url} target="_blank" rel="noopener noreferrer">
           {savings.source}
           <span className="sr-only"> (새 창)</span>
-        </a>{' '}
-        · 가입을 권하는 게 아니에요
+        </a>
+        . 가입을 권하는 게 아니에요.
       </p>
     </section>
   );
@@ -241,9 +288,7 @@ function CourseItem({ course, jobNcs }: { course: Course; jobNcs: string | null 
       </span>
       {/* 컨소시엄은 '무료'만 보이면 누구나 들을 수 있다고 오해한다 → 대상(중소기업 재직자)도 함께.
           강의는 장소가 중요해 좁은 화면에서도 기관을 보인다 */}
-      <span className="plan-row-meta">
-        {[course.kind_label, course.institute].filter(Boolean).join(' · ')}
-      </span>
+      <MetaLines lines={[course.kind_label, course.institute]} />
     </li>
   );
 }
@@ -262,11 +307,11 @@ function TrainingSlot({
   const where = training.region ? placeName(training.region) : '근무지';
   return (
     <section className="plan-section">
-      <h3 className="plan-section-title">일하면서 배우기</h3>
-      <p className="plan-section-desc">
-        {training.scope === 'sido' ? `${where} 근처 (시군구엔 과정이 없어 시도 전체)` : where}{' '}
-        재직자 강의 · 3개월 안에 시작 · {matched ? '직무 관련과 주말반 먼저' : '주말반 먼저'}
-      </p>
+      <SectionHead title="일하면서 배우기">
+        {where} 재직자 강의 중 3개월 안에 시작하는 것을 모았어요.{' '}
+        {training.scope === 'sido' && '시군구에는 과정이 없어 시도 전체에서 찾았어요. '}
+        {matched ? '직무 관련과 주말반을' : '주말반을'} 먼저 보여 드려요.
+      </SectionHead>
       <ul className="plan-items">
         {training.courses.map((course) => (
           <CourseItem
@@ -326,10 +371,10 @@ function defaultCase(result: CalculationResult, plans: Partial<Record<Case, Post
   return sm != null && sc != null && sm < sc ? 'move' : 'commute';
 }
 
-/** 정책·할 일 목록 (정책은 한 줄, 할 일은 카드) */
-function Rows({ items }: { items: PlanItem[] }) {
+/** 정책·할 일 목록 (정책은 한 줄, 할 일은 카드). twoColumns: 넓은 화면에서 짧은 목록을 두 칸으로 */
+function Rows({ items, twoColumns = false }: { items: PlanItem[]; twoColumns?: boolean }) {
   return (
-    <ul className="plan-items">
+    <ul className={twoColumns ? 'plan-items is-two' : 'plan-items'}>
       {items.map((item) => (
         <Item key={`${item.kind}-${item.policy_id ?? item.title}`} item={item} />
       ))}
@@ -406,12 +451,9 @@ function PostingPanel({
           {cases.map((c) => (
             <button key={c} type="button" aria-pressed={c === chosen} onClick={() => setPicked(c)}>
               {CASE_LABEL[c]}
-              {/* 폰에서는 금액을 아랫줄로 (중간에서 끊기지 않게) */}
+              {/* 금액은 보통 굵기로 띄워 붙인다 (' · '로 잇지 않는다). 폰에서는 아랫줄로 */}
               {amountOf(c) && (
-                <>
-                  <span className="hidden sm:inline"> · </span>
-                  <span className="block sm:inline">{amountOf(c)}</span>
-                </>
+                <span className="block font-normal sm:ml-2 sm:inline">{amountOf(c)}</span>
               )}
             </button>
           ))}
@@ -448,7 +490,7 @@ function PostingPanel({
             <strong className={remaining >= 0 ? 'is-good' : 'is-bad'}>약 {won(remaining)}</strong>
             {remaining < 0 ? (
               <small>
-                매달 모자라요 ·{' '}
+                매달 모자라요.{' '}
                 <button type="button" className="inline-link" onClick={onEditLiving}>
                   생활비 다시 보기
                 </button>
@@ -468,12 +510,14 @@ function PostingPanel({
             )}
           </div>
         ) : minSalary ? (
+          // 연봉 비공개: 4단계 '면접에서 확인할 연봉' 카드와 같은 말 ('… 이상', 그만큼 받으면 매달 얼마)
           <div>
-            <span>연봉 비공개 · 받아야 할 최소 연봉 (추정)</span>
-            <strong>최소 {formatWon(minSalary.salary)}</strong>
+            <span>받아야 할 최소 연봉</span>
+            <strong>{formatWon(minSalary.salary)} 이상</strong>
             <small>
-              {minSalary.monthly != null && `매달 약 ${won(minSalary.monthly)} · `}
-              기준 {minSalary.basis}
+              {minSalary.monthly != null
+                ? `그만큼 받으면 매달 약 ${won(minSalary.monthly)}이 남아요`
+                : '공고에 연봉이 없어 계산했어요'}
             </small>
           </div>
         ) : salaryHidden ? (
@@ -481,14 +525,14 @@ function PostingPanel({
           <div>
             <span>{moving ? '이사하면' : '통근하면'} 매달 남는 돈</span>
             <strong>계산할 수 없어요</strong>
-            <small>연봉 비공개 · 비교할 기준 없음</small>
+            <small>공고에 연봉이 없고 비교할 기준도 없어요</small>
           </div>
         ) : (
           <div>
             <span>{moving ? '이사하면' : '통근하면'} 매달 남는 돈</span>
             <strong>아직 계산 전</strong>
             <small>
-              생활비 빈칸 있음 ·{' '}
+              생활비에 빈칸이 있어요.{' '}
               <button type="button" className="inline-link" onClick={onEditLiving}>
                 채우러 가기
               </button>
@@ -511,33 +555,47 @@ function PostingPanel({
       {/* 급한 것부터: 날짜 있는 지원 → (이사) 순서 → 입사하면 → 언제든. 입사일을 몰라 순서와 날짜를 나눈다 */}
       {deadlines.length > 0 && (
         <section className="plan-section">
-          <h3 className="plan-section-title">마감이 있는 지원</h3>
-          <p className="plan-section-desc">날짜순{moving && ' · 지역 지원은 전입한 주소를 봐요'}</p>
+          {/* 날짜가 줄 앞에 있어 '날짜순'은 따로 쓰지 않는다 */}
+          <SectionHead title="마감이 있는 지원">
+            {moving && '지역 지원은 전입한 주소를 기준으로 봐요.'}
+          </SectionHead>
           <Rows items={deadlines} />
         </section>
       )}
       {moving && steps.length > 0 && (
         <section className="plan-section">
-          <h3 className="plan-section-title">이사 순서</h3>
-          <p className="plan-section-desc">날짜와 상관없이 이 순서로</p>
+          <SectionHead title="이사 순서">날짜와 상관없이 이 순서로 하면 돼요.</SectionHead>
+          {/* 번호 + 세로 선은 순서가 있는 이곳에만 (날짜 목록은 날짜를 앞에, 번호 없음) */}
           <ol className="plan-steps">
-            {steps.map((s, i) => (
-              <li key={s.label}>
-                <h4 className="plan-slot-label">
-                  {i + 1}. {s.label}
-                </h4>
-                <Rows items={s.items} />
-              </li>
-            ))}
+            {steps.map((s, i) => {
+              const tasks = s.items.filter((item) => item.kind !== 'policy');
+              const policies = s.items.filter((item) => item.kind === 'policy');
+              return (
+                <li key={s.label}>
+                  <span aria-hidden className="plan-step-number">
+                    {i + 1}
+                  </span>
+                  <h4 className="plan-slot-label">{s.label}</h4>
+                  {tasks.length > 0 && <Rows items={tasks} />}
+                  {/* 할 일(카드)과 알아볼 지원(줄)을 나눈다: 지원은 자격을 판단하지 않아 '알아볼' */}
+                  {policies.length > 0 && (
+                    <>
+                      <p className="plan-step-sub">알아볼 지원 {policies.length}개</p>
+                      <Rows items={policies} />
+                    </>
+                  )}
+                </li>
+              );
+            })}
           </ol>
         </section>
       )}
       {start.length > 0 && (
         <section className="plan-section">
-          <h3 className="plan-section-title">입사하면 챙겨 볼 것</h3>
-          <p className="plan-section-desc">첫 취업 때 많이 챙기는 전국 지원이에요</p>
-          {/* 모두 전국이라 칩은 빼고 */}
-          <Rows items={start.map((item) => ({ ...item, scope: null }))} />
+          <SectionHead title="입사하면 챙겨 볼 것">
+            첫 취업 때 많이 챙기는 전국 지원이에요.
+          </SectionHead>
+          <Rows items={start} twoColumns />
         </section>
       )}
       {anytime.length > 0 && (

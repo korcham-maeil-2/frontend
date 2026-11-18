@@ -339,7 +339,7 @@ function RowQuestions({
                 <button type="button" className="question-link" onClick={() => focusField(id)}>
                   {label}
                 </button>
-                <span className="row-questions-sub"> · 공고에 없어 짐작한 값</span>
+                <span className="row-questions-sub">공고에 없어 짐작한 값</span>
               </li>
             ))}
             {empty.map(({ id, label }) => (
@@ -347,13 +347,13 @@ function RowQuestions({
                 <button type="button" className="question-link" onClick={() => focusField(id)}>
                   {label}
                 </button>
-                <span className="row-questions-sub"> · 비어 있어요</span>
+                <span className="row-questions-sub">비어 있어요</span>
               </li>
             ))}
             {image.length > 0 && (
               <li>
                 이미지에서 읽은 값 {image.length}개
-                <span className="row-questions-sub"> · 원본 그림과 한 번 비교해 주세요</span>
+                <span className="row-questions-sub">원본 그림과 한 번 비교해 주세요</span>
                 <span className="row-questions-actions">
                   <button
                     type="button"
@@ -395,7 +395,7 @@ function QuestionList({ questions }: { questions: OpenQuestion[] }) {
           ) : (
             text
           )}
-          {ifUnknown && <span className="row-questions-sub"> · 모르면 {ifUnknown}</span>}
+          {ifUnknown && <span className="row-questions-sub">모르면 {ifUnknown}</span>}
         </li>
       ))}
     </ul>
@@ -789,8 +789,8 @@ function FieldRow({
         )}
         {hint && <span className="text-foreground">{hint}</span>}
         {cell.source_text && needsCheck(cell) && (
-          <span>
-            {hint ? ' · ' : ''}
+          // 원문은 금액 안내 아래 줄로 (' · '로 잇지 않는다)
+          <span className="block">
             {cell.from_image ? '이미지에서 옮긴 글' : '공고'}: “{cell.source_text}”
           </span>
         )}

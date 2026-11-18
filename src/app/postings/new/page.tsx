@@ -916,13 +916,17 @@ export default function NewPosting() {
               {support && (
                 <div className="plan-section">
                   <details className="result-details">
+                    {/* 지역별 개수는 ' · '로 잇지 않고 칩으로 */}
                     <summary>
-                      근무지별 청년 지원 전체 보기 (
+                      근무지별 청년 지원 전체 보기
                       {support.regions
                         .map((r) => `${placeName(r.region)} ${r.matched}개`)
                         .concat(`전국 ${support.national_matched}개`)
-                        .join(' · ')}
-                      )
+                        .map((count) => (
+                          <span key={count} className="support-category">
+                            {count}
+                          </span>
+                        ))}
                     </summary>
                     <SupportView
                       support={support}

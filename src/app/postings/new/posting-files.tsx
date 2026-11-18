@@ -256,7 +256,7 @@ export function AttachmentList({
       </ul>
       {showTotal && (
         <p className="mt-1.5 text-sm text-muted-foreground">
-          {files.length}/{MAX_FILES}개 · 합계 {formatBytes(totalBytes(files))} /{' '}
+          {files.length}/{MAX_FILES}개, 합계 {formatBytes(totalBytes(files))} /{' '}
           {formatBytes(MAX_TOTAL_BYTES)}
         </p>
       )}

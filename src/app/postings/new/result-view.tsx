@@ -226,21 +226,16 @@ function pickCase(posting: PostingResult, breakEven: BreakEven | undefined, mode
   return best?.case ?? 'commute';
 }
 
-/** 단계 표시에 쓸 결과 한 줄: 매달 가장 많이 남는 공고 (연봉 공개 공고, 고른 경우 중 큰 쪽) */
+/** 단계 표시에 쓸 결과 한 줄: 가장 많이 남는 금액만 (회사·경우는 화면에 있다. 단계 칸이 좁아 짧게) */
 export function bestRemainingText(result: Result): string {
-  const candidates = result.postings.flatMap((posting, i) =>
+  const values = result.postings.flatMap((posting) =>
     posting.scenarios
       .filter((s) => s.applicable && s.monthly_remaining != null)
-      .map((s) => ({
-        company: posting.company || `공고 ${i + 1}`,
-        value: s.monthly_remaining!,
-        when: s.case === 'move' ? '이사 시' : '통근 시',
-      })),
+      .map((s) => s.monthly_remaining!),
   );
-  if (!candidates.length) return `공고 ${result.postings.length}개 계산`;
-  const best = candidates.reduce((a, b) => (b.value > a.value ? b : a));
-  // 단계 표시에서 좁으면 뒤가 잘린다: 숫자를 앞에 (회사 이름이 잘리게)
-  return `${best.when} 매달 ${won(best.value)} · ${best.company}`;
+  return values.length
+    ? `매달 최대 ${won(Math.max(...values))}`
+    : `공고 ${result.postings.length}개 계산`;
 }
 
 function remainingCell(value: number, extra: Omit<Shown, 'value'> = {}): Shown {

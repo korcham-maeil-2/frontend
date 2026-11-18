@@ -471,6 +471,7 @@ details[open] > summary .when-closed {
   color: var(--foreground);
 }
 .row-questions-sub {
+  margin-inline-start: 0.5rem; /* 링크 뒤에 띄워 붙인다 (' · '로 잇지 않는다) */
   font-weight: 400;
   color: var(--muted-foreground);
 }
@@ -1023,7 +1024,9 @@ details[open] > summary .when-closed {
 .result-details > summary {
   min-height: 2.75rem;
   display: flex;
+  flex-wrap: wrap; /* 제목 뒤 칩(지역별 개수 등)이 좁으면 다음 줄로 */
   align-items: center;
+  gap: 0.25rem 0.5rem;
   font-weight: 600;
   color: var(--foreground);
   cursor: pointer;
@@ -2110,11 +2113,6 @@ details[open] > summary .when-closed {
   font-weight: 700;
   color: var(--foreground);
 }
-.plan-slot-label small {
-  font-size: 0.8125rem;
-  font-weight: 400;
-  color: var(--muted-foreground);
-}
 .plan-items {
   display: grid;
   gap: 0.5rem;
@@ -2245,11 +2243,48 @@ details[open] > summary .when-closed {
   margin-top: 1.5rem;
   padding-top: 1.5rem;
 }
-/* 이사 순서: 번호 칸마다 제목 + 목록 */
+/* 이사 순서: 번호 동그라미 + 세로 선으로 이어지는 단계 (순서가 있는 곳은 여기뿐, DESIGN.md) */
 .plan-steps {
   display: grid;
-  gap: 0.75rem;
+  gap: 1.25rem;
+  margin-top: 1rem;
+}
+.plan-steps > li {
+  position: relative;
+  padding-inline-start: 2.75rem;
+}
+.plan-steps > li:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  inset-inline-start: calc(0.875rem - 1px);
+  top: 2.25rem;
+  bottom: -1rem;
+  width: 2px;
+  background: var(--border);
+}
+.plan-step-number {
+  position: absolute;
+  inset-inline-start: 0;
+  top: 0;
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 999px;
+  background: var(--primary);
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--primary-foreground);
+}
+.plan-steps .plan-slot-label {
+  min-height: 1.75rem; /* 번호 동그라미와 제목 줄을 맞춘다 */
+}
+/* 단계 안 '알아볼 지원 N개': 위 할 일 카드와 아래 지원 줄을 나눈다 */
+.plan-step-sub {
   margin-top: 0.75rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--muted-foreground);
 }
 .plan-section-title {
   display: flex;
@@ -2259,10 +2294,18 @@ details[open] > summary .when-closed {
   font-weight: 700;
   color: var(--foreground);
 }
+/* 구역 칩(최대 2개)은 제목 줄 오른쪽 끝 (SectionHead) */
+.plan-section-chips {
+  margin-inline-start: auto;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.25rem;
+}
+/* 구역 설명은 읽어야 하는 문장: 본문 크기·본문색 (DESIGN.md 글씨 단계 ①) */
 .plan-section-desc {
   margin-top: 0.25rem;
-  font-size: 0.9375rem;
-  color: var(--muted-foreground);
+  color: var(--body);
 }
 .plan-section > .plan-items,
 .plan-section > .savings-calc {
@@ -2291,6 +2334,16 @@ details[open] > summary .when-closed {
 }
 .plan-items:has(> .plan-row) {
   gap: 0;
+}
+/* 짧은 목록(입사하면 챙겨 볼 것): 넓은 화면에서 두 칸, 줄 사이 선 없이 */
+@media (min-width: 64rem) {
+  .plan-items.is-two {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 2rem;
+  }
+  .plan-items.is-two > .plan-row {
+    border-bottom: 0;
+  }
 }
 .plan-row-title {
   font-weight: 600;
