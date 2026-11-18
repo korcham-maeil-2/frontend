@@ -168,13 +168,10 @@ function MetaLines({ lines }: { lines: (string | false | null | undefined)[] }) 
 function SavingsSlot({
   savings,
   remaining,
-  basis,
 }: {
   savings: SavingsList;
-  /** 계산에 쓸 매달 남는 돈 (연봉 비공개면 최소 연봉일 때 금액). 모르면 null */
+  /** 계산에 쓸 매달 남는 돈 (연봉 비공개면 최소 연봉일 때 금액 — 위 결론 칸에 같은 기준이 있다). 모르면 null */
   remaining: number | null;
-  /** 그 금액이 무엇 기준인지 ('이사하면', '최소 연봉 3,963만원을 받으면') */
-  basis: string;
 }) {
   // 12개월 뒤 금액은 백엔드가 계산해 보낸다 (estimates). 화면은 남는 돈 안의 금액만 고르게 한다
   const options = (savings.estimates ?? []).filter(
@@ -225,18 +222,10 @@ function SavingsSlot({
               약 {formatWon(Math.round(chosen.total_krw / 10_000) * 10_000)}
             </strong>
           </p>
-          {/* 한 줄에 한 가지만: 무엇 기준인지 / 어떻게 나온 금액인지 / 주의 */}
-          {/* 한 줄에 한 문장: 고를 수 있는 범위 / 금액이 어떻게 나왔는지 / 주의 */}
+          {/* 금액이 어떻게 나왔는지 한 줄 (남는 돈은 위 결론 칸에, 주의는 맨 아래 출처 줄에) */}
           <p className="savings-note">
-            <span className="block">
-              {basis} 매달 약 {formatWon(Math.round(remaining / 10_000) * 10_000)}이 남아요. 그
-              안에서 넣을 금액을 골라 보세요.
-            </span>
-            <span className="block">
-              원금 {formatWon(chosen.principal_krw)}에 세전 이자 약 {formatWon(chosen.interest_krw)}
-              이 붙어요 ({top.bank} 연 {rate(top.rate)} 기준).
-            </span>
-            <span className="block">실제 금리는 은행에서 확인해 주세요.</span>
+            원금 {formatWon(chosen.principal_krw)} + 세전 이자 약 {won(chosen.interest_krw)} (
+            {top.bank} 연 {rate(top.rate)})
           </p>
         </div>
       )}
@@ -264,7 +253,7 @@ function SavingsSlot({
           {savings.source}
           <span className="sr-only"> (새 창)</span>
         </a>
-        . 가입을 권하는 게 아니에요.
+        . 가입을 권하는 게 아니에요. 실제 금리는 은행에서 확인해 주세요.
       </p>
     </section>
   );
@@ -633,13 +622,6 @@ function PostingPanel({
           key={`${chosen}-${remaining ?? minSalary?.monthly}`}
           savings={savings}
           remaining={remaining ?? minSalary?.monthly ?? null}
-          basis={
-            remaining == null && minSalary
-              ? `최소 연봉 ${formatWon(minSalary.salary)}을 받으면`
-              : moving
-                ? '이사하면'
-                : '통근하면'
-          }
         />
       )}
       {showTraining && <TrainingSlot training={training} jobNcs={posting.ncs ?? null} />}
