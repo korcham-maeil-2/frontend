@@ -352,7 +352,9 @@ function PostingPanel({
   onEditLiving: () => void;
 }) {
   const cases = (['commute', 'move'] as const).filter((c) => plans[c]);
-  const [chosen, setChosen] = useState<Case>(() => defaultCase(result, plans));
+  const [picked, setChosen] = useState<Case>(() => defaultCase(result, plans));
+  // 플랜이 새로 와서 고른 경우가 없어졌으면 남은 쪽으로
+  const chosen = plans[picked] ? picked : cases[0];
   const posting = plans[chosen]!;
   const id = posting.posting_id;
   const scenario = scenarioOf(result, id, chosen);
@@ -430,13 +432,15 @@ function PostingPanel({
             <small>이사하지 않아요</small>
           </div>
         ) : (
-          deposit?.amount_krw != null && (
-            <div>
-              <span>처음 준비할 돈</span>
-              <strong>{formatWon(deposit.amount_krw)}</strong>
-              <small>원룸 보증금 시세 (추정)</small>
-            </div>
-          )
+          <div>
+            <span>처음 준비할 돈</span>
+            <strong>{deposit?.amount_krw != null ? formatWon(deposit.amount_krw) : '모름'}</strong>
+            <small>
+              {deposit?.amount_krw != null
+                ? '원룸 보증금 시세 (추정)'
+                : '이 지역 보증금 시세를 찾지 못했어요'}
+            </small>
+          </div>
         )}
         {remaining != null ? (
           <div>
@@ -633,16 +637,18 @@ function usePlanExtras(keys: string[]) {
 export function PlanView({
   plan,
   result,
+  supportFailed,
   onEditLiving,
 }: {
   plan: SettlePlan;
   result: CalculationResult;
+  /** 청년 지원을 못 불러왔는지 (세션의 local_support가 없음) */
+  supportFailed: boolean;
   onEditLiving: () => void;
 }) {
   const postings = plan.postings;
   const { savings, training } = usePlanExtras(extrasKeys(postings));
   if (!postings.length) return null;
-  const supportFailed = plan.notes.some((n) => n.includes('불러오지 못해'));
   // 처음 여는 탭: 처음 보여 줄 경우에 매달 더 많이 남는 회사 (같으면 첫 공고)
   const best = (p: PostingPlan) =>
     scenarioOf(result, p.posting_id, defaultCase(result, plansOf(plan, p)))?.monthly_remaining ??

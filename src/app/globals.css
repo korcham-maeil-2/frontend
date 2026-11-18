@@ -1107,8 +1107,15 @@ section.desk-sheet > .sheet-heading {
   .desk-spread.is-wide .step-track li:has(~ [aria-current])::after {
     border-color: var(--primary);
   }
+  /* 요약이 길면 칸 안에서 말줄임 (다음 단계 밑으로 넘치지 않게) */
+  .desk-spread.is-wide .step-track li > button,
+  .desk-spread.is-wide .step-text {
+    max-width: 100%;
+  }
   .desk-spread.is-wide .step-summary {
     display: block;
+    max-width: 100%;
+    white-space: nowrap;
   }
 }
 .desk-spread.is-wide .step-track button {

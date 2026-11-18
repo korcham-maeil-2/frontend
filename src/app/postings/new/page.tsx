@@ -917,6 +917,7 @@ export default function NewPosting() {
                 <PlanView
                   plan={plan}
                   result={freshResult}
+                  supportFailed={!support}
                   onEditLiving={() => changeStep('living')}
                 />
               )}
