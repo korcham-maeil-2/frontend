@@ -583,7 +583,9 @@ details[open] > summary .when-closed {
   width: calc(100% - var(--unit-slot));
 }
 .row-field > label,
-.row-field-head > label {
+.row-field-head > label,
+.field-label-line > label,
+.readonly-label {
   font-weight: 600;
   font-size: 1.0625rem;
   color: var(--foreground);
@@ -1374,12 +1376,18 @@ section.desk-sheet > .sheet-heading {
   background: var(--accent);
   color: var(--primary);
 }
-/* 통근 쪽 '지금 집 주거비'(보기만): 입력칸과 같은 높이에 값만 */
-.readonly-label {
-  font-weight: 600;
-  font-size: 1.0625rem;
-  color: var(--foreground);
+/* 칸 이름 줄: 이름 + 옆에 뜻 한 토막 (넘치면 뜻이 통째로 이름 아래로) */
+.field-label-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.125rem 0.75rem;
 }
+.field-help {
+  font-size: 0.9375rem;
+  color: var(--muted-foreground);
+}
+/* 통근 쪽 '지금 집 주거비'(보기만): 입력칸과 같은 높이에 값만 */
 .readonly-value {
   display: flex;
   align-items: center;
@@ -1394,7 +1402,8 @@ section.desk-sheet > .sheet-heading {
   border-color: var(--primary);
   box-shadow: inset 0 0 0 1px var(--primary);
 }
-.row-group legend + * {
+.row-group legend + *,
+.row-group-title + * {
   clear: both;
 }
 

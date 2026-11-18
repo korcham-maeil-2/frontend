@@ -44,7 +44,12 @@ function AgeField({
   const outOfRange = !editing && age != null && validAge(age) == null;
   return (
     <div className="row-field profile-field">
-      <label htmlFor="age">나이 (선택)</label>
+      <div className="field-label-line">
+        <label htmlFor="age">나이 (선택)</label>
+        <span id="age-help" className="field-help">
+          만 나이, 청년 지원을 고를 때만 써요
+        </span>
+      </div>
       <div className="unit-input">
         <Input
           id="age"
@@ -61,15 +66,13 @@ function AgeField({
             onChange(next);
           }}
           className={CONTROL_CLASS}
-          aria-describedby="age-hint"
+          aria-describedby="age-help age-hint"
           aria-invalid={outOfRange || undefined}
         />
         <span aria-hidden>세</span>
       </div>
       <p id="age-hint" className="row-field-hint" aria-live="polite">
-        {outOfRange
-          ? `${AGE_RANGE.min}~${AGE_RANGE.max}세로 넣어 주세요. 이 값은 쓰지 않아요`
-          : '만 나이. 청년 지원을 고를 때만 써요 (비워도 돼요)'}
+        {outOfRange && `${AGE_RANGE.min}~${AGE_RANGE.max}세로 넣어 주세요. 이 값은 쓰지 않아요`}
       </p>
     </div>
   );
@@ -87,6 +90,7 @@ function MoneyField({
   ask,
   askOrder,
   need = false,
+  blank,
 }: {
   id: string;
   label: string;
@@ -105,29 +109,43 @@ function MoneyField({
   askOrder?: string;
   /** 계산에 꼭 필요한데 비어 있음 (파란 테두리) */
   need?: boolean;
+  /** 비우면 어떻게 계산하는지 ('비우면 0원'). 칸 안 글로 보이고, 화면 읽기용으로도 남긴다 */
+  blank?: string;
 }) {
   const hintId = `${id}-hint`;
   const noteId = `${id}-note`;
   const askId = `${id}-ask`;
+  const helpId = `${id}-help`;
   const hasNote = note !== undefined;
-  const describedBy = [ask && askId, hintId, hasNote && noteId].filter(Boolean).join(' ');
+  const describedBy = [ask && askId, help && helpId, hintId, hasNote && noteId]
+    .filter(Boolean)
+    .join(' ');
   const field = (
     <div className={need ? 'row-field profile-field is-need' : 'row-field profile-field'}>
-      <label htmlFor={id}>
-        {label}
-        <span className="sr-only"> (단위: 원)</span>
-      </label>
+      {/* 칸 이름 줄: 이름 옆에 뜻 한 토막 (칸 아래 줄을 줄여 한눈에). 라벨 밖에 두어 이름이 길어지지 않게 */}
+      <div className="field-label-line">
+        <label htmlFor={id}>
+          {label}
+          <span className="sr-only"> (단위: 원)</span>
+        </label>
+        {help && (
+          <span id={helpId} className="field-help">
+            {help}
+          </span>
+        )}
+      </div>
       <MoneyInput
         id={id}
         value={value}
         onChange={onChange}
         example={example}
+        placeholder={blank}
         describedBy={describedBy}
       />
+      {/* 칸 아래는 넣은 값 확인('52만원')만. 비울 때 결과는 칸 안 글과 같은 말을 화면 읽기용으로 */}
       <p id={hintId} className="row-field-hint">
         {value != null && <span className="text-foreground">{formatWon(value)}</span>}
-        {value != null && help && ' · '}
-        {help}
+        {blank && <span className="sr-only">{blank}</span>}
       </p>
       {hasNote && (
         <p id={noteId} className="row-field-hint rent-note" aria-live="polite">
@@ -191,8 +209,8 @@ function moveHousingHelp(aid: number | null | undefined, companyHousing: boolean
 
 /**
  * 근무지 원룸 월세 시세 ('추정' 배지). 비워 두면 서버(calc/summary.py)가 이 값으로 계산한다.
- * 줄글 대신 두 줄로: 첫 줄은 금액, 둘째 줄은 꼭 알아야 할 것(비우면 이 값, 관리비 별도)만.
- * 어디서 낸 값인지(기간·거래 수)는 배지를 누르면 보인다.
+ * 한 줄로: 금액과 '관리비 제외'(이름 줄의 '월세 + 관리비'와 다르니 숨기지 않는다).
+ * 비울 때 이 값이 쓰인다는 건 칸 안 글('비우면 65만원')이 말한다. 출처(기간·거래 수)는 배지를 누르면 보인다.
  */
 function rentNote(
   value: Money,
@@ -220,13 +238,7 @@ function rentNote(
   }
   if (rent?.monthly_rent_krw == null) return null;
   const place = placeName(rent.region);
-  const notes = [
-    rent.sample_size < FEW_TRADES && '거래가 적어 참고만 하세요',
-    // 시세에는 관리비가 빠져 있다: 비워 둬서 이 값으로 계산하면 남는 돈이 실제보다 많게 나올 수 있다
-    ...(value == null
-      ? ['비우면 이 금액으로 계산해요', '관리비는 빠진 금액이에요']
-      : ['관리비는 빠진 금액이에요']),
-  ].filter(Boolean);
+  const few = rent.sample_size < FEW_TRADES;
   return (
     <>
       <span className="block">
@@ -241,14 +253,9 @@ function rentNote(
           ]}
         />{' '}
         {place} 원룸 월세{' '}
-        <span className="text-foreground">{formatWon(rent.monthly_rent_krw)}</span>
+        <span className="text-foreground">{formatWon(rent.monthly_rent_krw)}</span> (관리비 제외)
       </span>
-      {/* 한 줄에 한 가지만 (문장을 ' · '로 잇지 않는다) */}
-      {notes.map((note) => (
-        <span key={String(note)} className="mt-0.5 block">
-          {note}
-        </span>
-      ))}
+      {few && <span className="mt-0.5 block">거래가 적어 참고만 하세요</span>}
     </>
   );
 }
@@ -316,7 +323,10 @@ function PostingCosts({
           {/* 이사 쪽 '이사할 집 주거비'와 같은 줄: 통근은 지금 집 주거비를 그대로 쓴다 (넣는 곳은 위) */}
           {costs.canCommute && (
             <div className="row-field profile-field">
-              <p className="readonly-label">지금 집 주거비 (매달)</p>
+              <div className="field-label-line">
+                <p className="readonly-label">지금 집 주거비 (매달)</p>
+                <span className="field-help">위에서 넣은 값</span>
+              </div>
               <p className="readonly-value">
                 {currentHousing != null ? (
                   formatWon(currentHousing)
@@ -331,7 +341,6 @@ function PostingCosts({
                   </button>
                 )}
               </p>
-              <p className="row-field-hint">위 &lsquo;나와 지금 사는 곳&rsquo;에서 넣은 값</p>
             </div>
           )}
           {costs.canCommute && (
@@ -341,11 +350,8 @@ function PostingCosts({
               example="10만"
               value={costs.commuteTransport}
               onChange={(commuteTransport) => set({ commuteTransport })}
-              help={
-                row.shuttle_bus?.value
-                  ? '통근버스가 있어요. 비우면 0원으로 계산해요'
-                  : '비우면 0원으로 계산해요'
-              }
+              help={row.shuttle_bus?.value ? '통근버스 있음' : undefined}
+              blank="비우면 0원"
             />
           )}
         </div>
@@ -377,6 +383,11 @@ function PostingCosts({
                 value={costs.moveHousing}
                 onChange={(moveHousing) => set({ moveHousing })}
                 help={moveHousingHelp(aid, row.company_housing?.value === true)}
+                blank={
+                  rent?.monthly_rent_krw && !row.company_housing?.value
+                    ? `비우면 ${formatWon(rent.monthly_rent_krw)}`
+                    : undefined
+                }
                 note={rentNote(costs.moveHousing, rent, rentPending, rentFailed, () => {
                   // '다시 불러오기' 버튼은 불러오는 동안 사라진다 → 포커스를 금액 칸으로 옮겨
                   // 키보드·화면 읽기 사용자가 위치를 잃지 않게 한다 (결과는 안내 줄이 읽어 준다)
@@ -390,7 +401,8 @@ function PostingCosts({
                 example="6만"
                 value={costs.moveTransport}
                 onChange={(moveTransport) => set({ moveTransport })}
-                help="출퇴근·본가 오가는 비용 (비우면 0원)"
+                help="출퇴근·본가 오가는 비용"
+                blank="비우면 0원"
               />
             </>
           )}
@@ -475,7 +487,12 @@ export function ProfileFormView({
           askOrder={askOrder('current_housing')}
         />
         <div className="row-field profile-field">
-          <label htmlFor="family">가족 수 (본인 포함)</label>
+          <div className="field-label-line">
+            <label htmlFor="family">가족 수 (본인 포함)</label>
+            <span id="family-hint" className="field-help">
+              세금 계산에 써요
+            </span>
+          </div>
           <select
             id="family"
             value={form.family}
@@ -489,9 +506,6 @@ export function ProfileFormView({
               </option>
             ))}
           </select>
-          <p id="family-hint" className="row-field-hint">
-            세금 계산에 써요. 혼자 살면 1명
-          </p>
         </div>
         {askAge && <AgeField age={form.age ?? null} onChange={(age) => set({ age })} />}
       </fieldset>
@@ -685,7 +699,8 @@ export function ProfileFormView({
                   example="20만"
                   value={form.currentMeal}
                   onChange={(currentMeal) => set({ currentMeal })}
-                  help="급여명세서의 비과세 식대 (없으면 비워 두세요)"
+                  help="급여명세서의 비과세 식대"
+                  blank="비우면 0원"
                 />
                 <MoneyField
                   id="current-transport"
