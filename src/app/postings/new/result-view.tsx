@@ -63,7 +63,9 @@ type Shown = {
 /** 서버가 준 값(비용 등) → 배지 + '출처' 한 줄. '공고에 없음'은 숫자가 없는 칸이라 배지를 달지 않는다. */
 function tag(status: Status, source?: string | null): Tag | undefined {
   if (status === 'missing') return undefined;
-  return { badge: statusBadge[status], details: source ? [{ label: '출처', text: source }] : [] };
+  // 출처가 없는 직접 입력도 눌러서 열리게 ('배지를 누르면 출처가 보여요'가 모든 배지에 맞게)
+  const text = source ?? (status === 'user_input' ? '직접 넣은 값' : null);
+  return { badge: statusBadge[status], details: text ? [{ label: '출처', text }] : [] };
 }
 
 /**
@@ -634,7 +636,7 @@ function BreakEvenAnswer({
   // 최소 연봉에는 따로 받는 식대·수당이 빠져 있다 → 요약에도 적는다
   const onTop = column.posting.pay_on_top?.value ? column.posting.pay_on_top : null;
   const salary = (
-    <strong className="text-xl font-bold text-positive tabular-nums">
+    <strong className="text-xl font-bold text-foreground tabular-nums">
       {won(chosen.annual_salary_krw)}
     </strong>
   );
@@ -789,6 +791,15 @@ export function ResultView({ result, rows }: { result: Result; rows: Row[] }) {
         ))}
       </div>
 
+      {/* 연봉 비공개 공고의 최소 연봉이 무엇에 맞춘 값인지 표 위에서 먼저 (이사 탭에서 옆 열 금액과 헷갈리지 않게) */}
+      {[...new Set(result.break_even.map((be) => be.baseline.label))].map((label) => {
+        const be = result.break_even.find((b) => b.baseline.label === label)!;
+        return (
+          <p key={label} className="compare-basis">
+            연봉 비공개 공고의 기준: {label} · 매달 {won(be.baseline.monthly_remaining)}
+          </p>
+        );
+      })}
       <div className="compare-view result-compare">
         <div className="result-scroll">
           <table className="offer-table compare-table result-table" style={tableWidth}>
@@ -887,7 +898,8 @@ export function ResultView({ result, rows }: { result: Result; rows: Row[] }) {
         ))}
 
       {result.break_even.length > 0 && (
-        <div className="rounded-2xl bg-muted p-5">
+        // 답의 일부라 옅은 파랑 (보증금·계산 내역 같은 참고는 회색)
+        <div className="rounded-2xl bg-accent p-5">
           <h3 className="mb-2 font-semibold text-foreground">연봉이 공개되지 않은 공고</h3>
           <ul className="space-y-3 text-sm text-body">
             {result.break_even.map((be) => (

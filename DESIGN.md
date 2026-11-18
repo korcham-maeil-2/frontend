@@ -23,13 +23,13 @@ typography:
   fontFamily: SUIT (본문), 에스코어 드림 (강조)
   weights: [400, 600, 700]
   display: { fontSize: 'clamp(3rem, 5.6vw, 4.5rem)', fontWeight: 600, lineHeight: 1.2 }
-  heading-1: { fontSize: 24px, fontWeight: 700, lineHeight: 1.3 }
-  heading-2: { fontSize: 18px, fontWeight: 700, lineHeight: 1.4 }
+  heading-1: { fontSize: 26px, fontWeight: 700, lineHeight: 1.3 }
+  heading-2: { fontSize: 22px, fontWeight: 700, lineHeight: 1.4 }
   stat-value: { fontSize: 28px, fontWeight: 700, lineHeight: 1.2 }
-  body: { fontSize: 16px, fontWeight: 400, lineHeight: 1.6 }
-  body-sm: { fontSize: 14px, fontWeight: 400, lineHeight: 1.6 }
-  label: { fontSize: 14px, fontWeight: 600, lineHeight: 1.3 }
-  caption: { fontSize: 12px, fontWeight: 400, lineHeight: 1.4 }
+  body: { fontSize: 17px, fontWeight: 400, lineHeight: 1.6 }
+  body-sm: { fontSize: 15px, fontWeight: 400, lineHeight: 1.6 }
+  label: { fontSize: 17px, fontWeight: 600, lineHeight: 1.3 }
+  caption: { fontSize: 13px, fontWeight: 400, lineHeight: 1.4 }
 
 rounded:
   control: 6px
@@ -79,8 +79,9 @@ spacing:
 
 - **에스코어 드림 Bold**는 페이지·구역 제목(`h1`, `h2`), 워드마크, 한 달에 남는 금액에 쓴다. 본문·입력·표와 작은 소제목(`h3`)은 **SUIT**를 쓴다. 큰 제목은 600, 자간은 `-0.02em`, 본문은 400에 기본 자간을 쓴다.
 - 표의 금액은 SUIT의 고정폭 숫자(`tabular-nums`)로 오른쪽 정렬한다. 금액은 "4,000만원", "52만원"처럼 한글 단위로 쓴다.
-- 본문은 16px(`text-base`), 표 안은 14px(`text-sm`)을 기본으로 한다. 12px보다 작게 쓰지 않는다.
-- 글자 크기는 12 / 14 / 16 / 18 / 20 / 24 / 36 / 54px 여덟 단계만 쓴다(구역 제목과 히어로 제목은 `clamp`로 36·54px 근처). 사이 값(13, 15, 17px 등)을 새로 만들지 않는다.
+- 나이가 많은 사용자·심사위원도 읽기 쉽게, 디자인이 허용하는 만큼 크게 쓴다. 본문·입력·칸 이름은 17px(`text-base`), 문장인 보조글(도움말·출처·표 칸 설명)은 15px(`text-sm`), 13px(`text-xs`)은 배지·칩·단계 요약처럼 **낱말만** 있는 곳에만 쓴다. 문장을 15px보다 작게 쓰지 않는다.
+- 글자 크기는 13 / 15 / 17 / 20 / 22 / 26px 단계를 쓴다(구역 제목 22, 카드 제목·결과 금액 26, 표 머리 20). 페이지 제목과 히어로 제목은 `clamp`로 크게. `text-xs/sm/base`는 `globals.css`의 `@theme`에서 13/15/17px로 바꿔 두었으니 Tailwind 클래스를 그대로 쓴다.
+- 커진 글씨 때문에 줄이 넘치면 글씨를 줄이지 말고 배치를 고친다(배지를 아랫줄로, 칸 폭 넓히기).
 - 한국어 줄바꿈은 `word-break: keep-all`로 단어 중간에서 끊지 않는다. 뜻 단위로 끊어야 하는 짧은 문장(히어로 통계)만 구절을 `inline-block`으로 묶는다. 말풍선처럼 긴 문장은 줄을 채워 흐르게 두고 `text-wrap: pretty`만 쓴다.
 
 ## 모양과 간격

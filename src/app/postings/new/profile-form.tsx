@@ -7,6 +7,7 @@ import { SourceBadge } from './source-badge';
 import { AskBubble, type AskQuestion } from './ask-view';
 import { CONTROL_CLASS, MoneyInput } from './money-input';
 import { PostingTabs } from './posting-tabs';
+import { salaryLeftBlank } from './row-editor';
 import {
   AGE_RANGE,
   costsOf,
@@ -68,7 +69,7 @@ function AgeField({
       <p id="age-hint" className="row-field-hint" aria-live="polite">
         {outOfRange
           ? `${AGE_RANGE.min}~${AGE_RANGE.max}세로 넣어 주세요. 이 값은 쓰지 않아요`
-          : '만 나이. 청년 지원 정책을 나이 조건에 맞게 골라 드려요. 비워도 계산돼요'}
+          : '만 나이. 청년 지원을 고를 때만 써요 (비워도 돼요)'}
       </p>
     </div>
   );
@@ -175,7 +176,7 @@ function moveHousingHelp(aid: number | null | undefined, companyHousing: boolean
     return '사택·기숙사에 산다면 본인이 내는 돈(없으면 0), 따로 집을 구한다면 월세 + 관리비';
   }
   const parts = ['월세 + 관리비'];
-  if (aid) parts.push(`회사 주거지원비 ${formatWon(aid)}은 빼지 말고 넣어 주세요 (계산할 때 빼요)`);
+  if (aid) parts.push(`주거지원비 ${formatWon(aid)}은 빼지 말고 넣어 주세요`);
   return parts.join('. ');
 }
 
@@ -214,10 +215,7 @@ function rentNote(
     rent.sample_size < FEW_TRADES && '거래가 적어 참고만 하세요',
     // 시세에는 관리비가 빠져 있다: 비워 둬서 이 값으로 계산하면 남는 돈이 실제보다 많게 나올 수 있다
     ...(value == null
-      ? [
-          '비워 두면 이 금액으로 계산해요',
-          '관리비가 빠져 있어 남는 돈이 실제보다 많게 나올 수 있어요',
-        ]
+      ? ['비우면 이 금액으로 계산해요', '관리비는 빠진 금액이에요']
       : ['관리비는 빠진 금액이에요']),
   ].filter(Boolean);
   return (
@@ -236,7 +234,12 @@ function rentNote(
         {place} 원룸 월세{' '}
         <span className="text-foreground">{formatWon(rent.monthly_rent_krw)}</span>
       </span>
-      <span className="mt-0.5 block">{notes.join(' · ')}</span>
+      {/* 한 줄에 한 가지만 (문장을 ' · '로 잇지 않는다) */}
+      {notes.map((note) => (
+        <span key={String(note)} className="mt-0.5 block">
+          {note}
+        </span>
+      ))}
     </>
   );
 }
@@ -301,8 +304,8 @@ function PostingCosts({
               onChange={(commuteTransport) => set({ commuteTransport })}
               help={
                 row.shuttle_bus?.value
-                  ? '통근버스가 있어요. 무료면 0원. 비워 두면 0원으로 계산해요'
-                  : '비워 두면 0원으로 계산해요'
+                  ? '통근버스가 있어요. 비우면 0원으로 계산해요'
+                  : '비우면 0원으로 계산해요'
               }
             />
           )}
@@ -321,7 +324,13 @@ function PostingCosts({
               <MoneyField
                 id={id('move-housing')}
                 label="이사할 집 주거비 (매달)"
-                example="50만"
+                // 예시는 실제로 들어갈 시세로 (예시와 비울 때 값이 달라 헷갈리지 않게)
+                example={
+                  // 사택·기숙사 공고는 비워도 시세로 채우지 않으니 시세를 예시로 쓰지 않는다
+                  rent?.monthly_rent_krw && !row.company_housing?.value
+                    ? `${Math.round(rent.monthly_rent_krw / 10_000)}만`
+                    : '50만'
+                }
                 value={costs.moveHousing}
                 onChange={(moveHousing) => set({ moveHousing })}
                 help={moveHousingHelp(aid, row.company_housing?.value === true)}
@@ -338,7 +347,7 @@ function PostingCosts({
                 example="6만"
                 value={costs.moveTransport}
                 onChange={(moveTransport) => set({ moveTransport })}
-                help="출퇴근 + 본가에 다녀오는 비용. 비워 두면 0원으로 계산해요"
+                help="출퇴근·본가 오가는 비용 (비우면 0원)"
               />
             </>
           )}
@@ -411,7 +420,7 @@ export function ProfileFormView({
           example="52만"
           value={form.currentHousing}
           onChange={(currentHousing) => set({ currentHousing })}
-          help="월세 + 관리비. 본가라면 생활비로 드리는 돈"
+          help="월세 + 관리비 (본가면 생활비로 드리는 돈)"
           ask={askFor('current_housing')}
           askOrder={askOrder('current_housing')}
         />
@@ -440,7 +449,7 @@ export function ProfileFormView({
       <fieldset className="row-group">
         <legend>매달 나가는 고정비</legend>
         <p className="mb-3 text-sm text-muted-foreground">
-          학자금 상환, 통신비, 보험료처럼 어디서 일하든 나가는 돈이에요. 없으면 비워 두세요.
+          학자금·통신비·보험료처럼 어느 회사에 가든 똑같이 나가는 돈이에요.
         </p>
         <ul className="space-y-3">
           {form.fixedExpenses.map((item, i) => (
@@ -531,6 +540,8 @@ export function ProfileFormView({
         </Button>
       </fieldset>
 
+      {/* 위는 모든 공고에 같은 값, 여기부터는 공고마다 다른 값: 굵은 선과 제목으로 크게 나눈다 */}
+      <h3 className="profile-split">공고마다 다른 값</h3>
       <PostingTabs
         rows={rows}
         activeId={activeId}
@@ -566,60 +577,58 @@ export function ProfileFormView({
         )}
       </PostingTabs>
 
-      <fieldset className="row-group">
-        <legend>비교 기준 (선택)</legend>
-        <div className="mb-3 text-sm text-muted-foreground">
-          <p>
-            연봉이 공개되지 않은 공고는 &ldquo;최소 얼마를 받아야 기준만큼 남는지&rdquo;를 계산해요.
-          </p>
-          <ul className="bullet-list mt-1 space-y-0.5">
-            <li>목표 금액을 넣으면 그 금액이 기준이에요</li>
-            <li>넣지 않으면 연봉이 공개된 공고와 지금 회사 중 매달 더 많이 남는 쪽이 기준이에요</li>
-          </ul>
-        </div>
-        <Check
-          id="has-current-job"
-          checked={form.hasCurrentJob}
-          onChange={(hasCurrentJob) => set({ hasCurrentJob })}
-        >
-          지금 다니는 회사가 있어요 (지금처럼 살려면 얼마가 필요한지)
-        </Check>
-        {form.hasCurrentJob && (
-          <>
-            <MoneyField
-              id="current-salary"
-              label="지금 연봉 (세전)"
-              example="3800만"
-              value={form.currentSalary}
-              onChange={(currentSalary) => set({ currentSalary })}
-              help="성과급·연장근로수당을 뺀 고정연봉"
-            />
-            <MoneyField
-              id="current-meal"
-              label="그중 식대 (매달)"
-              example="20만"
-              value={form.currentMeal}
-              onChange={(currentMeal) => set({ currentMeal })}
-              help="급여명세서의 비과세 식대. 없으면 비워 두세요"
-            />
-            <MoneyField
-              id="current-transport"
-              label="지금 회사 교통비 (매달)"
-              example="6만"
-              value={form.currentTransport}
-              onChange={(currentTransport) => set({ currentTransport })}
-            />
-          </>
-        )}
-        <MoneyField
-          id="target"
-          label="매달 이만큼은 남았으면 (선택)"
-          example="150만"
-          value={form.target}
-          onChange={(target) => set({ target })}
-          help="넣으면 이 금액을 기준으로 계산해요"
-        />
-      </fieldset>
+      {/* 연봉 비공개 공고가 있을 때만: 최소 연봉을 무엇에 맞춰 계산할지 */}
+      {rows.some(salaryLeftBlank) && (
+        <fieldset className="row-group">
+          <legend>비교 기준 (선택)</legend>
+          <div className="mb-3 text-sm text-muted-foreground">
+            <p>연봉 비공개 공고는 이 기준만큼 남으려면 얼마를 받아야 하는지 계산해요.</p>
+            <p>비우면 다른 공고 중 매달 더 많이 남는 쪽이 기준이에요.</p>
+          </div>
+          <Check
+            id="has-current-job"
+            checked={form.hasCurrentJob}
+            onChange={(hasCurrentJob) => set({ hasCurrentJob })}
+          >
+            지금 다니는 회사가 있어요 (지금 회사와 비교하기)
+          </Check>
+          {form.hasCurrentJob && (
+            <>
+              <MoneyField
+                id="current-salary"
+                label="지금 연봉 (세전)"
+                example="3800만"
+                value={form.currentSalary}
+                onChange={(currentSalary) => set({ currentSalary })}
+                help="성과급·연장근로수당을 뺀 고정연봉"
+              />
+              <MoneyField
+                id="current-meal"
+                label="그중 식대 (매달)"
+                example="20만"
+                value={form.currentMeal}
+                onChange={(currentMeal) => set({ currentMeal })}
+                help="급여명세서의 비과세 식대 (없으면 비워 두세요)"
+              />
+              <MoneyField
+                id="current-transport"
+                label="지금 회사 교통비 (매달)"
+                example="6만"
+                value={form.currentTransport}
+                onChange={(currentTransport) => set({ currentTransport })}
+              />
+            </>
+          )}
+          <MoneyField
+            id="target"
+            label="매달 이만큼은 남았으면 (선택)"
+            example="150만"
+            value={form.target}
+            onChange={(target) => set({ target })}
+            help="넣으면 이 금액을 기준으로 계산해요"
+          />
+        </fieldset>
+      )}
     </div>
   );
 }

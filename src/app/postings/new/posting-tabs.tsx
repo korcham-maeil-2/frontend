@@ -8,7 +8,7 @@ import type { Row } from './format';
 // 회사 탭: 조건 확인·내 생활비에서 공고(회사)를 하나씩 골라 본다.
 //   - '방식 고르기'(본문/파일, 더 남는 쪽/통근/이사)는 회색 둥근 스위치(.source-tabs),
 //     '회사 고르기'는 아래 내용과 붙은 폴더 탭(.posting-tabs) — 생김새로 구분한다.
-//   - 탭마다 남은 일을 글자로 쓴다: 'n개 남음' / '확인 끝' / '아직 안 봄' (색만으로 구분하지 않는다)
+//   - 탭마다 남은 일을 글자로 쓴다: 'n개 남음' / '열어 봄' / '아직 안 봄' (색만으로 구분하지 않는다)
 //   - 공고가 하나뿐이면 탭을 그리지 않는다.
 //   - 키보드: ←/→ 로 탭 이동, Home/End 로 처음·끝 (WAI-ARIA 탭 패턴)
 
@@ -33,7 +33,7 @@ export function PostingTabs({
   onSelect,
   status,
   label,
-  doneLabel = '확인 끝',
+  doneLabel = '열어 봄',
   children,
 }: {
   rows: Row[];
@@ -41,7 +41,7 @@ export function PostingTabs({
   onSelect: (id: string) => void;
   status: (row: Row) => TabStatus;
   label: string;
-  /** 남은 일이 없을 때 탭에 쓸 말 (조건 확인: '확인 끝', 내 생활비: '다 넣음') */
+  /** 남은 일이 없을 때 탭에 쓸 말 (조건 확인: '열어 봄', 내 생활비: '다 넣음') */
   doneLabel?: string;
   /** 고른 공고의 내용. 공고가 하나면 탭 없이 이것만 그린다. */
   children: ReactNode;

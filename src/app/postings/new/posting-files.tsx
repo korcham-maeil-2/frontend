@@ -200,7 +200,7 @@ export function FilePicker({
             또는 여기에 공고 파일을 끌어다 놓으세요.
           </span>
         )}
-        <span id="accepted-formats" className="text-xs leading-relaxed text-muted-foreground">
+        <span id="accepted-formats" className="text-sm leading-relaxed text-muted-foreground">
           <span className="whitespace-nowrap">JPG, PNG, WEBP</span> ·{' '}
           <span className="whitespace-nowrap">PDF</span> ·{' '}
           <span className="whitespace-nowrap">엑셀(XLSX, XLS, CSV)</span> ·{' '}
@@ -255,7 +255,7 @@ export function AttachmentList({
         ))}
       </ul>
       {showTotal && (
-        <p className="mt-1.5 text-xs text-muted-foreground">
+        <p className="mt-1.5 text-sm text-muted-foreground">
           {files.length}/{MAX_FILES}개 · 합계 {formatBytes(totalBytes(files))} /{' '}
           {formatBytes(MAX_TOTAL_BYTES)}
         </p>
@@ -298,7 +298,7 @@ function AttachmentItem({
         </div>
         <p className="min-w-0 flex-1 basis-40 text-sm">
           <span className="font-semibold wrap-anywhere">{file.name}</span>
-          <span className="ms-2 text-xs whitespace-nowrap text-muted-foreground">
+          <span className="ms-2 text-sm whitespace-nowrap text-muted-foreground">
             {formatBytes(file.size)}
           </span>
         </p>
