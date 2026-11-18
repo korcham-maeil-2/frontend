@@ -857,11 +857,11 @@ export default function NewPosting() {
           </h1>
           <p className="intro-copy">
             {shown === 'plan'
-              ? '이 회사에 가면 1년 동안 챙길 일을 순서대로 모았어요.'
+              ? '이 회사에 가면 1년 동안 챙길 일을 모았어요.'
               : shown === 'result'
-                ? '세금과 4대보험, 집값·교통비·고정비를 빼고 매달 남는 돈이에요.'
+                ? '세금과 4대보험, 주거비·교통비·고정비를 빼고 매달 남는 돈이에요.'
                 : shown === 'living'
-                  ? '공고에 없는 내 생활비를 넣어 주세요. 꼭 필요한 칸은 위에 따로 알려 드려요.'
+                  ? '공고에 없는 내 생활비를 넣어 주세요.'
                   : reviewing
                     ? '공고에서 가져온 조건이에요. 다시 볼 값은 아래에 모았어요.'
                     : '공고 글을 붙여 넣거나 파일을 올려 주세요. 여러 곳을 한 번에 비교할 수 있어요.'}
@@ -1026,9 +1026,14 @@ export default function NewPosting() {
         >
           <h2 className="sheet-heading">공고 {rows.length}개에 필요한 값</h2>
           {/* 계산을 막는 빈칸을 맨 위에 (오류처럼 보이지 않게 '할 일' 상자로). 되묻기 중에는 질문이 칸 위에 있으니 숨긴다 */}
-          {missingProfile.length > 0 && !asking && (
+          {!asking && (
             <div className="review-todo">
-              <p className="review-todo-title">이 칸만 채우면 계산돼요</p>
+              {/* 빈칸이 다 채워지면 제목만 바뀐다 (화면 읽기 프로그램에 한 번 알림) */}
+              <p role="status" className="review-todo-title">
+                {missingProfile.length
+                  ? '이 칸만 채우면 계산돼요'
+                  : '필요한 칸은 다 채웠어요. 계산하면 돼요'}
+              </p>
               <ul>
                 {missingProfile.map((item) => (
                   <li key={item.fieldId}>

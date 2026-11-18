@@ -63,7 +63,9 @@ type Shown = {
 /** 서버가 준 값(비용 등) → 배지 + '출처' 한 줄. '공고에 없음'은 숫자가 없는 칸이라 배지를 달지 않는다. */
 function tag(status: Status, source?: string | null): Tag | undefined {
   if (status === 'missing') return undefined;
-  return { badge: statusBadge[status], details: source ? [{ label: '출처', text: source }] : [] };
+  // 출처가 없는 직접 입력도 눌러서 열리게 ('배지를 누르면 출처가 보여요'가 모든 배지에 맞게)
+  const text = source ?? (status === 'user_input' ? '직접 넣은 값' : null);
+  return { badge: statusBadge[status], details: text ? [{ label: '출처', text }] : [] };
 }
 
 /**
