@@ -859,7 +859,10 @@ export default function NewPosting() {
               ? '이 회사에 가면 1년 동안 챙길 일을 모았어요.'
               : shown === 'result'
                 ? '세금과 4대보험, 주거비·교통비·고정비를 빼고 매달 남는 돈이에요.' +
-                  (freshResult?.break_even.length
+                  // 한 경우라도 최소 연봉을 구했을 때만 (못 구했으면 카드가 '계산하지 못했어요'라고 한다)
+                  (freshResult?.break_even.some((be) =>
+                    be.cases.some((c) => c.annual_salary_krw != null),
+                  )
                     ? ' 연봉이 없는 공고는 받아야 할 최소 연봉을 계산했어요.'
                     : '')
                 : shown === 'living'

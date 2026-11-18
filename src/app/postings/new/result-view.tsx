@@ -450,7 +450,8 @@ function baselineName(be: BreakEven, columns: Column[]): string {
   if (be.baseline.kind === 'current_job') return '지금 회사';
   if (be.baseline.kind === 'target') return be.baseline.label;
   const base = columns.find((c) => c.posting.posting_id === be.baseline.posting_id);
-  return base?.posting.company || be.baseline.label;
+  // 백엔드 label은 경우까지 붙어 있어('○○ · 회사 근처로 이사') 문장에 넣으면 어색하다 (경우는 '기준' 줄에)
+  return base?.posting.company || '기준 공고';
 }
 
 function companyOf(column: Column, index: number) {
@@ -478,12 +479,13 @@ function salarySteps(column: Column) {
   const slip = posting.payslip;
   const onTop = posting.pay_on_top?.value ? posting.pay_on_top : null;
   const missingNote = netMissingNote(posting, row);
-  const net: Step = slip
-    ? { value: exact(posting.net_income.value ?? 0) }
-    : solved && breakEven?.net_income_krw != null
-      ? // 연봉 비공개 공고: 공제 내역 대신 최소 연봉일 때의 세후 월급
-        { value: exact(breakEven.net_income_krw), note: '최소 연봉일 때' }
-      : { value: missingNote ? '모름' : NONE, note: missingNote };
+  const net: Step =
+    slip && posting.net_income.value != null
+      ? { value: exact(posting.net_income.value) }
+      : solved && breakEven?.net_income_krw != null
+        ? // 연봉 비공개 공고: 공제 내역 대신 최소 연봉일 때의 세후 월급
+          { value: exact(breakEven.net_income_krw), note: '최소 연봉일 때' }
+        : { value: missingNote ? '모름' : NONE, note: missingNote };
   return {
     // 세전 월급에 연봉 외 수당이 들어 있으면 무엇인지 그 칸에서 바로 보인다
     gross: slip
@@ -543,7 +545,8 @@ function CalcSteps({ columns, style }: { columns: Column[]; style: CSSProperties
               ))}
             </tr>
             <tr>
-              <th scope="row">
+              {/* 이름표는 '세금·4대보험'만 (버튼 글자가 칸마다 머리글로 읽히지 않게) */}
+              <th scope="row" aria-label="세금·4대보험">
                 세금·4대보험
                 <button
                   type="button"
@@ -626,16 +629,18 @@ function SalaryAnswer({ result, columns }: { result: Result; columns: Column[] }
         면접에서 확인할 연봉
       </h3>
       <ul>
-        {result.break_even.map((be) => (
-          <li key={be.posting_id}>
-            <p className="salary-answer-company">{be.company || be.posting_id}</p>
-            <SalaryAnswerLine
-              be={be}
-              column={columns.find((c) => c.posting.posting_id === be.posting_id)}
-              columns={columns}
-            />
-          </li>
-        ))}
+        {result.break_even.map((be) => {
+          const i = columns.findIndex((c) => c.posting.posting_id === be.posting_id);
+          return (
+            <li key={be.posting_id}>
+              {/* 표 머리와 같은 이름 (회사 이름이 없으면 '공고 N') */}
+              <p className="salary-answer-company">
+                {i >= 0 ? companyOf(columns[i], i) : be.company || '연봉 비공개 공고'}
+              </p>
+              <SalaryAnswerLine be={be} column={columns[i]} columns={columns} />
+            </li>
+          );
+        })}
       </ul>
     </section>
   );
