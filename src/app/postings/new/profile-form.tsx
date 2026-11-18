@@ -7,6 +7,7 @@ import { SourceBadge } from './source-badge';
 import { AskBubble, type AskQuestion } from './ask-view';
 import { CONTROL_CLASS, MoneyInput } from './money-input';
 import { PostingTabs } from './posting-tabs';
+import { ChoiceRow } from './choice-row';
 import { focusField, salaryLeftBlank } from './row-editor';
 import {
   AGE_RANGE,
@@ -189,6 +190,29 @@ function GroupChip({ count, optional = false }: { count: number; optional?: bool
       선택
     </span>
   ) : null;
+}
+
+/** '6명 이상'의 숫자 칸 (6~20명). 치는 동안은 글자를 그대로 두고(지웠다 다시 칠 수 있게), 칸을 떠나면 맞는 값으로 */
+function FamilyMore({ family, onChange }: { family: number; onChange: (n: number) => void }) {
+  const [text, setText] = useState(String(family));
+  return (
+    <span className="unit-input">
+      <Input
+        aria-label="가족 수 (6명 이상, 20명까지)"
+        inputMode="numeric"
+        value={text}
+        onChange={(event) => {
+          const next = event.target.value.replace(/D/g, '').slice(0, 2);
+          setText(next);
+          const n = Number(next);
+          if (n >= 6 && n <= 20) onChange(n);
+        }}
+        onBlur={() => setText(String(family))}
+        className={`${CONTROL_CLASS} choice-more`}
+      />
+      <span aria-hidden>명</span>
+    </span>
+  );
 }
 
 function Check({
@@ -501,13 +525,8 @@ export function ProfileFormView({
           ask={askFor('current_housing')}
           askOrder={askOrder('current_housing')}
         />
-        {/* 가족 수: 선택지가 짧아 펼침 목록 대신 한 줄 버튼 (한 번에 보이고 한 번에 고른다). 진짜 라디오라 화살표로 옮긴다 */}
-        <div
-          className="row-field profile-field"
-          role="radiogroup"
-          aria-labelledby="family-label"
-          aria-describedby="family-hint"
-        >
+        {/* 가족 수: 펼침 목록 대신 한 줄 라디오. 계산은 20명까지 받으니 '6명 이상'을 고르면 숫자 칸이 나온다 */}
+        <div className="row-field profile-field">
           <div className="field-label-line">
             <span id="family-label" className="readonly-label">
               가족 수 (본인 포함)
@@ -516,21 +535,22 @@ export function ProfileFormView({
               세금 계산에 써요
             </span>
           </div>
-          <div className="choice-row">
-            {[1, 2, 3, 4, 5, 6].map((n) => (
-              <label key={n} className="choice">
-                <input
-                  type="radio"
-                  name="family"
-                  id={n === 1 ? 'family' : undefined}
-                  value={n}
-                  checked={form.family === n}
-                  onChange={() => set({ family: n })}
-                />
-                {n}명
-              </label>
-            ))}
-          </div>
+          <ChoiceRow
+            id="family"
+            name="family"
+            labelledBy="family-label"
+            describedBy="family-hint"
+            value={Math.min(form.family, 6)}
+            options={[1, 2, 3, 4, 5, 6].map((n) => ({
+              value: n,
+              label: n === 6 ? '6명 이상' : `${n}명`,
+            }))}
+            onChange={(family) => set({ family })}
+          >
+            {form.family >= 6 && (
+              <FamilyMore family={form.family} onChange={(family) => set({ family })} />
+            )}
+          </ChoiceRow>
         </div>
         {askAge && <AgeField age={form.age ?? null} onChange={(age) => set({ age })} />}
       </fieldset>

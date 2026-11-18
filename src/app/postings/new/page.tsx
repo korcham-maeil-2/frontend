@@ -96,7 +96,14 @@ function enterMovesToNextField(event: KeyboardEvent<HTMLFormElement>) {
       'input:not([type=hidden]):not(:disabled), select:not(:disabled)',
     ),
   ].filter((field) => !field.closest('details:not([open])')); // 접힌 선택 항목으로는 가지 않는다
-  const next = fields[fields.indexOf(target) + 1];
+  const sameGroup = (field: HTMLElement) =>
+    target.type === 'radio' && field instanceof HTMLInputElement && field.name === target.name;
+  let next = fields.slice(fields.indexOf(target) + 1).find((field) => !sameGroup(field));
+  // 다음 칸이 라디오 묶음이면 고른 단추로 (첫 단추로 가면 화살표 한 번에 값이 바뀐다)
+  if (next instanceof HTMLInputElement && next.type === 'radio') {
+    next =
+      event.currentTarget.querySelector<HTMLElement>(`input[name="${next.name}"]:checked`) ?? next;
+  }
   (next ?? event.currentTarget.querySelector<HTMLElement>('button[type=submit]'))?.focus();
 }
 
