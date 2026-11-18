@@ -141,27 +141,26 @@ function SavingsSlot({
       </p>
       {deposit != null && remaining != null && (
         <div className="savings-calc">
-          <p>
+          {/* 한 줄로: 문장 사이에 금액 버튼 (좁으면 알아서 줄바꿈) */}
+          <p className="savings-line">
             {moving ? '이사하면' : '지금 집에서 통근하면'} 매달 남는 돈 약{' '}
             {formatWon(Math.round(remaining / 10_000) * 10_000)} 중
-          </p>
-          <div className="flex flex-wrap gap-2" role="group" aria-label="매달 넣을 금액">
-            {options.map((d) => (
-              <Button
-                key={d}
-                type="button"
-                size="sm"
-                className="min-h-9 px-3"
-                variant={d === deposit ? 'default' : 'outline'}
-                aria-pressed={d === deposit}
-                onClick={() => setDeposit(d)}
-              >
-                {formatWon(d).replace(/원$/, '')}
-              </Button>
-            ))}
-          </div>
-          <p>
-            씩 12개월 넣으면{' '}
+            <span className="inline-flex flex-wrap gap-1" role="group" aria-label="매달 넣을 금액">
+              {options.map((d) => (
+                <Button
+                  key={d}
+                  type="button"
+                  size="sm"
+                  className="min-h-8 px-2.5"
+                  variant={d === deposit ? 'default' : 'outline'}
+                  aria-pressed={d === deposit}
+                  onClick={() => setDeposit(d)}
+                >
+                  {formatWon(d).replace(/원$/, '')}
+                </Button>
+              ))}
+            </span>
+            씩 12개월 넣으면
             <strong className="savings-total">
               약 {formatWon(Math.round((deposit * 12 + interest) / 10_000) * 10_000)}
             </strong>
