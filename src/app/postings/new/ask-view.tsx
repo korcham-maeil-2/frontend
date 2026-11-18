@@ -9,7 +9,7 @@ import { MessageCircleQuestion } from 'lucide-react';
 //   함께 반영된다. '모르겠어요, 이대로 계산'은 skip_missing=true로 보낸다 (써 둔 값은 그대로).
 
 export type AskQuestion = {
-  key: 'current_housing' | 'fixed_expenses';
+  key: 'current_housing'; // 고정비는 선택 항목이라 늘 보내서 묻지 않는다 (profile.ts toFixedExpenses)
   question: string;
   why: string;
   hint: string;
@@ -21,37 +21,16 @@ export function askQuestionsOf(pending: unknown): AskQuestion[] | null {
   const p = pending as { type?: string; payload?: { questions?: unknown } } | null | undefined;
   const list = p?.type === 'ask_missing' ? p.payload?.questions : null;
   if (!Array.isArray(list) || !list.length) return null;
-  const ok = list.every(
-    (q) =>
-      q &&
-      (q.key === 'current_housing' || q.key === 'fixed_expenses') &&
-      typeof q.question === 'string',
-  );
+  const ok = list.every((q) => q && q.key === 'current_housing' && typeof q.question === 'string');
   return ok ? (list as AskQuestion[]) : null;
 }
 
-/** 질문을 붙일 칸: 지금 집 주거비 칸, 고정비는 금액이 빈 첫 줄(없으면 고정비 묶음) */
-export function askTargetId(question: AskQuestion, emptyFixedIndex: number): string {
-  if (question.key === 'current_housing') return 'current-housing';
-  return emptyFixedIndex >= 0 ? `fixed-${emptyFixedIndex}-amount` : 'fixed-expenses';
-}
-
 /** 칸 위에 붙는 에이전트 질문 (말풍선). 질문 칸의 aria-describedby로 이어 화면 읽기도 읽는다 */
-export function AskBubble({
-  question,
-  id,
-  order,
-}: {
-  question: AskQuestion;
-  id: string;
-  /** 질문이 여럿일 때 '1/2' (몇 번째인지) */
-  order?: string;
-}) {
+export function AskBubble({ question, id }: { question: AskQuestion; id: string }) {
   return (
     <div id={id} className="ask-bubble" role="note">
       <p className="ask-bubble-title">
         <MessageCircleQuestion aria-hidden className="size-4 shrink-0" />
-        {order && <span className="ask-order">질문 {order}</span>}
         {question.question}
       </p>
       <p>

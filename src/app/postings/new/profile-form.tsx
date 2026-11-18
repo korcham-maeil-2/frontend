@@ -1,5 +1,5 @@
-import { Fragment, useState, type ReactNode } from 'react';
-import { Plus, X } from 'lucide-react';
+import { useState, type ReactNode } from 'react';
+import { ChevronDown, Plus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatWon, placeName, salaryText, statusBadge, type Row } from './format';
@@ -7,7 +7,8 @@ import { SourceBadge } from './source-badge';
 import { AskBubble, type AskQuestion } from './ask-view';
 import { CONTROL_CLASS, MoneyInput } from './money-input';
 import { PostingTabs } from './posting-tabs';
-import { salaryLeftBlank } from './row-editor';
+import { ChoiceRow } from './choice-row';
+import { focusField, salaryLeftBlank } from './row-editor';
 import {
   AGE_RANGE,
   costsOf,
@@ -44,7 +45,12 @@ function AgeField({
   const outOfRange = !editing && age != null && validAge(age) == null;
   return (
     <div className="row-field profile-field">
-      <label htmlFor="age">나이 (선택)</label>
+      <div className="field-label-line">
+        <label htmlFor="age">나이 (선택)</label>
+        <span id="age-help" className="field-help">
+          만 나이, 청년 지원을 고를 때만 써요
+        </span>
+      </div>
       <div className="unit-input">
         <Input
           id="age"
@@ -61,15 +67,13 @@ function AgeField({
             onChange(next);
           }}
           className={CONTROL_CLASS}
-          aria-describedby="age-hint"
+          aria-describedby="age-help age-hint"
           aria-invalid={outOfRange || undefined}
         />
         <span aria-hidden>세</span>
       </div>
       <p id="age-hint" className="row-field-hint" aria-live="polite">
-        {outOfRange
-          ? `${AGE_RANGE.min}~${AGE_RANGE.max}세로 넣어 주세요. 이 값은 쓰지 않아요`
-          : '만 나이. 청년 지원을 고를 때만 써요 (비워도 돼요)'}
+        {outOfRange && `${AGE_RANGE.min}~${AGE_RANGE.max}세로 넣어 주세요. 이 값은 쓰지 않아요`}
       </p>
     </div>
   );
@@ -85,7 +89,8 @@ function MoneyField({
   help,
   note,
   ask,
-  askOrder,
+  need = false,
+  blank,
 }: {
   id: string;
   label: string;
@@ -100,31 +105,51 @@ function MoneyField({
   note?: ReactNode;
   /** 되묻기: 에이전트가 이 칸의 값을 물었으면 칸 위에 질문을 붙인다 */
   ask?: AskQuestion;
-  /** 질문이 여럿일 때 몇 번째인지 ('1/2') */
-  askOrder?: string;
+  /** 계산에 꼭 필요한데 비어 있음 (파란 테두리) */
+  need?: boolean;
+  /** 비우면 어떻게 계산하는지 ('비우면 0원'). 칸 안 글로 보이고, 화면 읽기용으로도 남긴다 */
+  blank?: string;
 }) {
   const hintId = `${id}-hint`;
   const noteId = `${id}-note`;
   const askId = `${id}-ask`;
+  const helpId = `${id}-help`;
+  const blankId = `${id}-blank`;
   const hasNote = note !== undefined;
-  const describedBy = [ask && askId, hintId, hasNote && noteId].filter(Boolean).join(' ');
+  const describedBy = [ask && askId, help && helpId, blank && blankId, hintId, hasNote && noteId]
+    .filter(Boolean)
+    .join(' ');
   const field = (
-    <div className="row-field profile-field">
-      <label htmlFor={id}>
-        {label}
-        <span className="sr-only"> (단위: 원)</span>
-      </label>
+    <div className={need ? 'row-field profile-field is-need' : 'row-field profile-field'}>
+      {/* 칸 이름 줄: 이름 옆에 뜻 한 토막 (칸 아래 줄을 줄여 한눈에). 라벨 밖에 두어 이름이 길어지지 않게 */}
+      <div className="field-label-line">
+        <label htmlFor={id}>
+          {label}
+          <span className="sr-only"> (단위: 원)</span>
+        </label>
+        {help && (
+          <span id={helpId} className="field-help">
+            {help}
+          </span>
+        )}
+      </div>
       <MoneyInput
         id={id}
         value={value}
         onChange={onChange}
         example={example}
+        placeholder={blank}
         describedBy={describedBy}
       />
+      {/* 비울 때 결과: 칸 안 글과 같은 말을 화면 읽기용으로 (칸 안 글은 읽어 주지 않는 경우가 있다) */}
+      {blank && (
+        <span id={blankId} className="sr-only">
+          {blank}
+        </span>
+      )}
+      {/* 칸 아래는 넣은 값 확인('52만원')만 — 비어 있으면 줄도 없다 */}
       <p id={hintId} className="row-field-hint">
         {value != null && <span className="text-foreground">{formatWon(value)}</span>}
-        {value != null && help && ' · '}
-        {help}
       </p>
       {hasNote && (
         <p id={noteId} className="row-field-hint rent-note" aria-live="polite">
@@ -139,9 +164,75 @@ function MoneyField({
   // 되묻기: 질문을 칸 바로 위에 두고 둘을 함께 강조한다 (칸 안은 자리를 정해 둔 격자라 밖에 둔다)
   return (
     <div className="ask-wrap">
-      <AskBubble question={ask} id={askId} order={askOrder} />
+      <AskBubble question={ask} id={askId} />
       {field}
     </div>
+  );
+}
+
+/**
+ * 묶음 제목 오른쪽 칩: 계산에 쓰는데 비어 있는 칸 수, 또는 '선택'. 둘 다 아니면 없음.
+ * '필수'라고 하지 않는다 — 비워도 계산은 되고 그 경우만 '계산 못 함'이 된다. '다 넣음'도 쓰지 않는다 (선택 칸은 0원이 된다)
+ */
+function GroupChip({ count, optional = false }: { count: number; optional?: boolean }) {
+  // 화면용 표시: 묶음 이름에 섞이지 않게 숨긴다 (개수는 위 상자가 읽어 준다)
+  if (count > 0)
+    return (
+      <span aria-hidden className="group-chip is-need">
+        채울 칸 {count}
+      </span>
+    );
+  // '선택'은 위 상자가 읽어 주지 않으니 화면 읽기에는 '(선택)'으로 남긴다
+  return optional ? (
+    <>
+      <span aria-hidden className="group-chip">
+        선택
+      </span>
+      <span className="sr-only">(선택)</span>
+    </>
+  ) : null;
+}
+
+/**
+ * 선택 항목 접기 줄: 제목 + 오른쪽에 칩과 '펼치기/접기' (접혀 있어도 눌러서 열 수 있다는 게 보이게).
+ * 펼침 상태는 details가 화면 읽기에 알려 주므로 '펼치기' 글자는 숨긴다.
+ */
+function FoldSummary({ title, chip }: { title: string; chip: ReactNode }) {
+  return (
+    <summary>
+      {title}
+      <span className="fold-side">
+        {chip}
+        <span aria-hidden className="fold-toggle">
+          <span className="when-closed">펼치기</span>
+          <span className="when-open">접기</span>
+          <ChevronDown className="fold-chevron" />
+        </span>
+      </span>
+    </summary>
+  );
+}
+
+/** '6명 이상'의 숫자 칸 (6~20명). 치는 동안은 글자를 그대로 두고(지웠다 다시 칠 수 있게), 칸을 떠나면 맞는 값으로 */
+function FamilyMore({ family, onChange }: { family: number; onChange: (n: number) => void }) {
+  const [text, setText] = useState(String(family));
+  return (
+    <span className="unit-input">
+      <Input
+        aria-label="가족 수 (6명 이상, 20명까지)"
+        inputMode="numeric"
+        value={text}
+        onChange={(event) => {
+          const next = event.target.value.replace(/[^0-9]/g, '').slice(0, 2);
+          setText(next);
+          const n = Number(next);
+          if (n >= 6 && n <= 20) onChange(n);
+        }}
+        onBlur={() => setText(String(family))}
+        className={`${CONTROL_CLASS} choice-more`}
+      />
+      <span aria-hidden>명</span>
+    </span>
   );
 }
 
@@ -182,8 +273,8 @@ function moveHousingHelp(aid: number | null | undefined, companyHousing: boolean
 
 /**
  * 근무지 원룸 월세 시세 ('추정' 배지). 비워 두면 서버(calc/summary.py)가 이 값으로 계산한다.
- * 줄글 대신 두 줄로: 첫 줄은 금액, 둘째 줄은 꼭 알아야 할 것(비우면 이 값, 관리비 별도)만.
- * 어디서 낸 값인지(기간·거래 수)는 배지를 누르면 보인다.
+ * 한 줄로: 금액과 '관리비 제외'(이름 줄의 '월세 + 관리비'와 다르니 숨기지 않는다).
+ * 비울 때 이 값이 쓰인다는 건 칸 안 글('비우면 65만원')이 말한다. 출처(기간·거래 수)는 배지를 누르면 보인다.
  */
 function rentNote(
   value: Money,
@@ -211,13 +302,7 @@ function rentNote(
   }
   if (rent?.monthly_rent_krw == null) return null;
   const place = placeName(rent.region);
-  const notes = [
-    rent.sample_size < FEW_TRADES && '거래가 적어 참고만 하세요',
-    // 시세에는 관리비가 빠져 있다: 비워 둬서 이 값으로 계산하면 남는 돈이 실제보다 많게 나올 수 있다
-    ...(value == null
-      ? ['비우면 이 금액으로 계산해요', '관리비는 빠진 금액이에요']
-      : ['관리비는 빠진 금액이에요']),
-  ].filter(Boolean);
+  const few = rent.sample_size < FEW_TRADES;
   return (
     <>
       <span className="block">
@@ -232,19 +317,16 @@ function rentNote(
           ]}
         />{' '}
         {place} 원룸 월세{' '}
-        <span className="text-foreground">{formatWon(rent.monthly_rent_krw)}</span>
+        <span className="text-foreground">{formatWon(rent.monthly_rent_krw)}</span> (관리비 제외)
       </span>
-      {/* 한 줄에 한 가지만 (문장을 ' · '로 잇지 않는다) */}
-      {notes.map((note) => (
-        <span key={String(note)} className="mt-0.5 block">
-          {note}
-        </span>
-      ))}
+      {few && <span className="mt-0.5 block">거래가 적어 참고만 하세요</span>}
     </>
   );
 }
 
 function PostingCosts({
+  need,
+  currentHousing,
   row,
   index,
   costs,
@@ -254,6 +336,10 @@ function PostingCosts({
   onRetryRent,
   onChange,
 }: {
+  /** 계산에 꼭 필요한데 비어 있는 칸 id */
+  need: ReadonlySet<string>;
+  /** 위 '나와 지금 사는 곳'에서 넣은 지금 집 주거비 (통근 쪽 주거비 줄에 보기만) */
+  currentHousing: Money;
   row: Row;
   index: number;
   costs: PostingCostsForm;
@@ -285,9 +371,11 @@ function PostingCosts({
           <p className="row-card-meta">{[place, salaryText(row)].filter(Boolean).join(' · ')}</p>
         </div>
       </header>
-      <div className="row-card-body">
-        <fieldset className="row-group">
-          <legend>지금 집에서 다니기</legend>
+      <div className="row-card-body cost-cases">
+        <div role="group" aria-labelledby={id('commute-title')} className="row-group">
+          <h4 id={id('commute-title')} className="row-group-title">
+            지금 집에서 다니기
+          </h4>
           <Check
             id={id('can-commute')}
             checked={costs.canCommute}
@@ -295,6 +383,29 @@ function PostingCosts({
           >
             지금 집에서 다닐 수 있어요
           </Check>
+          {/* 이사 쪽 '이사할 집 주거비'와 같은 줄: 통근은 지금 집 주거비를 그대로 쓴다 (넣는 곳은 위) */}
+          {costs.canCommute && (
+            <div className="row-field profile-field">
+              <div className="field-label-line">
+                <p className="readonly-label">지금 집 주거비 (매달)</p>
+                <span className="field-help">위에서 넣은 값</span>
+              </div>
+              <p className="readonly-value">
+                {currentHousing != null ? (
+                  formatWon(currentHousing)
+                ) : (
+                  // 비어 있으면 넣는 곳(위)으로 데려간다
+                  <button
+                    type="button"
+                    className="inline-link"
+                    onClick={() => focusField('current-housing')}
+                  >
+                    위에서 넣기
+                  </button>
+                )}
+              </p>
+            </div>
+          )}
           {costs.canCommute && (
             <MoneyField
               id={id('commute-transport')}
@@ -302,16 +413,16 @@ function PostingCosts({
               example="10만"
               value={costs.commuteTransport}
               onChange={(commuteTransport) => set({ commuteTransport })}
-              help={
-                row.shuttle_bus?.value
-                  ? '통근버스가 있어요. 비우면 0원으로 계산해요'
-                  : '비우면 0원으로 계산해요'
-              }
+              help={row.shuttle_bus?.value ? '통근버스 있음' : undefined}
+              blank="비우면 0원"
             />
           )}
-        </fieldset>
-        <fieldset className="row-group">
-          <legend>회사 근처로 이사하기</legend>
+        </div>
+        <div role="group" aria-labelledby={id('move-title')} className="row-group">
+          <h4 id={id('move-title')} className="row-group-title">
+            회사 근처로 이사하기
+            <GroupChip count={need.has(id('move-housing')) ? 1 : 0} />
+          </h4>
           <Check
             id={id('consider-move')}
             checked={costs.considerMove}
@@ -323,17 +434,18 @@ function PostingCosts({
             <>
               <MoneyField
                 id={id('move-housing')}
+                need={need.has(id('move-housing'))}
                 label="이사할 집 주거비 (매달)"
-                // 예시는 실제로 들어갈 시세로 (예시와 비울 때 값이 달라 헷갈리지 않게)
-                example={
-                  // 사택·기숙사 공고는 비워도 시세로 채우지 않으니 시세를 예시로 쓰지 않는다
-                  rent?.monthly_rent_krw && !row.company_housing?.value
-                    ? `${Math.round(rent.monthly_rent_krw / 10_000)}만`
-                    : '50만'
-                }
+                example="50만"
                 value={costs.moveHousing}
                 onChange={(moveHousing) => set({ moveHousing })}
                 help={moveHousingHelp(aid, row.company_housing?.value === true)}
+                // 시세가 있으면 칸 안에 '비우면 65만원' (사택·기숙사 공고는 비워도 시세로 채우지 않으니 예시 그대로)
+                blank={
+                  rent?.monthly_rent_krw && !row.company_housing?.value
+                    ? `비우면 ${formatWon(rent.monthly_rent_krw)}`
+                    : undefined
+                }
                 note={rentNote(costs.moveHousing, rent, rentPending, rentFailed, () => {
                   // '다시 불러오기' 버튼은 불러오는 동안 사라진다 → 포커스를 금액 칸으로 옮겨
                   // 키보드·화면 읽기 사용자가 위치를 잃지 않게 한다 (결과는 안내 줄이 읽어 준다)
@@ -347,11 +459,12 @@ function PostingCosts({
                 example="6만"
                 value={costs.moveTransport}
                 onChange={(moveTransport) => set({ moveTransport })}
-                help="출퇴근·본가 오가는 비용 (비우면 0원)"
+                help="출퇴근·본가 오가는 비용"
+                blank="비우면 0원"
               />
             </>
           )}
-        </fieldset>
+        </div>
       </div>
     </section>
   );
@@ -363,13 +476,12 @@ export function ProfileFormView({
   onChange,
   activeId,
   onSelectPosting,
-  missingFor,
+  missing,
   askAge,
   rents,
   failedRents,
   onRetryRents,
   asking = [],
-  askFixedIndex = -1,
 }: {
   form: Form;
   rows: Row[];
@@ -377,8 +489,8 @@ export function ProfileFormView({
   /** 회사 탭에서 고른 공고 (조건 확인 화면과 같은 값) */
   activeId: string;
   onSelectPosting: (id: string) => void;
-  /** 이 공고에서 아직 비어 있는 칸 (profile.ts의 missingInputs 중 이 공고 것) */
-  missingFor: (row: Row) => MissingInput[];
+  /** 계산에 꼭 필요한데 비어 있는 칸 (profile.ts의 missingInputs) */
+  missing: MissingInput[];
   /** 나이 칸을 보일지 (서버가 청년 지원을 찾을 수 있을 때만. 나이는 그것에만 쓴다) */
   askAge: boolean;
   /** 근무지(시군구 코드)별 월세 시세. 이사할 집 주거비를 비우면 이 값으로 계산된다 */
@@ -389,17 +501,15 @@ export function ProfileFormView({
   onRetryRents: () => void;
   /** 되묻기: 에이전트가 물은 값들 (원래 칸 위에 질문을 붙인다) */
   asking?: AskQuestion[];
-  /** 되묻기: 고정비 질문을 붙일 줄 (질문이 온 때 정한 값. 없으면 -1) */
-  askFixedIndex?: number;
 }) {
   const set = (patch: Partial<Form>) => onChange({ ...form, ...patch });
+  // 비교 기준 접기는 처음 그릴 때만 정한다 (넣어 둔 값이 있으면 펼친 채로). 체크를 풀어도 접히지 않게
+  const [basisOpen] = useState(() => form.hasCurrentJob || form.target != null);
+  const [fixedOpen] = useState(() => form.fixedExpenses.length > 0);
+  const missingFor = (row: Row) => missing.filter((item) => item.rowId === row.id);
+  const need = new Set(missing.map((item) => item.fieldId));
+  const needIn = (test: (id: string) => boolean) => [...need].filter(test).length;
   const askFor = (key: AskQuestion['key']) => asking.find((q) => q.key === key);
-  const askOrder = (key: AskQuestion['key']) =>
-    asking.length > 1
-      ? `${asking.findIndex((q) => q.key === key) + 1}/${asking.length}`
-      : undefined;
-  const askFixed = askFor('fixed_expenses');
-  const fixedAskRow = askFixed ? askFixedIndex : -1;
   const setFixed = (fixedExpenses: Form['fixedExpenses']) => set({ fixedExpenses });
   /** 고정비 줄을 하나 더하고, 이름이 있으면 금액 칸·없으면 이름 칸으로 커서를 옮긴다. */
   const addFixed = (name = '') => {
@@ -413,62 +523,62 @@ export function ProfileFormView({
   return (
     <div className="space-y-8">
       <fieldset className="row-group">
-        <legend>나와 지금 사는 곳</legend>
+        <legend>
+          나와 지금 사는 곳
+          <GroupChip count={needIn((id) => id === 'current-housing')} />
+        </legend>
         <MoneyField
           id="current-housing"
           label="지금 집 주거비 (매달)"
+          need={need.has('current-housing')}
           example="52만"
           value={form.currentHousing}
           onChange={(currentHousing) => set({ currentHousing })}
           help="월세 + 관리비 (본가면 생활비로 드리는 돈)"
           ask={askFor('current_housing')}
-          askOrder={askOrder('current_housing')}
         />
+        {/* 가족 수: 펼침 목록 대신 한 줄 라디오. 계산은 20명까지 받으니 '6명 이상'을 고르면 숫자 칸이 나온다 */}
         <div className="row-field profile-field">
-          <label htmlFor="family">가족 수 (본인 포함)</label>
-          <select
+          <div className="field-label-line">
+            <span id="family-label" className="readonly-label">
+              가족 수 (본인 포함)
+            </span>
+            <span id="family-hint" className="field-help">
+              세금 계산에 써요
+            </span>
+          </div>
+          <ChoiceRow
             id="family"
-            value={form.family}
-            onChange={(event) => set({ family: Number(event.target.value) })}
-            className={CONTROL_CLASS}
-            aria-describedby="family-hint"
+            name="family"
+            labelledBy="family-label"
+            describedBy="family-hint"
+            value={Math.min(form.family, 6)}
+            options={[1, 2, 3, 4, 5, 6].map((n) => ({
+              value: n,
+              label: n === 6 ? '6명 이상' : `${n}명`,
+            }))}
+            onChange={(family) => set({ family })}
           >
-            {[1, 2, 3, 4, 5, 6].map((n) => (
-              <option key={n} value={n}>
-                {n}명
-              </option>
-            ))}
-          </select>
-          <p id="family-hint" className="row-field-hint">
-            세금 계산에 써요. 혼자 살면 1명
-          </p>
+            {form.family >= 6 && (
+              <FamilyMore family={form.family} onChange={(family) => set({ family })} />
+            )}
+          </ChoiceRow>
         </div>
         {askAge && <AgeField age={form.age ?? null} onChange={(age) => set({ age })} />}
       </fieldset>
 
-      <fieldset className="row-group">
-        <legend>매달 나가는 고정비</legend>
-        <p className="mb-3 text-sm text-muted-foreground">
-          학자금·통신비·보험료처럼 어느 회사에 가든 똑같이 나가는 돈이에요.
-        </p>
-        <ul className="space-y-3">
-          {form.fixedExpenses.map((item, i) => (
-            <Fragment key={i}>
-              {/* 되묻기: 금액이 빈 이 줄 위에 질문 (줄 안은 칸 순서로 자리를 잡아서 따로 둔다) */}
-              {askFixed && i === fixedAskRow && (
-                <li className="fixed-ask">
-                  <AskBubble
-                    // 서버는 '고정비 합계'로 묻지만, 화면은 금액이 빈 그 줄에서 답하므로 그 이름으로 묻는다
-                    question={{
-                      ...askFixed,
-                      question: `${item.name.trim() || `고정비 ${i + 1}`} 금액은 매달 얼마인가요?`,
-                    }}
-                    id={`fixed-${i}-ask`}
-                    order={askOrder('fixed_expenses')}
-                  />
-                </li>
-              )}
-              <li className={`fixed-expense${i === fixedAskRow ? ' is-asked' : ''}`}>
+      {/* 선택 항목이라 접어 둔다 (넣어 둔 줄이 있으면 펼친 채로). 금액을 비운 줄은 빼고 계산한다 */}
+      <details className="optional-group" open={fixedOpen || undefined}>
+        <FoldSummary title="매달 나가는 고정비" chip={<GroupChip count={0} optional />} />
+        <fieldset className="row-group">
+          <legend className="sr-only">매달 나가는 고정비</legend>
+          <p className="group-desc">
+            학자금·통신비·보험료처럼 어느 회사에 가든 똑같이 나가는 돈이에요. 넣지 않으면 0원으로
+            계산해요.
+          </p>
+          <ul className="space-y-3">
+            {form.fixedExpenses.map((item, i) => (
+              <li key={i} className="fixed-expense">
                 <Input
                   id={`fixed-${i}-name`}
                   aria-label={`고정비 ${i + 1} 이름`}
@@ -486,9 +596,9 @@ export function ProfileFormView({
                 <MoneyInput
                   id={`fixed-${i}-amount`}
                   label={`고정비 ${i + 1} 금액 (단위: 원)`}
-                  describedBy={askFixed && i === fixedAskRow ? `fixed-${i}-ask` : undefined}
                   value={item.amount}
                   example="5만"
+                  placeholder="비우면 0원"
                   onChange={(amount) =>
                     setFixed(form.fixedExpenses.map((x, j) => (j === i ? { ...x, amount } : x)))
                   }
@@ -513,32 +623,32 @@ export function ProfileFormView({
                   </p>
                 )}
               </li>
-            </Fragment>
-          ))}
-        </ul>
-        <div className="mt-3 flex flex-wrap gap-2" aria-label="자주 넣는 고정비">
-          {COMMON_FIXED.filter((name) => !used.has(name)).map((name) => (
-            <Button
-              key={name}
-              type="button"
-              variant="secondary"
-              className="min-h-11"
-              onClick={() => addFixed(name)}
-            >
-              <Plus aria-hidden /> {name}
-            </Button>
-          ))}
-        </div>
-        <Button
-          type="button"
-          id="add-fixed"
-          variant="outline"
-          className="mt-3 min-h-11 w-full"
-          onClick={() => addFixed()}
-        >
-          <Plus aria-hidden /> 다른 고정비 넣기
-        </Button>
-      </fieldset>
+            ))}
+          </ul>
+          <div className="mt-3 flex flex-wrap gap-2" aria-label="자주 넣는 고정비">
+            {COMMON_FIXED.filter((name) => !used.has(name)).map((name) => (
+              <Button
+                key={name}
+                type="button"
+                variant="secondary"
+                className="min-h-11"
+                onClick={() => addFixed(name)}
+              >
+                <Plus aria-hidden /> {name}
+              </Button>
+            ))}
+          </div>
+          <Button
+            type="button"
+            id="add-fixed"
+            variant="outline"
+            className="mt-3 min-h-11 w-full"
+            onClick={() => addFixed()}
+          >
+            <Plus aria-hidden /> 다른 고정비 넣기
+          </Button>
+        </fieldset>
+      </details>
 
       {/* 위는 모든 공고에 같은 값, 여기부터는 공고마다 다른 값: 굵은 선과 제목으로 크게 나눈다 */}
       <h3 className="profile-split">공고마다 다른 값</h3>
@@ -547,7 +657,7 @@ export function ProfileFormView({
         activeId={activeId}
         onSelect={onSelectPosting}
         label="비용을 넣을 공고"
-        doneLabel="다 넣음"
+        doneLabel="채울 칸 없음"
         status={(row) => {
           const missing = missingFor(row);
           // 통근·이사를 둘 다 끈 공고는 칸이 아니라 고를 일이 남았다
@@ -563,6 +673,8 @@ export function ProfileFormView({
           (row, i) =>
             row.id === activeId && (
               <PostingCosts
+                need={need}
+                currentHousing={form.currentHousing}
                 key={row.id}
                 row={row}
                 index={i}
@@ -579,55 +691,71 @@ export function ProfileFormView({
 
       {/* 연봉 비공개 공고가 있을 때만: 최소 연봉을 무엇에 맞춰 계산할지 */}
       {rows.some(salaryLeftBlank) && (
-        <fieldset className="row-group">
-          <legend>비교 기준 (선택)</legend>
-          <div className="mb-3 text-sm text-muted-foreground">
-            <p>연봉 비공개 공고는 이 기준만큼 남으려면 얼마를 받아야 하는지 계산해요.</p>
-            <p>비우면 다른 공고 중 매달 더 많이 남는 쪽이 기준이에요.</p>
-          </div>
-          <Check
-            id="has-current-job"
-            checked={form.hasCurrentJob}
-            onChange={(hasCurrentJob) => set({ hasCurrentJob })}
-          >
-            지금 다니는 회사가 있어요 (지금 회사와 비교하기)
-          </Check>
-          {form.hasCurrentJob && (
-            <>
-              <MoneyField
-                id="current-salary"
-                label="지금 연봉 (세전)"
-                example="3800만"
-                value={form.currentSalary}
-                onChange={(currentSalary) => set({ currentSalary })}
-                help="성과급·연장근로수당을 뺀 고정연봉"
+        // 선택 항목은 접어 둔다 (값을 넣어 둔 적이 있으면 펼친 채로: 돌아왔을 때 넣은 값이 숨지 않게)
+        <details className="optional-group" open={basisOpen || undefined}>
+          <FoldSummary
+            title="비교 기준"
+            chip={
+              <GroupChip
+                count={needIn((id) => id.startsWith('current-') && id !== 'current-housing')}
+                optional
               />
-              <MoneyField
-                id="current-meal"
-                label="그중 식대 (매달)"
-                example="20만"
-                value={form.currentMeal}
-                onChange={(currentMeal) => set({ currentMeal })}
-                help="급여명세서의 비과세 식대 (없으면 비워 두세요)"
-              />
-              <MoneyField
-                id="current-transport"
-                label="지금 회사 교통비 (매달)"
-                example="6만"
-                value={form.currentTransport}
-                onChange={(currentTransport) => set({ currentTransport })}
-              />
-            </>
-          )}
-          <MoneyField
-            id="target"
-            label="매달 이만큼은 남았으면 (선택)"
-            example="150만"
-            value={form.target}
-            onChange={(target) => set({ target })}
-            help="넣으면 이 금액을 기준으로 계산해요"
+            }
           />
-        </fieldset>
+          <fieldset className="row-group">
+            {/* 보이는 제목은 접기 줄(summary). 묶음 이름은 화면 읽기용으로 남긴다 */}
+            <legend className="sr-only">비교 기준</legend>
+            <div className="group-desc">
+              <p>연봉 비공개 공고는 이 기준만큼 남으려면 얼마를 받아야 하는지 계산해요.</p>
+              <p>비우면 다른 공고 중 매달 더 많이 남는 쪽이 기준이에요.</p>
+            </div>
+            <Check
+              id="has-current-job"
+              checked={form.hasCurrentJob}
+              onChange={(hasCurrentJob) => set({ hasCurrentJob })}
+            >
+              지금 다니는 회사가 있어요 (지금 회사와 비교하기)
+            </Check>
+            {form.hasCurrentJob && (
+              <>
+                <MoneyField
+                  id="current-salary"
+                  need={need.has('current-salary')}
+                  label="지금 연봉 (세전)"
+                  example="3800만"
+                  value={form.currentSalary}
+                  onChange={(currentSalary) => set({ currentSalary })}
+                  help="성과급·연장근로수당을 뺀 고정연봉"
+                />
+                <MoneyField
+                  id="current-meal"
+                  label="그중 식대 (매달)"
+                  example="20만"
+                  value={form.currentMeal}
+                  onChange={(currentMeal) => set({ currentMeal })}
+                  help="급여명세서의 비과세 식대"
+                  blank="비우면 0원"
+                />
+                <MoneyField
+                  id="current-transport"
+                  need={need.has('current-transport')}
+                  label="지금 회사 교통비 (매달)"
+                  example="6만"
+                  value={form.currentTransport}
+                  onChange={(currentTransport) => set({ currentTransport })}
+                />
+              </>
+            )}
+            <MoneyField
+              id="target"
+              label="매달 이만큼은 남았으면 (선택)"
+              example="150만"
+              value={form.target}
+              onChange={(target) => set({ target })}
+              help="넣으면 이 금액을 기준으로 계산해요"
+            />
+          </fieldset>
+        </details>
       )}
     </div>
   );

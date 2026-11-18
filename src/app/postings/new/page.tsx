@@ -42,7 +42,6 @@ import {
 } from './posting-files';
 import {
   EMPTY_PROFILE,
-  blankFixedIndex,
   isSettledRent,
   missingInputs,
   rentsFromResult,
@@ -57,7 +56,7 @@ import { ResultView, bestRemainingText, isCalculationResult } from './result-vie
 import { BadgeLegend } from './source-badge';
 import { SupportView, isLocalSupport } from './support-view';
 import { PlanPreview, PlanView, isSettlePlan } from './plan-view';
-import { askQuestionsOf, askTargetId, type AskQuestion } from './ask-view';
+import { askQuestionsOf, type AskQuestion } from './ask-view';
 import { ReportView, isReport, type Report } from './report-view';
 import { RowEditor, fieldsToCheck, focusField, salaryLeftBlank } from './row-editor';
 
@@ -95,8 +94,15 @@ function enterMovesToNextField(event: KeyboardEvent<HTMLFormElement>) {
     ...event.currentTarget.querySelectorAll<HTMLElement>(
       'input:not([type=hidden]):not(:disabled), select:not(:disabled)',
     ),
-  ];
-  const next = fields[fields.indexOf(target) + 1];
+  ].filter((field) => !field.closest('details:not([open])')); // 접힌 선택 항목으로는 가지 않는다
+  const sameGroup = (field: HTMLElement) =>
+    target.type === 'radio' && field instanceof HTMLInputElement && field.name === target.name;
+  let next = fields.slice(fields.indexOf(target) + 1).find((field) => !sameGroup(field));
+  // 다음 칸이 라디오 묶음이면 고른 단추로 (첫 단추로 가면 화살표 한 번에 값이 바뀐다)
+  if (next instanceof HTMLInputElement && next.type === 'radio') {
+    next =
+      event.currentTarget.querySelector<HTMLElement>(`input[name="${next.name}"]:checked`) ?? next;
+  }
   (next ?? event.currentTarget.querySelector<HTMLElement>('button[type=submit]'))?.focus();
 }
 
@@ -576,8 +582,7 @@ export default function NewPosting() {
     const questions = data.status === 'awaiting_answer' ? askQuestionsOf(data.pending) : null;
     if (questions) {
       setSessionId(id);
-      // 고정비 질문 줄은 질문이 온 때 정한다 (답을 치는 동안 말풍선이 옮겨 가지 않게)
-      setAsking({ id, questions, fixedIndex: blankFixedIndex(profile.fixedExpenses) });
+      setAsking({ id, questions });
       return;
     }
     setAsking(null);
@@ -602,23 +607,17 @@ export default function NewPosting() {
   }
 
   // 되묻기 대화 (계산 전에 서버가 빈 값을 물어볼 때)
-  const [asking, setAsking] = useState<{
-    id: string;
-    questions: AskQuestion[];
-    fixedIndex: number;
-  } | null>(null);
-  const askIds = asking?.questions.map((q) => askTargetId(q, asking.fixedIndex)) ?? [];
-  // 질문이 뜨면 첫 질문의 원래 칸으로 스크롤하고 커서를 넣는다 (바로 답할 수 있게).
+  const [asking, setAsking] = useState<{ id: string; questions: AskQuestion[] } | null>(null);
+  // 질문이 뜨면 물은 원래 칸으로 스크롤하고 커서를 넣는다 (바로 답할 수 있게).
   // 계산 중에는 입력칸이 잠겨 있어(fieldset disabled) 커서가 안 들어가므로, 계산이 끝난 뒤 한 번만.
   const focusedAsk = useRef<object | null>(null);
   useEffect(() => {
     if (!asking || busy !== null || focusedAsk.current === asking) return;
     focusedAsk.current = asking;
-    const field = document.getElementById(askIds[0]);
+    const field = document.getElementById('current-housing'); // 묻는 칸은 지금 집 주거비뿐
     field?.scrollIntoView({ block: 'center', behavior: 'smooth' });
     field?.focus({ preventScroll: true });
     // 질문이 새로 왔을 때만 (답을 치는 동안 폼이 바뀌어도 커서를 옮기지 않는다)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [asking, busy]);
 
   /**
@@ -787,8 +786,8 @@ export default function NewPosting() {
       shownIndex < 2 && !completed
         ? ''
         : missingProfile.length
-          ? `빈칸 ${missingProfile.length}개`
-          : '다 넣음',
+          ? `채울 칸 ${missingProfile.length}개`
+          : '채울 칸 없음', // 묶음 칩('채울 칸 N')과 같은 말. '다 넣음'은 선택 칸을 비워도 떠서 쓰지 않는다
     result: freshResult ? bestRemainingText(freshResult) : '',
     plan: '',
   };
@@ -859,7 +858,13 @@ export default function NewPosting() {
             {shown === 'plan'
               ? '이 회사에 가면 1년 동안 챙길 일을 모았어요.'
               : shown === 'result'
-                ? '세금과 4대보험, 주거비·교통비·고정비를 빼고 매달 남는 돈이에요.'
+                ? '세금과 4대보험, 주거비·교통비·고정비를 빼고 매달 남는 돈이에요.' +
+                  // 한 경우라도 최소 연봉을 구했을 때만 (못 구했으면 카드가 '계산하지 못했어요'라고 한다)
+                  (freshResult?.break_even.some((be) =>
+                    be.cases.some((c) => c.annual_salary_krw != null),
+                  )
+                    ? ' 연봉이 없는 공고는 받아야 할 최소 연봉을 계산했어요.'
+                    : '')
                 : shown === 'living'
                   ? '공고에 없는 내 생활비를 넣어 주세요.'
                   : reviewing
@@ -887,13 +892,19 @@ export default function NewPosting() {
         >
           {shown === 'result' ? (
             <>
-              <h2 className="sheet-heading">공고 {rows.length}개 비교</h2>
+              {/* 보이는 소제목은 위 제목과 같은 말이라 뺐다. 화면 읽기의 제목 단계(h1 → h2 → h3)는 남긴다 */}
+              <h2 className="sr-only">공고 {rows.length}개 비교</h2>
               <ReportView report={report} />
-              <ResultView result={freshResult} rows={rows} />
+              <ResultView
+                result={freshResult}
+                rows={rows}
+                // 결과는 지금 입력으로 계산한 것(freshResult)이라 지금 고정비 칸으로 판단해도 맞다
+                noFixed={!profile.fixedExpenses.some((item) => item.amount != null)}
+              />
             </>
           ) : (
             <>
-              <h2 className="sheet-heading">공고 {rows.length}개의 정착 플랜</h2>
+              <h2 className="sr-only">공고 {rows.length}개의 정착 플랜</h2>
               {plan && (
                 <PlanView
                   plan={plan}
@@ -998,40 +1009,30 @@ export default function NewPosting() {
           aria-label="내 생활비"
           aria-busy={busy === 'confirming'}
           onKeyDown={(event) => {
-            // 되묻기: 질문 칸에서 Enter는 다음 질문 칸, 마지막이면 계산
-            const at = askIds.indexOf((event.target as HTMLElement).id);
+            // 되묻기: 질문 칸에서 Enter는 바로 계산 (답이 없으면 그대로 — 보내면 같은 질문이 다시 온다)
+            const asked = asking && (event.target as HTMLElement).id === 'current-housing';
             const composing = event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229;
-            if (at < 0 || event.key !== 'Enter' || composing) {
+            if (!asked || event.key !== 'Enter' || composing) {
               enterMovesToNextField(event);
               return;
             }
             event.preventDefault();
-            // 답이 없으면 그대로 (보내면 같은 질문이 다시 온다)
-            const empty =
-              asking?.questions[at].key === 'current_housing'
-                ? profile.currentHousing == null
-                : profile.fixedExpenses[asking?.fixedIndex ?? -1]?.amount == null;
-            if (empty) return;
-            const next = askIds
-              .slice(at + 1)
-              .map((id) => document.getElementById(id))
-              .find((el) => el instanceof HTMLInputElement);
-            if (next) next.focus();
-            else event.currentTarget.requestSubmit();
+            if (profile.currentHousing != null) event.currentTarget.requestSubmit();
           }}
           onSubmit={(event) => {
             event.preventDefault();
             calculate();
           }}
         >
-          <h2 className="sheet-heading">공고 {rows.length}개에 필요한 값</h2>
+          <h2 className="sr-only">공고 {rows.length}개에 필요한 값</h2>
           {/* 계산을 막는 빈칸을 맨 위에 (오류처럼 보이지 않게 '할 일' 상자로). 되묻기 중에는 질문이 칸 위에 있으니 숨긴다 */}
           {!asking && (
             <div className="review-todo">
               {/* 빈칸이 다 채워지면 제목만 바뀐다 (화면 읽기 프로그램에 한 번 알림) */}
               <p role="status" className="review-todo-title">
                 {missingProfile.length
-                  ? '이 칸만 채우면 계산돼요'
+                  ? // 막지는 않는다: 비어 있으면 그 값이 필요한 경우만 '계산 못 함'이 된다 (칸마다 무엇이 빠지는지)
+                    '이 칸이 비면 남는 돈 일부가 안 나와요'
                   : '필요한 칸은 다 채웠어요. 계산하면 돼요'}
               </p>
               <ul>
@@ -1045,7 +1046,8 @@ export default function NewPosting() {
                       }
                     >
                       {item.label}
-                    </button>
+                    </button>{' '}
+                    <span className="todo-effect">{item.effect}</span>
                   </li>
                 ))}
               </ul>
@@ -1059,13 +1061,12 @@ export default function NewPosting() {
               onChange={setProfile}
               activeId={activeId}
               onSelectPosting={selectPosting}
-              missingFor={(row) => missingProfile.filter((item) => item.rowId === row.id)}
+              missing={missingProfile}
               askAge={supportEnabled}
               rents={rents}
               failedRents={failedRents}
               onRetryRents={retryFailedRents}
               asking={asking?.questions}
-              askFixedIndex={asking?.fixedIndex}
             />
           </fieldset>
           {/* 계산 실패: 빨간 한 줄 대신 눈에 띄는 상자로. 할 일은 오류 문구에, 넣은 값은 그대로라는 것을 함께 */}

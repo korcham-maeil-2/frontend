@@ -457,7 +457,8 @@ details[open] > summary .when-closed {
 .row-questions {
   margin-top: 0.75rem;
   border-radius: 0.5rem;
-  background: var(--muted);
+  /* '알면 더 정확해요'(선택): 회색 대신 옅은 파랑 — 안내는 파랑, 추정(꼭 볼 것)만 노랑 */
+  background: var(--accent);
   padding: 0.75rem 1rem;
   font-size: 0.9375rem;
   color: var(--body);
@@ -502,12 +503,14 @@ details[open] > summary .when-closed {
   background: var(--accent);
   scroll-margin: 6rem;
 }
-.sheet-heading + .review-todo {
-  margin-top: 1rem;
-}
 .review-todo:focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
+}
+/* 빈칸마다 비우면 무엇이 빠지는지 (칸 이름 바로 옆, 옅게) */
+.todo-effect {
+  font-size: 0.9375rem;
+  color: var(--body);
 }
 .review-todo-title {
   font-size: 1.0625rem;
@@ -581,9 +584,13 @@ details[open] > summary .when-closed {
   flex-wrap: wrap;
   align-items: center;
   gap: 0.25rem 0.5rem;
+  /* 배지 끝을 입력칸 끝에 맞춘다 (단위 자리만큼 덜 간다) */
+  width: calc(100% - var(--unit-slot));
 }
 .row-field > label,
-.row-field-head > label {
+.row-field-head > label,
+.field-label-line > label,
+.readonly-label {
   font-weight: 600;
   font-size: 1.0625rem;
   color: var(--foreground);
@@ -650,26 +657,49 @@ details[open] > summary .when-closed {
   font-size: 0.9375rem;
   color: var(--body);
 }
-@media (min-width: 64rem) {
-  .row-field {
-    grid-template-columns: 11.5rem minmax(0, 1fr) 5.5rem;
+/* 넓은 화면(≥48rem): 칸 이름은 늘 위, 짧은 칸은 한 줄에 둘 (조건 확인·내 생활비 공통).
+   칸이 아닌 것(묶음 제목·안내·체크·고정비 줄·질문 말풍선)과 넓은 칸(.is-wide)은 한 줄 전체.
+   화면 폭 기준: 입력 두 칸은 48rem, 글이 긴 목록 두 칸(정착 플랜 등)은 64rem */
+@media (min-width: 48rem) {
+  .row-group {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+    column-gap: 2rem;
   }
-  /* 조건 확인 화면(이름 + 배지 묶음이 있는 칸)만 이름 칸을 넓혀 배지를 그 끝에 둔다.
-     내 생활비 화면(profile-form.tsx)은 배지가 없어 원래 칸 나눔 그대로 */
-  .row-field:has(> .row-field-head) {
-    grid-template-columns: 15rem minmax(0, 1fr);
+  .row-group > * {
+    grid-column: 1 / -1;
   }
-  /* 넓은 화면: 배지를 이름 칸 오른쪽 끝(입력칸 바로 앞)에 세로로 줄 맞춘다 — '확인할 칸'을 위아래로 훑기 쉽게.
-     이름과 배지가 한 줄에 안 들어가면('이미지에서 읽음' 등) 배지가 아랫줄 오른쪽으로 내려간다 */
+  .row-group > .row-field:not(.is-wide) {
+    grid-column: auto;
+  }
+  /* 배지는 칸 이름 줄의 오른쪽 끝: 위아래 칸끼리 배지가 한 줄로 맞는다 */
   .row-field-head > .status-badge {
     margin-inline-start: auto;
   }
-  .row-field > :is(input, select, .unit-input) {
-    grid-row: 1;
-    grid-column: 2;
+}
+/* 내 생활비: 공고마다 '지금 집에서 다니기'와 '회사 근처로 이사하기'를 나란히 (통근·이사 비교와 같은 모양).
+   각 묶음 안은 한 칸이다 */
+@media (min-width: 64rem) {
+  .cost-cases {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+    column-gap: 2.5rem;
   }
-  .row-field-hint {
-    grid-column: 2 / -1;
+  /* 두 묶음의 줄을 맞춘다: 제목 | 체크 | 주거비 | 교통비 — 같은 줄끼리 통근과 이사를 비교.
+     묶음마다 정확히 이 4줄이라 span 4 (묶음에 줄을 더하면 이 숫자도 함께 바꾼다) */
+  .cost-cases {
+    grid-template-rows: repeat(4, auto);
+  }
+  .cost-cases > .row-group {
+    grid-row: 1 / span 4;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: subgrid;
+  }
+  .cost-cases > .row-group + .row-group {
+    padding-top: 0;
+    border-top: 0;
   }
 }
 .desk-sheet {
@@ -709,9 +739,6 @@ details[open] > summary .when-closed {
   font-weight: 600;
   letter-spacing: -0.02em;
   color: var(--foreground);
-}
-section.desk-sheet > .sheet-heading {
-  margin-bottom: 1rem;
 }
 .desk-sheet input:not([type='file']),
 .desk-sheet textarea {
@@ -1001,50 +1028,12 @@ section.desk-sheet > .sheet-heading {
   color: var(--foreground);
   cursor: pointer;
 }
-.breakdown > div {
-  display: grid;
-  grid-template-columns: minmax(0, 8rem) minmax(0, 1fr);
-  gap: 0.75rem;
-  padding-block: 0.6rem;
-  border-block-end: 1px solid var(--border);
-  font-size: 0.9375rem;
-}
-/* 내역의 마지막 줄 '매달 남는 돈': 위 2px 선 + 굵게, 금액은 남는 돈 초록 (DESIGN.md) */
-.breakdown > div.breakdown-total {
-  border-block-start: 2px solid var(--foreground);
-  border-block-end: 0;
-  font-weight: 700;
-}
-.breakdown-total dt,
-.breakdown-total dd {
-  color: var(--foreground);
-}
-.breakdown-total .tabular-nums {
-  font-size: 1.375rem;
-  color: var(--positive);
-}
-.breakdown-total dt {
-  font-size: 1.0625rem;
-}
-.breakdown dt {
-  color: var(--muted-foreground);
-  font-weight: 600;
-}
-.breakdown dd {
-  text-align: end;
-  color: var(--foreground);
-}
-.breakdown .cell-note,
+/* 계산 과정 표의 '참고' 칸 목록 (result-view.tsx CalcSteps) */
 .result-notes {
-  display: block;
-  margin-block-start: 0.2rem;
-  font-size: 0.9375rem;
-  color: var(--muted-foreground);
-}
-.result-notes {
-  margin-block-start: 0.75rem;
   padding-inline-start: 1.1rem;
   list-style: disc;
+  font-size: 0.9375rem;
+  color: var(--muted-foreground);
 }
 /* 보기 방식 고르기 (더 남는 쪽 / 통근 / 이사): .source-tabs 탭과 같은 모양의 버튼 묶음 */
 .mode-switch {
@@ -1094,12 +1083,6 @@ section.desk-sheet > .sheet-heading {
 }
 .cell-value.is-muted {
   color: var(--muted-foreground);
-}
-/* 좁은 화면의 공고 고르기: 공고가 많으면 넘기지 않고 가로로 밀어 본다 */
-.result-compare .compare-switch {
-  max-width: 100%; /* 탭 줄이 카드 밖으로 나가 페이지가 가로로 밀리지 않게 (줄 안에서 민다) */
-  overflow-x: auto;
-  justify-content: flex-start;
 }
 
 /* ── 2단계부터: 화면 한 장 (desk-spread.is-wide) ──
@@ -1198,6 +1181,9 @@ section.desk-sheet > .sheet-heading {
 .posting-tabs {
   position: relative; /* 고른 탭으로 줄을 밀 때 tab.offsetLeft의 기준 (posting-tabs.tsx) */
   display: flex;
+  width: 100%; /* 탭이 같은 폭으로 줄을 꽉 채운다 (정착 플랜·결과의 탭 목록도) */
+  /* 넘칠 때 첫 탭부터 (TabsList 기본 justify-center면 앞 탭이 왼쪽 밖으로 잘려 밀어도 못 본다) */
+  justify-content: flex-start;
   gap: 0.25rem;
   /* 공고가 많으면 가로로 밀어 본다. 탭 줄 아래 1px 선은 배경으로, 고른 탭의 밑줄이 그 위에 겹친다 */
   overflow-x: auto;
@@ -1206,11 +1192,11 @@ section.desk-sheet > .sheet-heading {
   scrollbar-width: thin;
 }
 /* 밑줄 탭 (토스·은행 앱처럼): 고른 탭 = 진한 굵은 글자 + 코발트 밑줄 2px ('현재 선택' 색, DESIGN.md),
-   나머지 = 회색 글자. 남는 폭은 나눠 갖고(줄지는 않는다 — 줄면 폰에서 회사 이름이 사라질 수 있다),
-   많으면 줄을 가로로 민다. 아주 긴 이름만 18rem에서 줄인다 */
+   나머지 = 회색 글자. 공고 수만큼 같은 폭으로 줄을 꽉 채우고(2개면 반반), 한 칸이 10rem보다 좁아지면
+   그때부터 줄을 가로로 민다 (긴 회사 이름은 말줄임) */
 .posting-tabs [role='tab'] {
-  flex: 1 0 auto;
-  max-width: 18rem;
+  flex: 1 1 0;
+  min-width: 10rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1242,6 +1228,7 @@ section.desk-sheet > .sheet-heading {
 }
 .posting-tab-name {
   min-width: 0;
+  max-width: 100%; /* 좁은 화면(이름·상태 세로 배치)에서도 말줄임이 되게 */
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1302,16 +1289,144 @@ section.desk-sheet > .sheet-heading {
   padding-top: 2rem;
   border-top: 1px solid var(--border);
 }
-.row-group legend {
+/* 화면 읽기용으로만 둔 legend(.sr-only, 접기 묶음)는 빼야 폭 100%가 1px 숨김을 덮어 가로로 넘치지 않는다 */
+.row-group legend:not(.sr-only),
+.row-group-title {
   float: left; /* fieldset 테두리 위에 걸치지 않고 일반 제목처럼 */
   width: 100%;
+  /* 제목 왼쪽, 묶음 칩('채울 칸 1'·'선택'·'다시 볼 값 2') 오른쪽 — 빈 오른쪽을 쓰고 지금 할 일을 알린다 */
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.25rem 1rem;
   margin-bottom: 0.75rem;
   /* 묶음 제목은 항목 이름(17px)보다 확실히 크게(22px): 어디서 묶음이 바뀌는지 한눈에 */
   font-size: 1.375rem;
   font-weight: 700;
   color: var(--foreground);
 }
-.row-group legend + * {
+/* 내 생활비의 선택 항목 접기 ('비교 기준'): 묶음 제목과 같은 크기·선, 오른쪽에 '선택' 칩 */
+.optional-group {
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+}
+.optional-group > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 2.75rem;
+  cursor: pointer;
+  font-size: 1.375rem;
+  font-weight: 700;
+  color: var(--foreground);
+}
+.optional-group > summary::-webkit-details-marker {
+  display: none; /* 삼각형 대신 오른쪽 '펼치기 ⌄' (profile-form.tsx FoldSummary) */
+}
+.fold-side {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.fold-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--primary);
+}
+.fold-chevron {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+.optional-group[open] > summary .fold-chevron {
+  rotate: 180deg;
+}
+.optional-group > .row-group {
+  margin-top: 0.5rem;
+}
+/* 묶음 설명(읽어야 하는 문장): 본문 크기·진한 색. 출처·예시만 작고 옅게 */
+.group-desc {
+  margin-bottom: 0.75rem;
+  color: var(--body);
+}
+.group-chip {
+  border-radius: 0.25rem;
+  padding: 0.15rem 0.5rem;
+  background: var(--secondary);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--body);
+}
+/* 채워야 할 것: 파랑 (지금 할 일). 추정(노랑)과 섞지 않는다 */
+.group-chip.is-need {
+  background: var(--accent);
+  color: var(--primary);
+}
+/* 칸 이름 줄: 이름 + 옆에 뜻 한 토막 (넘치면 뜻이 통째로 이름 아래로) */
+.field-label-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.125rem 0.75rem;
+}
+.field-help {
+  font-size: 0.9375rem;
+  color: var(--muted-foreground);
+}
+/* 짧은 선택지 한 줄 라디오 (choice-row.tsx): 동그란 단추 + 글자. 상자형 버튼보다 조용해서
+   확인된 값이 많은 조건 확인 화면에서도 튀지 않는다. 고른 것은 코발트 단추, '모름'은 옅은 글자 */
+.choice-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 1.25rem;
+}
+.choice {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--foreground);
+  cursor: pointer;
+}
+.choice input {
+  width: 1.25rem;
+  height: 1.25rem;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+.choice.is-muted {
+  color: var(--muted-foreground);
+}
+.choice:has(input:checked) {
+  font-weight: 600;
+}
+/* '6명 이상'을 고르면 옆에 나오는 숫자 칸 */
+.choice-more {
+  width: 6rem;
+}
+/* 통근 쪽 '지금 집 주거비'(보기만): 입력칸과 같은 높이에 값만 */
+.readonly-value {
+  display: flex;
+  align-items: center;
+  min-height: 2.75rem;
+  font-size: 1.0625rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--foreground);
+}
+/* 계산에 꼭 필요한 빈칸: 파란 테두리 (채우면 사라진다) */
+.row-field.is-need input {
+  border-color: var(--primary);
+  box-shadow: inset 0 0 0 1px var(--primary);
+}
+.row-group legend + *,
+.row-group-title + * {
   clear: both;
 }
 
@@ -1783,72 +1898,65 @@ section.desk-sheet > .sheet-heading {
   margin-top: 0.25rem;
 }
 
-/* 계산 내역 묶음 (result-view.tsx Breakdown): 월급 / 매달 나가는 돈 (끝에 매달 남는 돈) */
-.breakdown-group {
-  margin-top: 0.75rem;
-  font-size: 0.8125rem;
-  font-weight: 700;
-  color: var(--foreground); /* 아래 줄 이름(회색)과 구분되는 묶음 제목 */
-}
-/* 세금·4대보험 6줄은 접어 두고 합계만 한 줄로 */
-.breakdown-fold {
-  border-block-end: 1px solid var(--border);
-  font-size: 0.9375rem;
-}
-.breakdown-fold > summary {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  min-height: 2.75rem; /* 누르는 줄: 44px */
-  padding-block: 0.6rem;
-  list-style: none; /* 삼각형 표시 대신 '6개 항목 보기 / 접기' 글자로 알린다 */
-  cursor: pointer;
-  font-weight: 600;
-  color: var(--muted-foreground);
-}
-.breakdown-fold > summary::-webkit-details-marker {
-  display: none;
-}
-.breakdown-fold > summary .tabular-nums {
-  margin-inline-start: auto;
-  font-weight: 400;
+/* ④ 연봉 비공개 공고의 답 카드 '면접에서 확인할 연봉' (result-view.tsx SalaryAnswer).
+   초록 최소 연봉은 화면에 이 카드 하나뿐 (표 칸은 기본색). 금액 말고 글자는 진한 색 (옅은 초록 바탕 대비) */
+.salary-answer {
+  border-radius: 1rem;
+  background: var(--positive-soft);
+  padding: 1.25rem;
   color: var(--foreground);
 }
-.breakdown-fold-hint {
-  margin-inline-start: 0.25rem;
+.salary-answer-title {
   font-size: 0.9375rem;
-  font-weight: 400;
-  text-decoration: underline;
-  text-underline-offset: 0.2em;
+  font-weight: 700;
 }
-.breakdown-fold .breakdown {
-  padding-inline-start: 0.75rem;
+.salary-answer li {
+  margin-top: 0.75rem;
 }
-.breakdown-fold .breakdown > div:last-child {
-  border-block-end: 0;
+.salary-answer li + li {
+  border-top: 1px solid color-mix(in srgb, var(--positive) 25%, transparent);
+  padding-top: 0.75rem;
 }
-
-/* 연봉 비공개 공고 요약 카드의 이름표 + 값 (result-view.tsx BreakEvenSummary) */
+.salary-answer-company {
+  font-weight: 600;
+}
+.salary-answer-amount {
+  white-space: nowrap;
+}
+.salary-answer-amount strong {
+  margin-inline-end: 0.25rem;
+  font-size: 1.625rem;
+  font-weight: 800;
+  color: var(--positive);
+  font-variant-numeric: tabular-nums;
+}
+.salary-answer.is-many .salary-answer-amount strong {
+  font-size: 1.375rem;
+}
+/* 답 카드의 이름표 + 값 */
 .be-facts {
   margin-top: 0.5rem;
   display: grid;
-  gap: 0.25rem;
+  /* 이름표 칸은 가장 긴 이름표 폭에 맞춘다 ('주거지원비 받는 동안'이 두 줄로 꺾이지 않게) */
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 0.25rem 1rem;
   font-size: 0.9375rem;
 }
 .be-facts > div {
-  display: grid;
-  grid-template-columns: 7.5rem minmax(0, 1fr);
-  gap: 0.5rem;
+  display: contents;
 }
 /* 좁은 화면: 이름표를 값 위로 (값 칸이 좁아져 여러 줄로 꺾이지 않게) */
 @media (max-width: 39.99rem) {
-  .be-facts > div {
+  .be-facts {
     grid-template-columns: minmax(0, 1fr);
-    gap: 0;
+    row-gap: 0;
+  }
+  .be-facts > div + div > dt {
+    margin-top: 0.25rem; /* dt·dd 쌍은 div마다 따로라 'dd + dt'로는 안 잡힌다 */
   }
 }
 .be-facts dt {
-  color: var(--muted-foreground);
+  color: var(--body);
 }
 
 /* 결과 화면 좁은 화면 명세: 최소 연봉 칸의 '공고엔 비공개' 칩이 바로 앞 신뢰도 배지와 붙지 않게 */
@@ -1861,11 +1969,88 @@ section.desk-sheet > .sheet-heading {
   color: var(--foreground);
 }
 
-/* 표 위 '연봉 비공개 공고의 기준' 한 줄 (result-view.tsx) */
-.compare-basis {
-  margin-top: -0.75rem;
+/* 결과 표의 빠지는 돈 줄: 보통 굵기·회청색 (세후 월급은 굵게, 남는 돈만 초록) */
+.compare-table .is-cost .cell-value,
+.compare-list .is-cost .cell-value {
+  font-weight: 400;
+  color: var(--body);
+}
+/* ④ 계산 과정 비교 표 (result-view.tsx CalcSteps): 금액은 오른쪽 정렬, 공제 6개 항목은 한 칸 들여 쓴다.
+   landing.css(.offer-table)가 뒤에 읽혀 같은 세기면 이기므로 모두 .offer-table.calc-table로 시작한다 */
+.offer-table.calc-table td,
+.offer-table.calc-table thead th:not(:first-child) {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+.offer-table.calc-table thead th {
+  font-size: 1.0625rem;
+}
+.offer-table.calc-table .cell-note {
+  display: block;
+  margin-block-start: 0.15rem;
   font-size: 0.9375rem;
   color: var(--muted-foreground);
+}
+.calc-toggle {
+  display: block;
+  min-height: 2.75rem; /* 누르는 칸: 44px */
+  font-size: 0.9375rem;
+  font-weight: 400;
+  color: var(--primary);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  cursor: pointer;
+}
+.offer-table.calc-table .calc-item :is(th, td) {
+  padding-block: 0.5rem;
+  font-weight: 400;
+  color: var(--body);
+}
+.offer-table.calc-table .calc-item th {
+  padding-inline-start: 0.75rem;
+}
+.offer-table.calc-table .calc-net td .cell-value {
+  font-weight: 700;
+}
+/* 참고는 문장이라 왼쪽 정렬 */
+/* 줄 사이 선은 칸에 긋는다: 좁은 화면에서 붙여 둔(sticky) 이름 칸이 겹친 선(collapse)을 가리지 않게 */
+.offer-table.calc-table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+.offer-table.calc-table tbody tr {
+  border-block-end: 0;
+}
+.offer-table.calc-table tbody :is(th, td) {
+  border-block-end: 1px solid var(--border);
+}
+.offer-table.calc-table tbody tr:last-child :is(th, td) {
+  border-block-end: 0; /* 접기 상자 테두리가 바로 아래에 있다 */
+}
+/* 표가 넘칠 때만 나오는 '옆으로 밀면…' 한 줄 (result-view.tsx CalcSteps가 재서 보인다) */
+.calc-scroll-hint {
+  margin-block-end: 0.5rem;
+  font-size: 0.9375rem;
+  color: var(--muted-foreground);
+}
+/* 좁은 화면: 가로로 넘겨 보는 표. 항목 이름 열은 붙여 둔다 */
+@media (max-width: 39.99rem) {
+  .offer-table.calc-table {
+    min-width: calc(6.5rem + var(--result-columns, 2) * 10rem);
+  }
+  .offer-table.calc-table thead th:first-child {
+    width: 6.5rem;
+  }
+  .offer-table.calc-table :is(th, td):first-child {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: var(--card);
+  }
+}
+.offer-table.calc-table .calc-notes td {
+  text-align: start;
+  font-variant-numeric: normal;
 }
 
 /* 결과 표의 답 줄 '매달 남는 돈': 이름도 크게 (옆의 큰 초록 금액이 무엇인지 바로 읽히게) */
@@ -1875,12 +2060,6 @@ section.desk-sheet > .sheet-heading {
 }
 .result-compare .compare-list .compare-result dt {
   font-size: 1.0625rem;
-}
-
-/* 연봉 비공개 공고 요약: 회색 카드 한 겹, 공고가 여럿이면 사이에 선 */
-.be-item + .be-item {
-  border-top: 1px solid var(--border);
-  padding-top: 0.75rem;
 }
 
 /* '새로 비교하기' 확인 (page.tsx): 버튼 자리에 질문과 두 버튼 */
@@ -2134,6 +2313,16 @@ section.desk-sheet > .sheet-heading {
 .plan-fold[open] > summary::before {
   content: '▾';
 }
+/* 미리보기 칩은 흰 바탕 (상자의 옅은 파랑 위에서 칩으로 보이게) */
+.plan-preview .support-category {
+  background: var(--card);
+}
+.plan-preview-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.5rem;
+}
 .plan-preview {
   flex-basis: 100%;
   display: grid;
@@ -2171,19 +2360,10 @@ section.desk-sheet > .sheet-heading {
   color: var(--muted-foreground);
 }
 /* 되묻기 (ask-view.tsx): 에이전트가 물은 원래 칸 위에 질문을 붙이고, 질문과 칸을 함께 강조한다 */
-.ask-wrap,
-.fixed-expense.is-asked {
+.ask-wrap {
   border-radius: 0.5rem;
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 45%, transparent);
-}
-.ask-wrap {
   padding: 0.5rem 0.75rem 0;
-}
-.fixed-expense.is-asked {
-  padding: 0.5rem;
-}
-.fixed-ask {
-  list-style: none;
 }
 .ask-bubble {
   border-radius: 0.5rem;
@@ -2191,13 +2371,6 @@ section.desk-sheet > .sheet-heading {
   padding: 0.75rem;
   font-size: 0.9375rem;
   color: var(--body);
-}
-.ask-order {
-  flex-shrink: 0;
-  border-radius: 0.25rem;
-  background: color-mix(in srgb, var(--primary) 15%, var(--card));
-  padding: 0 0.375rem;
-  font-size: 0.8125rem;
 }
 .ask-bubble-title {
   display: flex;

@@ -60,6 +60,7 @@ export function MoneyInput({
   example,
   label,
   describedBy,
+  placeholder,
 }: {
   id?: string;
   value: number | null | undefined;
@@ -68,6 +69,8 @@ export function MoneyInput({
   /** 보이는 라벨이 없을 때 화면 읽기 프로그램용 이름 */
   label?: string;
   describedBy?: string;
+  /** 예시 대신 칸 안에 보일 글 (예: '비우면 0원' — 비울 때 어떻게 되는지) */
+  placeholder?: string;
 }) {
   // 커서가 있는 동안 친 글자. 커서가 없으면 null → 값을 정리한 모양으로 보여 준다.
   const [typing, setTyping] = useState<string | null>(null);
@@ -76,7 +79,7 @@ export function MoneyInput({
       <Input
         id={id}
         value={typing ?? formatted(value)}
-        placeholder={placeholderOf(example)}
+        placeholder={placeholder ?? placeholderOf(example)}
         onFocus={() => setTyping(formatted(value))}
         onBlur={() => setTyping(null)}
         // 엔터를 '입력 끝'으로 누르는 사람이 많다 → 칸을 떠나지 않아도 '100,000'처럼 정리해 보여 준다.

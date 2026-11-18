@@ -14,6 +14,7 @@ import {
 } from './format';
 import { CONTROL_CLASS, MoneyInput } from './money-input';
 import { SourceBadge } from './source-badge';
+import { ChoiceRow } from './choice-row';
 
 // 비교표 한 행(공고 1건)을 보여 주고 고치는 부품.
 // 칸마다 값 + 배지(확인/추정/입력/공고에 없음) + 공고 원문 조각을 함께 보여 준다.
@@ -373,8 +374,7 @@ function RowQuestions({
       {optional.length > 0 && (
         <div className="row-questions">
           <p className="row-questions-title">
-            알면 더 정확해요
-            <span className="row-questions-sub">· 몰라도 계산돼요</span>
+            알면 더 정확해요 <span className="row-questions-sub">(선택)</span>
           </p>
           <QuestionList questions={optional} />
         </div>
@@ -405,8 +405,17 @@ function QuestionList({ questions }: { questions: OpenQuestion[] }) {
 /** 칸으로 이동해 커서를 둔다 ('확인이 필요한 것', 연봉 빈칸 안내에서 쓴다) */
 export function focusField(id: string) {
   const element = document.getElementById(id);
+  // 접힌 묶음(비교 기준·고정비) 안의 칸이면 먼저 펼친다 (접힌 칸에는 커서가 안 들어간다)
+  const fold = element?.closest('details');
+  if (fold && !fold.open) fold.open = true;
   element?.scrollIntoView({ block: 'center' });
-  element?.focus({ preventScroll: true });
+  // 라디오 묶음이면 고른 단추(없으면 첫 단추)로
+  const target =
+    element?.getAttribute('role') === 'radiogroup'
+      ? (element.querySelector<HTMLElement>('input:checked') ??
+        element.querySelector<HTMLElement>('input'))
+      : element;
+  target?.focus({ preventScroll: true });
 }
 
 export function fieldId(row: Row, key: string) {
@@ -512,41 +521,56 @@ export function RowEditor({
       <div className="row-card-body">
         <RowQuestions row={row} questions={questions} onConfirmImage={confirmImageValues} />
         {/* 다시 볼 칸은 노란 바탕 (탭·위 상자와 같은 기준: fieldsToCheck) */}
-        {groups.map((group) => (
-          <fieldset key={group.title} className="row-group">
-            <legend>{group.title}</legend>
-            {group.fields
-              .filter((field) => !hidden(row, field.key))
-              .map((field) => (
-                <FieldRow
-                  key={field.key}
-                  id={fieldId(row, field.key)}
-                  field={{ ...field, label: labelOf(row, field) } as Field}
-                  cell={cellOf(row, field.key)}
-                  check={toCheck.has(fieldId(row, field.key))}
-                  onChange={(value) => set(field.key, value)}
-                  onConfirm={() => confirm(field.key)}
-                />
-              ))}
-            {group.title === '급여' &&
-              row.other_allowances?.map((allowance, i) => (
-                <FieldRow
-                  key={`other-${allowance.name}`}
-                  id={fieldId(row, `other-${i}`)}
-                  field={{
-                    key: 'company',
-                    label: `${allowance.name} (매달)`,
-                    kind: 'money',
-                    example: MONTHLY_EXAMPLE,
-                  }}
-                  cell={allowance.monthly_krw}
-                  check={toCheck.has(fieldId(row, `other-${i}`))}
-                  onChange={(value) => setAllowance(i, (_, first) => changed(first, value))}
-                  onConfirm={() => setAllowance(i, (cell) => confirmed(cell))}
-                />
-              ))}
-          </fieldset>
-        ))}
+        {groups.map((group) => {
+          // 이 묶음에서 다시 볼 칸 수 (탭·위 상자와 같은 기준). 없으면 칩을 달지 않는다 ('다 봄'은 확인할 수 없는 말)
+          const ids = group.fields.map((field) => fieldId(row, field.key));
+          if (group.title === '급여') {
+            row.other_allowances?.forEach((_, i) => ids.push(fieldId(row, `other-${i}`)));
+          }
+          const toReview = ids.filter((id) => toCheck.has(id)).length;
+          return (
+            <fieldset key={group.title} className="row-group">
+              <legend>
+                {group.title}
+                {toReview > 0 && (
+                  <span aria-hidden className="group-chip is-need">
+                    다시 볼 값 {toReview}
+                  </span>
+                )}
+              </legend>
+              {group.fields
+                .filter((field) => !hidden(row, field.key))
+                .map((field) => (
+                  <FieldRow
+                    key={field.key}
+                    id={fieldId(row, field.key)}
+                    field={{ ...field, label: labelOf(row, field) } as Field}
+                    cell={cellOf(row, field.key)}
+                    check={toCheck.has(fieldId(row, field.key))}
+                    onChange={(value) => set(field.key, value)}
+                    onConfirm={() => confirm(field.key)}
+                  />
+                ))}
+              {group.title === '급여' &&
+                row.other_allowances?.map((allowance, i) => (
+                  <FieldRow
+                    key={`other-${allowance.name}`}
+                    id={fieldId(row, `other-${i}`)}
+                    field={{
+                      key: 'company',
+                      label: `${allowance.name} (매달)`,
+                      kind: 'money',
+                      example: MONTHLY_EXAMPLE,
+                    }}
+                    cell={allowance.monthly_krw}
+                    check={toCheck.has(fieldId(row, `other-${i}`))}
+                    onChange={(value) => setAllowance(i, (_, first) => changed(first, value))}
+                    onConfirm={() => setAllowance(i, (cell) => confirmed(cell))}
+                  />
+                ))}
+            </fieldset>
+          );
+        })}
       </div>
     </section>
   );
@@ -573,6 +597,7 @@ function FieldRow({
   const hintId = `${id}-hint`;
   const unit = UNITS[field.kind];
   const control = CONTROL_CLASS;
+  const radio = field.kind === 'bool' || (field.kind === 'choice' && field.options.length <= 3);
   let input: ReactNode;
   let hint: string | null = null;
 
@@ -646,23 +671,42 @@ function FieldRow({
       break;
     }
     case 'bool':
+      // 있음/없음/모름: 한 줄 라디오 (한 번에 보이고 한 번에 고른다). 모름은 옅게 맨 뒤
       input = (
-        <select
+        <ChoiceRow
           id={id}
-          value={cell.value == null ? '' : String(cell.value)}
-          onChange={(event) =>
-            onChange(event.target.value === '' ? null : event.target.value === 'true')
-          }
-          className={control}
-          aria-describedby={hintId}
-        >
-          <option value="">모름</option>
-          <option value="true">{field.yes}</option>
-          <option value="false">{field.no}</option>
-        </select>
+          name={id}
+          labelledBy={`${id}-label`}
+          describedBy={hintId}
+          value={(cell.value as boolean | null | undefined) ?? null}
+          options={[
+            { value: true, label: field.yes },
+            { value: false, label: field.no },
+            { value: null, label: '모름', muted: true },
+          ]}
+          onChange={onChange}
+        />
       );
       break;
     case 'choice':
+      // 선택지가 셋 이하로 짧으면 라디오, 많거나 길면(고용형태·급여 종류) 펼침 목록 그대로
+      if (field.options.length <= 3) {
+        input = (
+          <ChoiceRow
+            id={id}
+            name={id}
+            labelledBy={`${id}-label`}
+            describedBy={hintId}
+            value={(cell.value as string | null | undefined) ?? null}
+            options={[
+              ...field.options.map(([value, label]) => ({ value, label })),
+              { value: null, label: '모름', muted: true },
+            ]}
+            onChange={onChange}
+          />
+        );
+        break;
+      }
       input = (
         <select
           id={id}
@@ -706,14 +750,25 @@ function FieldRow({
   }
 
   return (
-    <div className="row-field" data-check={check || undefined}>
+    // 근무지는 글이 길어 넓은 화면에서도 한 줄 전체 (나머지 칸은 둘씩)
+    <div
+      className={field.kind === 'location' ? 'row-field is-wide' : 'row-field'}
+      data-check={check || undefined}
+    >
       {/* 배지는 항목 이름 바로 옆에 둔다 (이름과 배지 사이로 눈을 멀리 옮기지 않게) */}
       <div className="row-field-head">
-        <label htmlFor={id}>
-          {field.label}
-          {/* 화면에는 입력칸 옆에 단위가 보이고, 화면 읽기 프로그램은 라벨에서 단위를 듣는다. */}
-          {unit && <span className="sr-only"> (단위: {unit})</span>}
-        </label>
+        {radio ? (
+          // 라디오 묶음은 label로 가리킬 수 없어 이름을 묶음의 aria-labelledby로
+          <span id={`${id}-label`} className="readonly-label">
+            {field.label}
+          </span>
+        ) : (
+          <label htmlFor={id}>
+            {field.label}
+            {/* 화면에는 입력칸 옆에 단위가 보이고, 화면 읽기 프로그램은 라벨에서 단위를 듣는다. */}
+            {unit && <span className="sr-only"> (단위: {unit})</span>}
+          </label>
+        )}
         {/* 다시 볼 필요 없는 칸은 공고 원문을 배지 안에 (누르면 보임): 화면이 짧아지고 볼 칸이 드러난다 */}
         <SourceBadge
           badge={badge}
