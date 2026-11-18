@@ -131,7 +131,7 @@ function RegionPanel({
   return (
     <div className="space-y-3">
       <p className="support-region">
-        {companiesOf(region, rows)} 근무지 · {region.region}
+        {companiesOf(region, rows)} 근무지: {region.region}
       </p>
       {region.policies.length > 0 ? (
         <>
@@ -216,14 +216,14 @@ export function SupportView({
 
       {national.length > 0 && (
         <details className="result-details">
-          <summary>전국 정책 {support.national_matched}개 · 어느 회사를 골라도 같아요</summary>
+          <summary>전국 정책 {support.national_matched}개 (어느 회사를 골라도 같아요)</summary>
           <PolicyList policies={national} thisYear={thisYear} />
           <More shown={national.length} total={support.national_matched} url={support.source_url} />
         </details>
       )}
 
       <p className="text-sm text-muted-foreground">
-        출처: {support.source} · {day(support.checked_on, thisYear)} 기준
+        출처: {support.source} ({day(support.checked_on, thisYear)} 기준)
       </p>
     </section>
   );

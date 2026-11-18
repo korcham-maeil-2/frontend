@@ -27,6 +27,23 @@ export function rentsFromResult(estimates: readonly RentEstimate[] | undefined):
 }
 
 /**
+ * 사택·기숙사에 들어가는지: 공고에 사택·기숙사가 있고, 이사할 집 주거비를 0원으로 넣었으면.
+ * 이때는 원룸 보증금을 따로 준비하지 않는다 (④ 보증금 상자, ⑤ '처음 준비할 돈').
+ * 정착 플랜의 보증금 할 일·주거 지원은 백엔드가 같은 규칙으로 뺀다 (plan.py build_plan).
+ * 주거비를 넣었으면 따로 집을 구하는 것으로 본다 (③ 칸 안내: '따로 집을 구한다면 월세 + 관리비').
+ */
+export function livesInCompanyHousing(
+  row: Row | undefined,
+  moveHousing: number | null | undefined,
+): boolean {
+  // 주거지원비가 있으면 이사 주거비가 '넣은 금액 − 지원비'(0원 아래로 안 내려감)라 0원이어도 넣은 금액을
+  // 알 수 없다 → 사택으로 보지 않는다 (틀려도 보증금이 보이는 쪽이 안전하다. 백엔드 housing_aid와 같은 조건)
+  const aid = row?.housing_allowance_monthly_krw?.value;
+  const hasAid = !!aid && row?.housing_allowance_months?.value !== 0;
+  return row?.company_housing?.value === true && !hasAid && moveHousing === 0;
+}
+
+/**
  * 이 공고 근무지의 시세를 불러오지 못했는지 (공공데이터 조회 실패).
  * 회사가 사택·기숙사를 주면 시세를 쓰지 않으므로(rentFor와 같은 조건) 실패여도 상관없다.
  */

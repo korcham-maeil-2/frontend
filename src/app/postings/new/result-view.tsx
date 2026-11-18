@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { components } from '@/lib/api/schema';
 import '../../landing.css'; // 비교표 모양(.offer-table, .compare-table)을 랜딩과 같이 쓴다
@@ -16,7 +16,7 @@ import {
   type Row,
   type Status,
 } from './format';
-import { FEW_TRADES, rentFailed } from './profile';
+import { FEW_TRADES, livesInCompanyHousing, rentFailed } from './profile';
 import { BadgeLegend, SourceBadge, type Detail } from './source-badge';
 
 // 결과 화면: 공고별 '매달 남는 돈'을 한 표로 비교한다 (DESIGN.md "비교표").
@@ -226,21 +226,16 @@ function pickCase(posting: PostingResult, breakEven: BreakEven | undefined, mode
   return best?.case ?? 'commute';
 }
 
-/** 단계 표시에 쓸 결과 한 줄: 매달 가장 많이 남는 공고 (연봉 공개 공고, 고른 경우 중 큰 쪽) */
+/** 단계 표시에 쓸 결과 한 줄: 가장 많이 남는 금액만 (회사·경우는 화면에 있다. 단계 칸이 좁아 짧게) */
 export function bestRemainingText(result: Result): string {
-  const candidates = result.postings.flatMap((posting, i) =>
+  const values = result.postings.flatMap((posting) =>
     posting.scenarios
       .filter((s) => s.applicable && s.monthly_remaining != null)
-      .map((s) => ({
-        company: posting.company || `공고 ${i + 1}`,
-        value: s.monthly_remaining!,
-        when: s.case === 'move' ? '이사 시' : '통근 시',
-      })),
+      .map((s) => s.monthly_remaining!),
   );
-  if (!candidates.length) return `공고 ${result.postings.length}개 계산`;
-  const best = candidates.reduce((a, b) => (b.value > a.value ? b : a));
-  // 단계 표시에서 좁으면 뒤가 잘린다: 숫자를 앞에 (회사 이름이 잘리게)
-  return `${best.when} 매달 ${won(best.value)} · ${best.company}`;
+  return values.length
+    ? `매달 최대 ${won(Math.max(...values))}`
+    : `공고 ${result.postings.length}개 계산`;
 }
 
 function remainingCell(value: number, extra: Omit<Shown, 'value'> = {}): Shown {
@@ -444,21 +439,46 @@ function baselinePosting(be: BreakEven, columns: Column[]) {
   return i >= 0 ? companyOf(columns[i], i) : undefined;
 }
 
-/** 연봉 비공개 공고의 비교 기준을 한 덩어리로: '(가상) 이음데이터랩(주) 통근 시 매달 약 242만원' */
-function baselineText(be: BreakEven, columns: Column[]): string {
-  const name = baselinePosting(be, columns);
-  const who = name
-    ? `${name} ${be.baseline.case === 'move' ? '이사 시' : '통근 시'}`
-    : be.baseline.label;
-  return `${who} 매달 ${won(be.baseline.monthly_remaining)}`;
-}
+/** 이 공고를 그 경우로 다닐 때 ('여기 근처로 이사해서') */
+const HERE: Record<Case, string> = {
+  commute: '여기를 집에서 다니면서',
+  move: '여기 근처로 이사해서',
+};
 
-/** 답 문장에 넣을 기준 이름: '이음데이터랩만큼 남아요' (통근·이사는 아래 '기준' 줄에) */
-function baselineName(be: BreakEven, columns: Column[]): string {
-  if (be.baseline.kind === 'current_job') return '지금 회사';
-  if (be.baseline.kind === 'target') return be.baseline.label;
-  // 백엔드 label은 경우까지 붙어 있어('○○ · 회사 근처로 이사') 문장에 넣으면 어색하다
-  return baselinePosting(be, columns) ?? '기준 공고';
+/**
+ * 답 문장: 기준이 매달 얼마 남는지 먼저 말하고, 여기서 그만큼 남으려면 이만큼은 받아야 한다고 잇는다
+ * ('이음데이터랩에 집에서 다니면 매달 약 257만원이 남아요. 여기 근처로 이사해서 그만큼 남으려면…').
+ * 회사 이름은 표 머리와 같게. 백엔드 label은 경우까지 붙어 있어('○○ · 회사 근처로 이사') 문장에 넣지 않는다.
+ * own: 이 공고에서 고른 경우(통근·이사), floor: 최저임금으로 올린 답이면 '…보다 많이 남아요'.
+ */
+function answerSentence(be: BreakEven, columns: Column[], own: Case, floor: boolean): string {
+  const value = be.baseline.monthly_remaining;
+  const monthly = won(value);
+  // 기준이 마이너스면 '−31만원이 남아요'가 아니라 '31만원이 모자라요'
+  const left = value < 0 ? `${won(-value)}이 모자라요` : `${monthly}이 남아요`;
+  const same = value < 0 ? '그 정도로 맞추려면' : '그만큼 남으려면';
+  // 기준 공고가 주거지원비를 받으면, 기준은 지원이 끝난 뒤 금액이다 (표의 그 공고 칸은 받는 동안 금액)
+  const afterAid = baselineDuringAid(be, columns) != null ? '주거지원비가 끝난 뒤 ' : '';
+  if (be.baseline.kind === 'target') {
+    return floor
+      ? `최저임금 수준만 받아도 목표한 매달 ${monthly}보다 많이 남아요.`
+      : `${HERE[own]} 목표한 매달 ${monthly}을 남기려면 이만큼은 받아야 해요.`;
+  }
+  let when = '지금 회사에 다닐 때';
+  let fact = `지금 회사에서는 매달 ${left}.`;
+  // 기준이 같은 경우(통근끼리·이사끼리)면 '여기서도', 다르면 이 공고의 경우를 적는다
+  let here = HERE[own];
+  if (be.baseline.kind === 'posting') {
+    const name = baselinePosting(be, columns) ?? '기준 공고';
+    const baseCase = be.baseline.case ?? 'commute'; // 예전 결과엔 경우가 없을 수 있다 (통근으로 읽는다)
+    const go = baseCase === 'move' ? `${name} 근처로 이사해서` : `${name}에 집에서`;
+    when = `${go} 다닐 때`;
+    fact = `${go} 다니면 ${afterAid}매달 ${left}.`;
+    if (baseCase === own) here = '여기서도';
+  }
+  return floor
+    ? `최저임금 수준만 받아도 ${when}보다 많이 남아요.`
+    : `${fact} ${here} ${same} 이만큼은 받아야 해요.`;
 }
 
 function companyOf(column: Column, index: number) {
@@ -518,28 +538,40 @@ function StepCell({ step }: { step: Step }) {
 }
 
 /**
+ * 표를 감싼 칸이 가로로 넘치는지 ('옆으로 밀면 다른 공고도 보여요'를 넘칠 때만 보인다).
+ * 폭으로 짐작하면 안 넘치는데도 뜨거나, 넘치는데 안 떠서 뒤 공고를 놓친다 — 실제로 잰다.
+ * 접힌 상자 안이면 폭이 0이었다가 펼칠 때 바뀌므로 크기가 바뀔 때마다 다시 잰다.
+ */
+function useOverflowX() {
+  const ref = useRef<HTMLDivElement>(null);
+  const [overflows, setOverflows] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const observer = new ResizeObserver(() => setOverflows(el.scrollWidth > el.clientWidth + 1));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+  return [ref, overflows] as const;
+}
+
+function ScrollHint() {
+  return <p className="scroll-hint">옆으로 밀면 다른 공고도 보여요</p>;
+}
+
+/**
  * 계산 과정 비교: 위 표에 없는 세전 월급 → 세금·4대보험 → 세후 월급을 공고끼리 나란히 (접어 둔다).
  * 주거비·교통비·고정비·남는 돈은 위 표와 같아서 넣지 않는다. 공제 6개 항목은 한 번 더 펼친다.
  */
 function CalcSteps({ columns, style }: { columns: Column[]; style: CSSProperties }) {
   const [itemsOpen, setItemsOpen] = useState(false);
-  // 표가 칸보다 넓어 가로로 밀어야 할 때만 알린다 (폭으로 짐작하면 안 넘치는데도 뜬다)
-  const [overflows, setOverflows] = useState(false);
-  const scroller = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const el = scroller.current;
-    if (!el) return;
-    // 접혀 있으면 폭이 0이었다가 펼칠 때 바뀌므로, 펼친 순간에도 다시 잰다
-    const observer = new ResizeObserver(() => setOverflows(el.scrollWidth > el.clientWidth + 1));
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
+  const [scroller, overflows] = useOverflowX();
   const steps = columns.map(salarySteps);
   const hasNotes = steps.some((s) => s.notes.length > 0);
   return (
     <details className="result-details">
       <summary>세금·4대보험 계산 과정 비교</summary>
-      {overflows && <p className="calc-scroll-hint">옆으로 밀면 다른 공고도 보여요</p>}
+      {overflows && <ScrollHint />}
       <div ref={scroller} className="result-scroll">
         <table className="offer-table result-table calc-table" style={style}>
           <caption className="sr-only">공고별 세전 월급에서 세후 월급까지</caption>
@@ -632,16 +664,23 @@ function baselineDuringAid(be: BreakEven, columns: Column[]): number | undefined
 
 /**
  * 연봉 비공개 공고의 답 카드 '면접에서 확인할 연봉' (표 위, 비교 방식을 따라 숫자가 바뀐다).
- * 최소 연봉을 초록으로 크게 쓰는 곳은 화면에 이 카드 하나뿐 (표 칸은 기본색).
- * 기준·지원받는 동안·따로 받는 돈은 이름표 붙은 줄로.
- * 문구 '○○ 이상이면 … 남아요'는 이슈 backend#14 완료 조건이다.
+ * 공고마다: 회사 → 금액(초록·크게, 추정 배지) → 짧은 문장 한두 개. 없는 사실은 줄을 비우지 않고 뺀다.
+ * 최소 연봉을 초록으로 쓰는 곳은 화면에 이 카드 하나뿐 (표 칸은 기본색, DESIGN.md).
+ * '○○ 이상 … 남아요'는 이슈 backend#14 완료 조건이다.
  */
 function SalaryAnswer({ result, columns }: { result: Result; columns: Column[] }) {
   if (!result.break_even.length) return null;
   return (
     <section
       aria-labelledby="salary-answer-title"
-      className={result.break_even.length >= 3 ? 'salary-answer is-many' : 'salary-answer'}
+      // 하나면 넓은 화면에서 제목·회사·금액을 왼쪽에 모으고 문장을 오른쪽 가운데에 (위 오른쪽이 비지 않게)
+      className={
+        result.break_even.length === 1
+          ? 'salary-answer is-single'
+          : result.break_even.length >= 3
+            ? 'salary-answer is-many'
+            : 'salary-answer'
+      }
     >
       <h3 id="salary-answer-title" className="salary-answer-title">
         면접에서 확인할 연봉
@@ -651,11 +690,13 @@ function SalaryAnswer({ result, columns }: { result: Result; columns: Column[] }
           const i = columns.findIndex((c) => c.posting.posting_id === be.posting_id);
           return (
             <li key={be.posting_id}>
-              {/* 표 머리와 같은 이름 (회사 이름이 없으면 '공고 N') */}
-              <p className="salary-answer-company">
-                {i >= 0 ? companyOf(columns[i], i) : be.company || '연봉 비공개 공고'}
-              </p>
-              <SalaryAnswerLine be={be} column={columns[i]} columns={columns} />
+              <SalaryAnswerBody
+                be={be}
+                // 표 머리와 같은 이름 (회사 이름이 없으면 '공고 N')
+                company={i >= 0 ? companyOf(columns[i], i) : be.company || '연봉 비공개 공고'}
+                column={columns[i]}
+                columns={columns}
+              />
             </li>
           );
         })}
@@ -664,83 +705,87 @@ function SalaryAnswer({ result, columns }: { result: Result; columns: Column[] }
   );
 }
 
-function SalaryAnswerLine({
+/** 공고 한 줄: 왼쪽(회사·금액)과 오른쪽(문장). 넓은 화면에서는 나란히, 좁으면 위아래 */
+function AnswerRow({ head, children }: { head: ReactNode; children: ReactNode }) {
+  return (
+    <>
+      <div className="salary-answer-head">{head}</div>
+      <div className="salary-answer-why">{children}</div>
+    </>
+  );
+}
+
+function SalaryAnswerBody({
   be,
+  company,
   column,
   columns,
 }: {
   be: BreakEven;
+  company: string;
   column: Column | undefined;
   columns: Column[];
 }) {
+  const name = <p className="salary-answer-company">{company}</p>;
   const chosen = column?.breakEven;
-  if (!column?.scenario) return <p>이 경우는 해당 없어요. 다른 경우를 골라 보세요.</p>;
+  if (!column?.scenario) {
+    return (
+      <AnswerRow head={name}>
+        <p className="salary-answer-text">이 경우는 해당 없어요. 위에서 다른 경우를 골라 보세요.</p>
+      </AnswerRow>
+    );
+  }
   if (!chosen || chosen.annual_salary_krw == null) {
     // 빈 값이 이유면 표의 '매달 남는 돈' 칸과 같은 말로 무엇이 필요한지 적는다
     const why = chosen?.missing.length ? `필요한 값: ${chosen.missing.join(', ')}` : chosen?.reason;
-    return <p>이 경우는 최소 연봉을 계산하지 못했어요{why ? ` (${why})` : ''}.</p>;
+    return (
+      <AnswerRow head={name}>
+        <p className="salary-answer-text">최소 연봉을 계산하지 못했어요.</p>
+        {why && <p className="salary-answer-text">{why}</p>}
+      </AnswerRow>
+    );
   }
-  // 최소 연봉에는 따로 받는 식대·수당이 빠져 있다 → 카드에도 적는다
-  const onTop = column.posting.pay_on_top?.value ? column.posting.pay_on_top : null;
+  const floor = chosen.floor === 'minimum_wage';
   const tag = column.cells.salary.tag;
-  const name = baselineName(be, columns);
-  const duringAid = baselineDuringAid(be, columns);
-  // 금액과 배지는 한 덩어리 (좁아도 배지만 다음 줄로 떨어지지 않게)
-  const salary = (
-    <span className="salary-answer-amount">
-      <strong>{won(chosen.annual_salary_krw)}</strong>
-      {tag && (
-        <SourceBadge
-          badge={tag.badge}
-          details={tag.details}
-          subject="최소 연봉"
-          className="result-badge"
-        />
-      )}
-    </span>
-  );
+  const onTop = column.posting.pay_on_top?.value ? column.posting.pay_on_top : null;
+  const aidMonths = column.row?.housing_allowance_months?.value;
   return (
-    <>
-      <p className="salary-answer-line">
-        {chosen.floor === 'minimum_wage' ? (
-          <>
-            최저임금 수준인 {salary}만 받아도 {name}보다 많이 남아요
-          </>
-        ) : (
-          <>
-            연봉 {salary} 이상이면 {name}만큼 남아요
-          </>
-        )}
-      </p>
-      <dl className="be-facts">
-        <div>
-          <dt>기준</dt>
-          <dd>
-            {baselineText(be, columns)}
-            {duringAid != null && (
-              <span className="block">
-                주거지원비가 끝난 뒤 기준이에요 (받는 동안은 매달 {won(duringAid)})
-              </span>
+    <AnswerRow
+      head={
+        <>
+          {name}
+          {/* 금액·'이상'·배지는 한 덩어리 (좁아도 배지만 떨어지지 않고, 문장 가운데 끼지 않게) */}
+          <p className="salary-answer-amount">
+            <strong>{won(chosen.annual_salary_krw)}</strong>
+            {!floor && ' 이상'}
+            {tag && (
+              <SourceBadge
+                badge={tag.badge}
+                details={tag.details}
+                subject="최소 연봉"
+                className="result-badge"
+              />
             )}
-          </dd>
-        </div>
-        {chosen.during_support_annual_salary_krw != null && (
-          <div>
-            <dt>주거지원비 받는 동안</dt>
-            <dd>최소 {won(chosen.during_support_annual_salary_krw)}이면 돼요</dd>
-          </div>
-        )}
-        {onTop && (
-          <div>
-            {/* 최소 연봉에 안 들어 있는 돈이라는 뜻이 보이게 ('연봉 외' → '연봉과 따로 받는 돈') */}
-            <dt>{onTop.label.replace(/ 외$/, '')}과 따로 받는 돈</dt>
-            <dd>
-              매달 {formatWon(onTop.value!)} 더 받아요 ({onTop.source})
-            </dd>
-          </div>
-        )}
-      </dl>
-    </>
+          </p>
+        </>
+      }
+    >
+      <p className="salary-answer-text">
+        {answerSentence(be, columns, column.scenario.case, floor)}
+      </p>
+      {chosen.during_support_annual_salary_krw != null && (
+        <p className="salary-answer-text">
+          주거지원비가 나오는 {aidMonths ? `처음 ${aidMonths}개월은` : '동안은'}{' '}
+          {won(chosen.during_support_annual_salary_krw)}만 받아도 돼요.
+        </p>
+      )}
+      {/* 최소 연봉에 안 들어 있는 돈 (식대·수당은 연봉과 따로) */}
+      {onTop && (
+        <p className="salary-answer-text">
+          이 연봉과 따로 매달 {formatWon(onTop.value!)}을 더 받아요 ({onTop.source}).
+        </p>
+      )}
+    </AnswerRow>
   );
 }
 
@@ -774,10 +819,12 @@ function rentFailures(columns: Column[], estimates: RentEstimate[]) {
 function DepositSummary({ columns, estimates }: { columns: Column[]; estimates: RentEstimate[] }) {
   const byRegion = new Map<string, { rent: RentEstimate; companies: string[] }>();
   columns.forEach((column, i) => {
-    const moves = column.posting.scenarios.some((s) => s.case === 'move' && s.applicable);
+    const move = column.posting.scenarios.find((s) => s.case === 'move' && s.applicable);
     const code = column.row?.location?.value?.lawd_cd;
     const rent = estimates.find((e) => e.lawd_cd === code);
-    if (!moves || !code || rent?.status !== 'estimated' || rent.deposit_krw == null) return;
+    if (!move || !code || rent?.status !== 'estimated' || rent.deposit_krw == null) return;
+    // 사택·기숙사에 들어가면 원룸 보증금이 들지 않는다
+    if (livesInCompanyHousing(column.row, move.housing.value)) return;
     const entry = byRegion.get(code) ?? { rent, companies: [] };
     entry.companies.push(companyOf(column, i));
     byRegion.set(code, entry);
@@ -786,7 +833,7 @@ function DepositSummary({ columns, estimates }: { columns: Column[]; estimates: 
   return (
     <div className="rounded-2xl bg-muted p-5">
       <h3 className="mb-2 font-semibold text-foreground">이사하면 처음에 준비할 돈</h3>
-      <ul className="space-y-2 text-sm text-body">
+      <ul className="deposit-list space-y-2 text-sm text-body">
         {[...byRegion.values()].map(({ rent, companies }) => {
           const place = placeName(rent.region);
           return (
@@ -846,10 +893,12 @@ export function ResultView({
     ),
   );
   const computed = (column: Column) => (column.solved ? 'is-computed' : undefined);
+  const [tableScroller, tableOverflows] = useOverflowX();
   // 공고가 많으면 열마다 최소 폭을 주고 표를 가로로 넘겨 본다 (글자가 겹치지 않게)
   const tableWidth = { '--result-columns': columns.length } as CSSProperties;
   // 좁은 화면은 계산한 쪽(연봉 비공개 공고)을 먼저 보여 준다 (DESIGN.md)
-  const firstTab = (columns.find((c) => c.solved) ?? columns[0])?.posting.posting_id;
+  // 비교 방식에 따라 바뀌지 않게 (기본값이 바뀌면 탭이 경고를 낸다): 연봉 비공개 공고 → 첫 공고
+  const firstTab = result.break_even[0]?.posting_id ?? columns[0]?.posting.posting_id;
 
   return (
     <div className="space-y-6">
@@ -869,7 +918,9 @@ export function ResultView({
 
       <SalaryAnswer result={result} columns={columns} />
       <div className="compare-view result-compare">
-        <div className="result-scroll">
+        {/* 공고가 많아 표가 넘치면 뒤 공고가 오른쪽에 숨는다 → 넘칠 때만 알린다 */}
+        {tableOverflows && <ScrollHint />}
+        <div ref={tableScroller} className="result-scroll">
           <table className="offer-table compare-table result-table" style={tableWidth}>
             <caption className="sr-only">공고별 매달 남는 돈 비교</caption>
             <thead>

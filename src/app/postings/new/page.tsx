@@ -353,7 +353,14 @@ export default function NewPosting() {
     setConfirmingRestart(false); // 다른 단계에 갔다 오면 '새로 시작' 확인은 닫힌 채로
     setCheckWarned(false);
     if (next === 'review' && markActiveSeen && activeId) markSeen(activeId);
-    if (next === 'living') retryFailedRents(); // 불러오지 못했던 지역은 다시 묻는다
+    if (next === 'living') {
+      retryFailedRents(); // 불러오지 못했던 지역은 다시 묻는다
+      // 조건 확인에서 넘어올 때만: 생활비는 첫 공고부터 (마지막에 본 공고로 시작하면 앞 공고를 건너뛰기 쉽다).
+      // 채울 칸이 있는 공고가 있으면 그 공고부터. 결과·플랜에서 돌아올 때는 보던 회사를 그대로 둔다
+      if (step === 'review') {
+        setActivePosting(missingProfile.find((item) => item.rowId)?.rowId ?? rows[0]?.id ?? '');
+      }
+    }
     setStep(next);
     // 넓은 화면에서는 왼쪽 제목이 따라다녀서(sticky) 포커스만으로는 위로 안 올라간다.
     window.scrollTo({ top: 0 });
@@ -856,7 +863,9 @@ export default function NewPosting() {
           </h1>
           <p className="intro-copy">
             {shown === 'plan'
-              ? '이 회사에 가면 1년 동안 챙길 일을 모았어요.'
+              ? rows.length > 1
+                ? '회사마다 1년 동안 챙길 일을 모았어요.'
+                : '이 회사에 가면 1년 동안 챙길 일을 모았어요.'
               : shown === 'result'
                 ? '세금과 4대보험, 주거비·교통비·고정비를 빼고 매달 남는 돈이에요.' +
                   // 한 경우라도 최소 연봉을 구했을 때만 (못 구했으면 카드가 '계산하지 못했어요'라고 한다)
@@ -909,6 +918,7 @@ export default function NewPosting() {
                 <PlanView
                   plan={plan}
                   result={freshResult}
+                  rows={rows}
                   supportFailed={!support}
                   onEditLiving={() => changeStep('living')}
                 />
@@ -916,13 +926,20 @@ export default function NewPosting() {
               {support && (
                 <div className="plan-section">
                   <details className="result-details">
+                    {/* 지역별 개수는 ' · '로 잇지 않고 칩으로 */}
                     <summary>
-                      근무지별 청년 지원 전체 보기 (
+                      근무지별 청년 지원 전체 보기
                       {support.regions
-                        .map((r) => `${placeName(r.region)} ${r.matched}개`)
-                        .concat(`전국 ${support.national_matched}개`)
-                        .join(' · ')}
-                      )
+                        .map((r) => ({
+                          key: r.region,
+                          text: `${placeName(r.region)} ${r.matched}개`,
+                        }))
+                        .concat({ key: 'national', text: `전국 ${support.national_matched}개` })
+                        .map(({ key, text }) => (
+                          <span key={key} className="support-category">
+                            {text}
+                          </span>
+                        ))}
                     </summary>
                     <SupportView
                       support={support}
@@ -1245,7 +1262,8 @@ export default function NewPosting() {
               {checkWarned && cellsToCheck
                 ? '그대로 다음으로'
                 : edited
-                  ? '고친 내용으로 다음'
+                  ? // '이 값이 맞아요'로 확인만 해도 바뀐 것으로 친다 → '고친'이 아니라 '확인한'
+                    '확인한 내용으로 다음'
                   : '이대로 다음'}{' '}
               <ArrowRight aria-hidden />
             </Button>
