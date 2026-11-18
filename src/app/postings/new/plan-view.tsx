@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { ArrowRight, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -456,10 +456,10 @@ function PostingPanel({
                 // 줄이 바뀌면 항목 사이에서만 (항목 중간에서 끊기지 않게)
                 <small>
                   {costs.map((c, i) => (
-                    <span key={c} className="whitespace-nowrap">
+                    <Fragment key={c}>
                       {i > 0 && ' · '}
-                      {c}
-                    </span>
+                      <span className="whitespace-nowrap">{c}</span>
+                    </Fragment>
                   ))}
                 </small>
               )
