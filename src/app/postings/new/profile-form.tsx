@@ -104,33 +104,39 @@ function MoneyField({
   const askId = `${id}-ask`;
   const hasNote = note !== undefined;
   const describedBy = [ask && askId, hintId, hasNote && noteId].filter(Boolean).join(' ');
-  return (
-    // 되묻기: 질문을 칸 묶음 바로 위에 두고 둘을 함께 강조한다 (칸 안은 자리를 정해 둔 격자라 밖에 둔다)
-    <div className={ask ? 'ask-wrap' : 'contents'}>
-      {ask && <AskBubble question={ask} id={askId} />}
-      <div className="row-field profile-field">
-        <label htmlFor={id}>
-          {label}
-          <span className="sr-only"> (단위: 원)</span>
-        </label>
-        <MoneyInput
-          id={id}
-          value={value}
-          onChange={onChange}
-          example={example}
-          describedBy={describedBy}
-        />
-        <p id={hintId} className="row-field-hint">
-          {value != null && <span className="text-foreground">{formatWon(value)}</span>}
-          {value != null && help && ' · '}
-          {help}
+  const field = (
+    <div className="row-field profile-field">
+      <label htmlFor={id}>
+        {label}
+        <span className="sr-only"> (단위: 원)</span>
+      </label>
+      <MoneyInput
+        id={id}
+        value={value}
+        onChange={onChange}
+        example={example}
+        describedBy={describedBy}
+      />
+      <p id={hintId} className="row-field-hint">
+        {value != null && <span className="text-foreground">{formatWon(value)}</span>}
+        {value != null && help && ' · '}
+        {help}
+      </p>
+      {hasNote && (
+        <p id={noteId} className="row-field-hint rent-note" aria-live="polite">
+          {note}
         </p>
-        {hasNote && (
-          <p id={noteId} className="row-field-hint rent-note" aria-live="polite">
-            {note}
-          </p>
-        )}
-      </div>
+      )}
+    </div>
+  );
+  // 질문이 없으면 칸만 그대로 둔다. 감싸면(display: contents여도) 'legend 바로 다음 칸'(clear: both)·
+  // ':last-child' 같은 묶음 규칙이 감싸개에 걸려, 떠 있는 묶음 제목 옆으로 칸이 밀려 폭이 0이 됐다.
+  if (!ask) return field;
+  // 되묻기: 질문을 칸 바로 위에 두고 둘을 함께 강조한다 (칸 안은 자리를 정해 둔 격자라 밖에 둔다)
+  return (
+    <div className="ask-wrap">
+      <AskBubble question={ask} id={askId} />
+      {field}
     </div>
   );
 }
