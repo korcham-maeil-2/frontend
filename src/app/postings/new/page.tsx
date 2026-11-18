@@ -539,14 +539,21 @@ export default function NewPosting() {
     // 다시 볼 값이 남았으면 한 번만 위 상자로 올려 보여 준다. 막지는 않는다 (모르는 값은 두고 가도 된다).
     if (cellsToCheck && !checkWarned) {
       setCheckWarned(true);
-      reviewTodo.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      reviewTodo.current?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'center' });
       reviewTodo.current?.focus({ preventScroll: true });
       return;
     }
     changeStep('living');
   }
 
-  const missingProfile = missingInputs(profile, rows, rents, failedRents);
+  // '비교 기준'은 연봉 금액이 없는 공고가 있을 때만 보인다 → 숨었으면 '지금 회사' 칸도 묻지 않는다
+  const missingProfile = missingInputs(
+    rows.some(salaryLeftBlank) ? profile : { ...profile, hasCurrentJob: false },
+    rows,
+    rents,
+    failedRents,
+  );
   // 지금 보이는 결과가 지금 입력(비교표 + 생활비)으로 계산한 것인지. 고쳤으면 다시 계산해야 결과를 보여 준다.
   const currentKey = useMemo(() => inputKey(rows, toUserProfile(profile, rows)), [rows, profile]);
   const freshResult = result !== null && resultKey === currentKey ? result : null;
@@ -1134,7 +1141,7 @@ export default function NewPosting() {
                   return (
                     <li key={row.id}>
                       {single ? (
-                        '연봉 비공개'
+                        '연봉 금액 없음'
                       ) : (
                         <button
                           type="button"
@@ -1144,7 +1151,7 @@ export default function NewPosting() {
                           {name}
                         </button>
                       )}
-                      {single ? '. 비워 둬도 돼요' : ': 연봉 비공개. 비워 둬도 돼요'}
+                      {single ? '. 비워 둬도 돼요' : ': 연봉 금액 없음. 비워 둬도 돼요'}
                     </li>
                   );
                 return null;

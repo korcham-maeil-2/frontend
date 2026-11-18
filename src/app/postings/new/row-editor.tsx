@@ -214,7 +214,7 @@ function expectsAmount(row: Row) {
 
 const AMOUNT_KEYS = new Set<string>(['annual_salary_krw', 'monthly_salary_krw']);
 
-/** 연봉 비공개라 금액 칸이 비어 있는 공고: 비워 둬도 된다 (받아야 할 최소 연봉을 계산한다) */
+/** 공고에 금액이 없어(비공개·희망 연봉 질문) 금액 칸이 빈 공고: 비워 둬도 된다 (받아야 할 최소 연봉을 계산한다) */
 export function salaryLeftBlank(row: Row) {
   return (
     !expectsAmount(row) &&
@@ -524,11 +524,6 @@ export function RowEditor({
                   field={{ ...field, label: labelOf(row, field) } as Field}
                   cell={cellOf(row, field.key)}
                   check={toCheck.has(fieldId(row, field.key))}
-                  note={
-                    AMOUNT_KEYS.has(field.key) && salaryLeftBlank(row)
-                      ? '비워 둬도 돼요. 받아야 할 최소 연봉을 계산해요'
-                      : null
-                  }
                   onChange={(value) => set(field.key, value)}
                   onConfirm={() => confirm(field.key)}
                 />
@@ -562,7 +557,6 @@ function FieldRow({
   field,
   cell,
   check = false,
-  note = null,
   onChange,
   onConfirm,
 }: {
@@ -571,8 +565,6 @@ function FieldRow({
   cell: Cell;
   /** 다시 볼 칸이면 노란 바탕 */
   check?: boolean;
-  /** 칸 아래 한 줄 안내 (예: 연봉 비공개면 비워 둬도 된다고) */
-  note?: string | null;
   onChange: (value: unknown) => void;
   /** 다시 볼 칸(추정·이미지에서 읽음)의 값이 맞다고 확인 */
   onConfirm: () => void;
@@ -741,7 +733,6 @@ function FieldRow({
           </button>
         )}
         {hint && <span className="text-foreground">{hint}</span>}
-        {note && <span className="text-foreground">{note}</span>}
         {cell.source_text && needsCheck(cell) && (
           <span>
             {hint ? ' · ' : ''}

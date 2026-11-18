@@ -326,7 +326,8 @@ function PostingCosts({
                 label="이사할 집 주거비 (매달)"
                 // 예시는 실제로 들어갈 시세로 (예시와 비울 때 값이 달라 헷갈리지 않게)
                 example={
-                  rent?.monthly_rent_krw
+                  // 사택·기숙사 공고는 비워도 시세로 채우지 않으니 시세를 예시로 쓰지 않는다
+                  rent?.monthly_rent_krw && !row.company_housing?.value
                     ? `${Math.round(rent.monthly_rent_krw / 10_000)}만`
                     : '50만'
                 }
