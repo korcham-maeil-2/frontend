@@ -952,7 +952,7 @@ export default function NewPosting() {
           <div className="sheet-actions flex-wrap">
             {/* 다음 단계 미리보기는 버튼 줄과 한 덩어리로 */}
             {shown === 'result' && hasPlan && plan && (
-              <PlanPreview plan={plan} result={freshResult} rows={rows} />
+              <PlanPreview plan={plan} result={freshResult} />
             )}
             <div className="flex flex-wrap gap-2">
               {shown === 'plan' ? (

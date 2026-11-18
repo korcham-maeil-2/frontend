@@ -419,9 +419,10 @@ function PostingPanel({
   const moveMonth = itemsOf('move_month');
   const start = itemsOf('start');
   const anytime = itemsOf('anytime');
-  // 사택·기숙사에 들어가면(이사할 집 주거비 0원) 원룸 보증금 할 일은 뺀다 (백엔드는 시세로 넣어 보낸다)
+  // 사택·기숙사에 들어가면(이사할 집 주거비 0원) 백엔드가 보증금 할 일을 빼서 보낸다 (plan.py).
+  // '처음 준비할 돈' 칸이 '모름'이 아니라 '없음'이라고 말하려면 이유를 알아야 해서 여기서도 본다
   const dorm = livesInCompanyHousing(row, scenarioOf(result, id, 'move')?.housing.value);
-  const deposit = dorm ? undefined : before.find((i) => i.kind === 'deposit');
+  const deposit = before.find((i) => i.kind === 'deposit');
   const showSavings =
     savings?.status === 'ok' &&
     savings.products.length > 0 &&
@@ -444,7 +445,7 @@ function PostingPanel({
     return r != null ? `약 ${won(r)}` : m ? minSalaryText(m) : '';
   };
   const steps = [
-    { label: '집 구하기 전', items: dorm ? before.filter((i) => i.kind !== 'deposit') : before },
+    { label: '집 구하기 전', items: before },
     { label: '이사하고 14일 안', items: moveMonth.filter((i) => i.kind === 'move_in') },
     { label: '전입한 뒤', items: moveMonth.filter((i) => i.kind === 'policy') },
   ].filter((s) => s.items.length);
@@ -651,26 +652,14 @@ function PostingPanel({
 }
 
 /** 남는 돈 단계 맨 아래: 다음 단계(정착 플랜) 미리보기, 공고마다 한 줄 (처음 보여 줄 경우 기준, 최대 3개) */
-export function PlanPreview({
-  plan,
-  result,
-  rows,
-}: {
-  plan: SettlePlan;
-  result: CalculationResult;
-  rows: Row[];
-}) {
+export function PlanPreview({ plan, result }: { plan: SettlePlan; result: CalculationResult }) {
   // 적금·강의를 미리 불러 둔다: 정착 플랜 단계에 들어가면 서버에 담아 둔 결과가 바로 온다
   usePlanExtras(extrasKeys(plan.postings));
   const lines = plan.postings.slice(0, 3).map((p) => {
     const plans = plansOf(plan, p);
     const c = defaultCase(result, plans);
     const items = plans[c]!.slots.flatMap((s) => s.items);
-    const dorm = livesInCompanyHousing(
-      rows.find((r) => r.id === p.posting_id),
-      scenarioOf(result, p.posting_id, 'move')?.housing.value,
-    );
-    const deposit = dorm ? null : items.find((i) => i.kind === 'deposit')?.amount_krw;
+    const deposit = items.find((i) => i.kind === 'deposit')?.amount_krw;
     // 회사 이름 + 사실 칩 (' · '로 잇지 않는다)
     const facts = [
       c === 'move' ? '이사' : '통근',

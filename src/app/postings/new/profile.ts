@@ -28,7 +28,8 @@ export function rentsFromResult(estimates: readonly RentEstimate[] | undefined):
 
 /**
  * 사택·기숙사에 들어가는지: 공고에 사택·기숙사가 있고, 이사할 집 주거비를 0원으로 넣었으면.
- * 이때는 원룸 보증금을 따로 준비하지 않는다 (④ 보증금 상자, ⑤ '처음 준비할 돈'·이사 순서에서 뺀다).
+ * 이때는 원룸 보증금을 따로 준비하지 않는다 (④ 보증금 상자, ⑤ '처음 준비할 돈').
+ * 정착 플랜의 보증금 할 일·주거 지원은 백엔드가 같은 규칙으로 뺀다 (plan.py build_plan).
  * 주거비를 넣었으면 따로 집을 구하는 것으로 본다 (③ 칸 안내: '따로 집을 구한다면 월세 + 관리비').
  */
 export function livesInCompanyHousing(
