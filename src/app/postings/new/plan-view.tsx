@@ -143,7 +143,7 @@ function SavingsSlot({
   return (
     <li className="plan-slot is-extra">
       <h4 className="plan-slot-label">
-        첫 월급 받은 뒤<small>남는 돈을 모으고 싶다면 · 참고</small>
+        첫 월급 받은 뒤<small>남는 돈을 모으고 싶다면</small>
       </h4>
       <p className="plan-chips">
         <span className="support-category">12개월 기본금리 순</span>
@@ -396,6 +396,8 @@ function PostingPanel({
 /** 남는 돈 단계 맨 아래: 다음 단계(정착 플랜)에 무엇이 있는지 공고마다 한 줄 (최대 3개) */
 export function PlanPreview({ plan }: { plan: SettlePlan }) {
   const postings = plan.postings.filter((p) => p.slots.length > 0);
+  // 적금·강의를 미리 불러 둔다: 정착 플랜 단계에 들어가면 서버에 담아 둔 결과가 바로 온다
+  usePlanExtras(extrasKeys(postings));
   const lines = postings.slice(0, 3).map((posting) => {
     // 회사마다 다른 것만: 보증금과 지원 개수
     const items = posting.slots.flatMap((slot) => slot.items);
@@ -418,6 +420,11 @@ export function PlanPreview({ plan }: { plan: SettlePlan }) {
       {postings.length > 3 && <p>외 {postings.length - 3}개</p>}
     </div>
   );
+}
+
+/** 플랜에 나오는 강의 열쇠들 (겹치지 않게, 순서 고정) */
+function extrasKeys(postings: PostingPlan[]): string[] {
+  return [...new Set(postings.map(trainingKey).filter((k): k is string => !!k))].sort();
 }
 
 /** 재직자 강의를 받을 열쇠: 근무지 시군구 코드와 직무 분류 ('41135:20'). 근무지를 모르면 null */
@@ -464,8 +471,7 @@ function usePlanExtras(keys: string[]) {
 
 export function PlanView({ plan, result }: { plan: SettlePlan; result: CalculationResult }) {
   const postings = plan.postings.filter((p) => p.slots.length > 0);
-  const keys = [...new Set(postings.map(trainingKey).filter((k): k is string => !!k))].sort();
-  const { savings, training } = usePlanExtras(keys);
+  const { savings, training } = usePlanExtras(extrasKeys(postings));
   const remainingFor = (posting: PostingPlan) =>
     result.postings
       .find((p) => p.posting_id === posting.posting_id)

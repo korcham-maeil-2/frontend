@@ -1930,6 +1930,24 @@ section.desk-sheet > .sheet-heading {
 .plan-conclusion strong.is-good {
   color: var(--positive, var(--primary));
 }
+/* 폰: 결론 세 칸을 한 줄씩 (이름 왼쪽, 숫자 오른쪽) */
+@media (max-width: 39.99rem) {
+  .plan-conclusion > div {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    column-gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+  }
+  .plan-conclusion strong {
+    font-size: 1.125rem;
+  }
+  .plan-conclusion small {
+    flex-basis: 100%;
+    text-align: end;
+  }
+}
 .plan-ref {
   border-top: 1px solid var(--border);
   padding-top: 1rem;
@@ -1938,6 +1956,10 @@ section.desk-sheet > .sheet-heading {
   font-size: 0.875rem;
   font-weight: 700;
   color: var(--muted-foreground);
+}
+/* 참고는 순서(타임라인)가 아니라 점을 찍지 않는다 */
+.plan-ref .plan-slot::before {
+  display: none;
 }
 .plan-ref > ul {
   display: grid;
