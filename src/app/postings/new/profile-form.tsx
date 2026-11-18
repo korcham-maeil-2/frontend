@@ -410,7 +410,7 @@ export function ProfileFormView({
   const used = new Set(form.fixedExpenses.map((item) => item.name.trim()));
 
   return (
-    <div className="space-y-8">
+    <div className="profile-form space-y-8">
       <fieldset className="row-group">
         <legend>나와 지금 사는 곳</legend>
         <MoneyField

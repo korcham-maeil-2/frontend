@@ -502,6 +502,9 @@ details[open] > summary .when-closed {
   background: var(--accent);
   scroll-margin: 6rem;
 }
+.sheet-heading + .review-todo {
+  margin-top: 1rem;
+}
 .review-todo:focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
@@ -1254,6 +1257,12 @@ section.desk-sheet > .sheet-heading {
   color: var(--muted-foreground);
 }
 
+/* 내 생활비: 넓은 화면에서 숫자 칸이 이름에서 멀어지지 않게 폼 폭을 묶는다 (고정비 줄·단위 끝선은 그대로) */
+@media (min-width: 64rem) {
+  .profile-form {
+    max-width: 46rem;
+  }
+}
 /* 내 생활비: '모든 공고에 같은 값'과 '공고마다 다른 값'의 경계 (가장 큰 구분: 굵은 잉크 선) */
 .profile-split {
   margin-top: 3rem;
@@ -1825,6 +1834,13 @@ section.desk-sheet > .sheet-heading {
 /* 결과 화면 좁은 화면 명세: 최소 연봉 칸의 '공고엔 비공개' 칩이 바로 앞 신뢰도 배지와 붙지 않게 */
 .result-compare .compare-list .offer-badge {
   margin-inline-start: 0.375rem;
+}
+
+/* 표 위 '연봉 비공개 공고의 기준' 한 줄 (result-view.tsx) */
+.compare-basis {
+  margin-top: -0.75rem;
+  font-size: 0.9375rem;
+  color: var(--muted-foreground);
 }
 
 /* 결과 표의 답 줄 '매달 남는 돈': 이름도 크게 (옆의 큰 초록 금액이 무엇인지 바로 읽히게) */

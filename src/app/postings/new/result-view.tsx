@@ -634,7 +634,7 @@ function BreakEvenAnswer({
   // 최소 연봉에는 따로 받는 식대·수당이 빠져 있다 → 요약에도 적는다
   const onTop = column.posting.pay_on_top?.value ? column.posting.pay_on_top : null;
   const salary = (
-    <strong className="text-xl font-bold text-positive tabular-nums">
+    <strong className="text-xl font-bold text-foreground tabular-nums">
       {won(chosen.annual_salary_krw)}
     </strong>
   );
@@ -789,6 +789,15 @@ export function ResultView({ result, rows }: { result: Result; rows: Row[] }) {
         ))}
       </div>
 
+      {/* 연봉 비공개 공고의 최소 연봉이 무엇에 맞춘 값인지 표 위에서 먼저 (이사 탭에서 옆 열 금액과 헷갈리지 않게) */}
+      {[...new Set(result.break_even.map((be) => be.baseline.label))].map((label) => {
+        const be = result.break_even.find((b) => b.baseline.label === label)!;
+        return (
+          <p key={label} className="compare-basis">
+            연봉 비공개 공고의 기준: {label} · 매달 {won(be.baseline.monthly_remaining)}
+          </p>
+        );
+      })}
       <div className="compare-view result-compare">
         <div className="result-scroll">
           <table className="offer-table compare-table result-table" style={tableWidth}>
