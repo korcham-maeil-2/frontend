@@ -84,6 +84,11 @@ function Item({ item }: { item: PlanItem }) {
   );
 }
 
+/** 금리 자릿수를 맞춘다: 3 → '3.00%', 3.85 → '3.85%' */
+function rate(value: number): string {
+  return `${value.toFixed(2)}%`;
+}
+
 /** '2026-12-01' → '12월 1일' */
 function md(iso: string): string {
   const [, m, d] = iso.split('-');
@@ -118,15 +123,16 @@ function SavingsSlot({ savings }: { savings: SavingsList }) {
               <span className="support-category">{p.bank}</span>
             </p>
             <p className="plan-amount">
-              연 {p.rate}%
+              연 {rate(p.rate)}
               {p.max_rate != null && p.max_rate > p.rate && (
-                <small className="plan-amount-note"> 우대 최고 연 {p.max_rate}%</small>
+                <small className="plan-amount-note"> 우대 최고 연 {rate(p.max_rate)}</small>
               )}
             </p>
             <p className="support-meta">
               <span>{p.saving_type}</span>
               {p.join_way && <span>가입: {p.join_way.replaceAll(',', '·')}</span>}
-              {p.limit_krw != null && <span>한도 {formatWon(p.limit_krw)}</span>}
+              {/* 금감원 공시의 '최고 한도'(max_limit). 월 한도인지 총액인지는 상품마다 달라 공시 이름 그대로 */}
+              {p.limit_krw != null && <span>공시 최고 한도 {formatWon(p.limit_krw)}</span>}
             </p>
           </li>
         ))}
@@ -161,7 +167,9 @@ function CourseItem({ course }: { course: Course }) {
         <span className="support-open">
           {md(course.start)} 시작{course.end && ` ~ ${md(course.end)}`}
         </span>
-        <span>{course.fee_krw === 0 ? '무료' : course.kind_label}</span>
+        {/* 컨소시엄은 '무료'만 보이면 누구나 들을 수 있다고 오해한다 → 대상(중소기업 재직자)도 함께 */}
+        <span>{course.kind_label}</span>
+        {course.fee_krw === 0 && <span>무료</span>}
         {course.institute && <span className="support-agency">{course.institute}</span>}
       </p>
     </li>
