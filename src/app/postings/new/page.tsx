@@ -738,7 +738,7 @@ export default function NewPosting() {
 
   // 화면에 보이는 단계. 결과 단계인데 결과가 지금 입력과 맞지 않으면(고쳤거나 예전 초안) 생활비 단계를 보여 준다.
   // 정착 플랜은 결과의 다음 단계: 결과가 없으면 생활비, 플랜이 없으면 결과를 보여 준다.
-  const hasPlan = !!plan?.postings.some((p) => p.slots.length > 0);
+  const hasPlan = !!plan?.postings.length; // 칸이 없어도 결론·참고는 보여 준다
   const shown: Step =
     (step === 'result' || step === 'plan') && !freshResult
       ? 'living'

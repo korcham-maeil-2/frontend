@@ -33,12 +33,6 @@ export function isSettlePlan(value: unknown): value is SettlePlan {
   );
 }
 
-/** 칸 이름 옆 짧은 설명 */
-const SLOT_HINT: Partial<Record<PlanSlot['kind'], string>> = {
-  before: '집을 구하기 전에',
-  move_month: '이사하고 바로',
-};
-
 function ItemTitle({ item }: { item: PlanItem }) {
   if (!item.url) return <span className="plan-item-title">{item.title}</span>;
   return (
@@ -285,57 +279,179 @@ function TrainingSlot({
   );
 }
 
-/** 연봉 비공개 공고: 이 플랜의 경우(이사·통근)에 같은 돈이 남으려면 받아야 할 최소 연봉 */
+/** 연봉 비공개 공고: 이 경우(이사·통근)에 같은 돈이 남으려면 받아야 할 최소 연봉 */
 type MinSalary = { salary: number; monthly: number | null; basis: string };
+type Case = 'commute' | 'move';
+type Scenario = CalculationResult['postings'][number]['scenarios'][number];
+
+const CASE_LABEL: Record<Case, string> = { commute: '지금 집에서 통근', move: '회사 근처로 이사' };
+const won = (v: number) => formatWon(Math.round(v / 10_000) * 10_000);
+
+/** 공고의 플랜들: 이사 플랜(postings)과 통근 플랜(alternates). 예전 백엔드면 하나뿐 */
+function plansOf(plan: SettlePlan, posting: PostingPlan): Partial<Record<Case, PostingPlan>> {
+  if (!posting.moving) return { commute: posting };
+  const alt = plan.alternates?.find((a) => a.posting_id === posting.posting_id);
+  return alt ? { commute: alt, move: posting } : { move: posting };
+}
+
+function scenarioOf(result: CalculationResult, id: string, c: Case): Scenario | undefined {
+  const s = result.postings.find((p) => p.posting_id === id)?.scenarios.find((x) => x.case === c);
+  return s?.applicable ? s : undefined;
+}
+
+function minSalaryOf(result: CalculationResult, id: string, c: Case): MinSalary | null {
+  const be = result.break_even?.find((b) => b.posting_id === id);
+  const x = be?.cases.find((k) => k.case === c);
+  return be && x?.annual_salary_krw != null
+    ? {
+        salary: x.annual_salary_krw,
+        monthly: x.monthly_remaining ?? null,
+        basis: be.baseline.label,
+      }
+    : null;
+}
+
+/** 처음 보여 줄 경우: 매달 더 많이 남는 쪽, 연봉 비공개면 최소 연봉이 낮은 쪽 (같거나 모르면 통근) */
+function defaultCase(result: CalculationResult, plans: Partial<Record<Case, PostingPlan>>): Case {
+  if (!plans.commute) return 'move';
+  if (!plans.move) return 'commute';
+  const id = plans.move.posting_id;
+  const [m, c] = (['move', 'commute'] as const).map(
+    (k) => scenarioOf(result, id, k)?.monthly_remaining,
+  );
+  if (m != null && c != null) return m > c ? 'move' : 'commute';
+  const [sm, sc] = (['move', 'commute'] as const).map((k) => minSalaryOf(result, id, k)?.salary);
+  return sm != null && sc != null && sm < sc ? 'move' : 'commute';
+}
+
+/** 정책·할 일 목록 (정책은 한 줄, 할 일은 카드) */
+function Rows({ items }: { items: PlanItem[] }) {
+  return (
+    <ul className="plan-items">
+      {items.map((item) => (
+        <Item key={`${item.kind}-${item.policy_id ?? item.title}`} item={item} />
+      ))}
+    </ul>
+  );
+}
 
 function PostingPanel({
-  posting,
+  plans,
+  result,
   savings,
   training,
-  remaining,
-  minSalary,
+  supportFailed,
   onEditLiving,
 }: {
-  posting: PostingPlan;
+  plans: Partial<Record<Case, PostingPlan>>;
+  result: CalculationResult;
   savings: SavingsList | null;
   training: TrainingList | undefined;
-  /** 이 플랜의 경우(이사·통근)에 매달 남는 돈. 모르면 null */
-  remaining: number | null;
-  minSalary: MinSalary | null;
+  /** 청년 지원을 못 불러와 지원 일정이 빠졌는지 */
+  supportFailed: boolean;
   onEditLiving: () => void;
 }) {
-  if (!posting.slots.length) {
-    return <p className="support-empty">지금 넣을 할 일을 찾지 못했어요.</p>;
-  }
-  const items = posting.slots.flatMap((slot) => slot.items);
-  const deposit = items.find((i) => i.kind === 'deposit');
-  const deadlines = items.filter((i) => i.kind === 'policy' && i.when && i.when !== '상시');
-  const showSavings = savings?.status === 'ok' && savings.products.length > 0;
-  const caseText = posting.moving ? '이사하면' : '지금 집에서 통근하면';
-  const won = (v: number) => formatWon(Math.round(v / 10_000) * 10_000);
+  const cases = (['commute', 'move'] as const).filter((c) => plans[c]);
+  const [chosen, setChosen] = useState<Case>(() => defaultCase(result, plans));
+  const posting = plans[chosen]!;
+  const id = posting.posting_id;
+  const scenario = scenarioOf(result, id, chosen);
+  const remaining = scenario?.monthly_remaining ?? null;
+  const minSalary = remaining == null ? minSalaryOf(result, id, chosen) : null;
+  const moving = chosen === 'move';
+  const itemsOf = (kind: PlanSlot['kind']) =>
+    posting.slots.filter((s) => s.kind === kind).flatMap((s) => s.items);
+  const deadlines = itemsOf('month');
+  const before = itemsOf('before');
+  const moveMonth = itemsOf('move_month');
+  const start = itemsOf('start');
+  const anytime = itemsOf('anytime');
+  const deposit = before.find((i) => i.kind === 'deposit');
+  const showSavings =
+    savings?.status === 'ok' &&
+    savings.products.length > 0 &&
+    !(remaining != null && remaining < 0);
   const showTraining = training?.status === 'ok' && training.courses.length > 0;
+  // 남는 돈 칸 설명: 무엇을 빼고 남는지 (통근은 교통비, 이사는 주거비·교통비).
+  // 비워 둔 교통비는 '0원'을 강조하지 않고 비워 둬서 0원으로 계산했다고 알린다
+  const costs = scenario
+    ? [
+        moving && scenario.housing.value != null ? `주거비 ${won(scenario.housing.value)}` : '',
+        (scenario.assumed_zero ?? []).includes('교통비')
+          ? '교통비는 비워 둬서 0원으로 계산했어요 · 더 들 수 있어요'
+          : scenario.transport.value != null
+            ? `${moving ? '' : '출퇴근 '}교통비 ${won(scenario.transport.value)} 빼고`
+            : '',
+      ]
+        .filter(Boolean)
+        .join(' · ')
+    : '';
+  const amountOf = (c: Case) => {
+    const r = scenarioOf(result, id, c)?.monthly_remaining;
+    const m = minSalaryOf(result, id, c)?.salary;
+    return r != null ? `약 ${won(r)}` : m != null ? `최소 ${formatWon(m)}` : '';
+  };
+  const steps = [
+    { label: '집 구하기 전', items: before },
+    { label: '이사하고 14일 안', items: moveMonth.filter((i) => i.kind === 'move_in') },
+    { label: '전입한 뒤', items: moveMonth.filter((i) => i.kind === 'policy') },
+  ].filter((s) => s.items.length);
   return (
     <div className="space-y-4">
+      {/* 통근·이사 바꿔 보기 (둘 다 될 때). 4단계의 '비교할 경우'와 같은 모양 */}
+      {cases.length > 1 && (
+        <div role="group" aria-label="볼 경우" className="source-tabs mode-switch">
+          {cases.map((c) => (
+            <button key={c} type="button" aria-pressed={c === chosen} onClick={() => setChosen(c)}>
+              {CASE_LABEL[c]}
+              {/* 폰에서는 금액을 아랫줄로 (중간에서 끊기지 않게) */}
+              {amountOf(c) && (
+                <>
+                  <span className="hidden sm:inline"> · </span>
+                  <span className="block sm:inline">{amountOf(c)}</span>
+                </>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
       <p className="plan-chips">
         {posting.region && <span className="support-category">{posting.region}</span>}
-        <span className="support-category">
-          {posting.moving ? '회사 근처로 이사하는 경우' : '지금 집에서 통근하는 경우'}
-        </span>
+        {cases.length === 1 && (
+          <span className="support-category">{CASE_LABEL[chosen]}하는 경우</span>
+        )}
       </p>
-      {/* 결론: 이 회사로 가면 숫자 셋 (처음 드는 돈, 매달 남는 돈, 놓치면 안 되는 마감) */}
+      {/* 결론: 같은 세 칸이 경우마다 숫자만 바뀐다 (처음 드는 돈, 매달 남는 돈, 마감) */}
       <div className="plan-conclusion">
-        {deposit?.amount_krw != null && (
+        {!moving ? (
           <div>
             <span>처음 준비할 돈</span>
-            <strong>{formatWon(deposit.amount_krw)}</strong>
-            <small>원룸 보증금 시세 (추정)</small>
+            <strong>없음</strong>
+            <small>이사하지 않아요</small>
           </div>
+        ) : (
+          deposit?.amount_krw != null && (
+            <div>
+              <span>처음 준비할 돈</span>
+              <strong>{formatWon(deposit.amount_krw)}</strong>
+              <small>원룸 보증금 시세 (추정)</small>
+            </div>
+          )
         )}
-        {/* 남는 돈을 알면 그 금액, 연봉 비공개면 받아야 할 최소 연봉, 빈 값이면 채우러 가는 길 */}
         {remaining != null ? (
           <div>
-            <span>{caseText} 매달 남는 돈</span>
+            <span>{moving ? '이사하면' : '통근하면'} 매달 남는 돈</span>
             <strong className={remaining >= 0 ? 'is-good' : 'is-bad'}>약 {won(remaining)}</strong>
+            {remaining < 0 ? (
+              <small>
+                매달 모자라요 ·{' '}
+                <button type="button" className="inline-link" onClick={onEditLiving}>
+                  생활비 다시 보기
+                </button>
+              </small>
+            ) : (
+              costs && <small>{costs}</small>
+            )}
           </div>
         ) : minSalary ? (
           <div>
@@ -349,7 +465,7 @@ function PostingPanel({
           </div>
         ) : (
           <div>
-            <span>{caseText} 매달 남는 돈</span>
+            <span>{moving ? '이사하면' : '통근하면'} 매달 남는 돈</span>
             <strong>아직 계산 전</strong>
             <small>
               생활비 빈칸을 채우면 계산돼요 ·{' '}
@@ -360,55 +476,72 @@ function PostingPanel({
           </div>
         )}
         <div>
-          <span>마감 있는 지원</span>
-          <strong>{deadlines.length ? `${deadlines.length}건` : '없음'}</strong>
-          <small>{deadlines[0]?.when ?? '지원은 모두 상시 신청이에요'}</small>
+          <span>마감이 있는 지원</span>
+          <strong>
+            {supportFailed ? '모름' : deadlines.length ? `${deadlines.length}건` : '없음'}
+          </strong>
+          <small>
+            {supportFailed
+              ? '청년 지원을 불러오지 못했어요'
+              : (deadlines[0]?.when ?? '지원은 모두 상시 신청이에요')}
+          </small>
         </div>
       </div>
-      <h3 className="plan-section-title plan-section">언제 무엇을</h3>
-      <ol className="plan-timeline">
-        {posting.slots.map((slot) => {
-          const list = (
-            <ul className="plan-items">
-              {slot.items.map((item) => (
-                <Item key={`${item.kind}-${item.policy_id ?? item.title}`} item={item} />
-              ))}
-            </ul>
-          );
-          return (
-            <li key={`${slot.kind}-${slot.month ?? ''}`} className={`plan-slot is-${slot.kind}`}>
-              <h4 className="plan-slot-label">
-                {slot.label}
-                {SLOT_HINT[slot.kind] && <small>{SLOT_HINT[slot.kind]}</small>}
-              </h4>
-              {/* 언제든: 날짜가 없는 지원이라 접어 둔다 (날짜 있는 일만 펼쳐 보이게) */}
-              {slot.kind === 'anytime' ? (
-                <details className="plan-fold">
-                  <summary>지원 {slot.items.length}개 펼치기</summary>
-                  {list}
-                </details>
-              ) : (
-                list
-              )}
-            </li>
-          );
-        })}
-      </ol>
+      {/* 급한 것부터: 날짜 있는 지원 → (이사) 순서 → 입사하면 → 언제든. 입사일을 몰라 순서와 날짜를 나눈다 */}
+      {deadlines.length > 0 && (
+        <section className="plan-section">
+          <h3 className="plan-section-title">마감이 있는 지원</h3>
+          <p className="plan-section-desc">날짜순{moving && ' · 지역 지원은 전입한 주소를 봐요'}</p>
+          <Rows items={deadlines} />
+        </section>
+      )}
+      {moving && steps.length > 0 && (
+        <section className="plan-section">
+          <h3 className="plan-section-title">이사 순서</h3>
+          <p className="plan-section-desc">날짜와 상관없이 이 순서로</p>
+          <ol className="plan-steps">
+            {steps.map((s, i) => (
+              <li key={s.label}>
+                <h4 className="plan-slot-label">
+                  {i + 1}. {s.label}
+                </h4>
+                <Rows items={s.items} />
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
+      {start.length > 0 && (
+        <section className="plan-section">
+          <h3 className="plan-section-title">입사하면 챙겨 볼 것</h3>
+          <p className="plan-section-desc">
+            첫 취업이면 누구나 · 어느 회사든 같아요 · 자격은 신청 페이지에서 확인해 주세요
+          </p>
+          {/* 모두 전국이라 칩은 빼고 */}
+          <Rows items={start.map((item) => ({ ...item, scope: null }))} />
+        </section>
+      )}
+      {anytime.length > 0 && (
+        <details className="plan-fold plan-section">
+          <summary>언제든 신청할 수 있는 지원 {anytime.length}개</summary>
+          <Rows items={anytime} />
+        </details>
+      )}
       {posting.notes.map((note) => (
         <p key={note} className="text-sm text-muted-foreground">
           {note}
         </p>
       ))}
-      {/* 할 일이 아닌 참고 정보: 타임라인(순서) 밖에 섹션으로. 남는 돈이 바뀌면 고른 금액도 새로 */}
+      {/* 참고: 할 일이 아니라 순서 밖 섹션으로. 경우·남는 돈이 바뀌면 고른 금액도 새로 */}
       {showSavings && (
         <SavingsSlot
-          key={remaining ?? minSalary?.monthly}
+          key={`${chosen}-${remaining ?? minSalary?.monthly}`}
           savings={savings}
           remaining={remaining ?? minSalary?.monthly ?? null}
           basis={
             remaining == null && minSalary
               ? `최소 연봉 ${formatWon(minSalary.salary)}을 받는다면`
-              : posting.moving
+              : moving
                 ? '이사하면'
                 : '통근하면'
           }
@@ -419,24 +552,25 @@ function PostingPanel({
   );
 }
 
-/** 남는 돈 단계 맨 아래: 다음 단계(정착 플랜)에 무엇이 있는지 공고마다 한 줄 (최대 3개) */
+/** 남는 돈 단계 맨 아래: 다음 단계(정착 플랜) 미리보기, 공고마다 한 줄 (처음 보여 줄 경우 기준, 최대 3개) */
 export function PlanPreview({ plan, result }: { plan: SettlePlan; result: CalculationResult }) {
-  const postings = plan.postings.filter((p) => p.slots.length > 0);
   // 적금·강의를 미리 불러 둔다: 정착 플랜 단계에 들어가면 서버에 담아 둔 결과가 바로 온다
-  usePlanExtras(extrasKeys(postings));
-  const lines = postings.slice(0, 3).map((posting) => {
-    // 회사마다 다른 것만: 보증금과 지원 개수
-    const items = posting.slots.flatMap((slot) => slot.items);
+  usePlanExtras(extrasKeys(plan.postings));
+  const lines = plan.postings.slice(0, 3).map((p) => {
+    const plans = plansOf(plan, p);
+    const c = defaultCase(result, plans);
+    const items = plans[c]!.slots.flatMap((s) => s.items);
     const deposit = items.find((i) => i.kind === 'deposit')?.amount_krw;
     const line = [
-      posting.company || posting.posting_id,
-      result.break_even?.some((b) => b.posting_id === posting.posting_id) ? '연봉 비공개' : '',
+      p.company || p.posting_id,
+      c === 'move' ? '이사' : '통근',
+      result.break_even?.some((b) => b.posting_id === p.posting_id) ? '연봉 비공개' : '',
       deposit != null ? `보증금 ${formatWon(deposit)}` : '',
       `지원 ${items.filter((i) => i.kind === 'policy').length}개`,
     ]
       .filter(Boolean)
       .join(' · ');
-    return { id: posting.posting_id, line };
+    return { id: p.posting_id, line };
   });
   return (
     <div className="plan-preview">
@@ -444,7 +578,7 @@ export function PlanPreview({ plan, result }: { plan: SettlePlan; result: Calcul
       {lines.map(({ id, line }) => (
         <p key={id}>{line}</p>
       ))}
-      {postings.length > 3 && <p>외 {postings.length - 3}개</p>}
+      {plan.postings.length > 3 && <p>외 {plan.postings.length - 3}개</p>}
     </div>
   );
 }
@@ -505,36 +639,22 @@ export function PlanView({
   result: CalculationResult;
   onEditLiving: () => void;
 }) {
-  const postings = plan.postings.filter((p) => p.slots.length > 0);
+  const postings = plan.postings;
   const { savings, training } = usePlanExtras(extrasKeys(postings));
-  const remainingFor = (posting: PostingPlan) =>
-    result.postings
-      .find((p) => p.posting_id === posting.posting_id)
-      ?.scenarios.find((s) => s.case === (posting.moving ? 'move' : 'commute'))
-      ?.monthly_remaining ?? null;
-  const minSalaryFor = (posting: PostingPlan): MinSalary | null => {
-    const be = result.break_even?.find((b) => b.posting_id === posting.posting_id);
-    const c = be?.cases.find((x) => x.case === (posting.moving ? 'move' : 'commute'));
-    return be && c?.annual_salary_krw != null
-      ? {
-          salary: c.annual_salary_krw,
-          monthly: c.monthly_remaining ?? null,
-          basis: be.baseline.label,
-        }
-      : null;
-  };
   if (!postings.length) return null;
-  // 처음 여는 탭: 매달 더 많이 남는 회사 (같으면 첫 공고)
-  const first = postings.reduce((a, b) =>
-    (remainingFor(b) ?? -Infinity) > (remainingFor(a) ?? -Infinity) ? b : a,
-  );
+  const supportFailed = plan.notes.some((n) => n.includes('불러오지 못해'));
+  // 처음 여는 탭: 처음 보여 줄 경우에 매달 더 많이 남는 회사 (같으면 첫 공고)
+  const best = (p: PostingPlan) =>
+    scenarioOf(result, p.posting_id, defaultCase(result, plansOf(plan, p)))?.monthly_remaining ??
+    -Infinity;
+  const first = postings.reduce((a, b) => (best(b) > best(a) ? b : a));
   const panel = (posting: PostingPlan) => (
     <PostingPanel
-      posting={posting}
+      plans={plansOf(plan, posting)}
+      result={result}
       savings={savings}
       training={training[trainingKey(posting) ?? '']}
-      remaining={remainingFor(posting)}
-      minSalary={minSalaryFor(posting)}
+      supportFailed={supportFailed}
       onEditLiving={onEditLiving}
     />
   );

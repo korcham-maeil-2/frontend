@@ -1026,7 +1026,7 @@ export interface components {
        * Kind
        * @enum {string}
        */
-      kind: 'before' | 'move_month' | 'month' | 'anytime';
+      kind: 'before' | 'move_month' | 'month' | 'start' | 'anytime';
       /**
        * Label
        * @description '이사 전', '이사한 달', '2026년 12월', '언제든'
@@ -1514,6 +1514,8 @@ export interface components {
     SettlePlan: {
       /** Postings */
       postings: components['schemas']['PostingPlan'][];
+      /** Alternates */
+      alternates: components['schemas']['PostingPlan'][];
       /**
        * Start Month
        * @description 달력의 첫 달 (조회한 날의 달, YYYY-MM)

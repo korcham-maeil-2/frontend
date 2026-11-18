@@ -229,12 +229,16 @@ export function bestRemainingText(result: Result): string {
   const candidates = result.postings.flatMap((posting, i) =>
     posting.scenarios
       .filter((s) => s.applicable && s.monthly_remaining != null)
-      .map((s) => ({ company: posting.company || `공고 ${i + 1}`, value: s.monthly_remaining! })),
+      .map((s) => ({
+        company: posting.company || `공고 ${i + 1}`,
+        value: s.monthly_remaining!,
+        when: s.case === 'move' ? '이사 시' : '통근 시',
+      })),
   );
   if (!candidates.length) return `공고 ${result.postings.length}개 계산`;
   const best = candidates.reduce((a, b) => (b.value > a.value ? b : a));
   // 단계 표시에서 좁으면 뒤가 잘린다: 숫자를 앞에 (회사 이름이 잘리게)
-  return `매달 ${won(best.value)} · ${best.company}`;
+  return `${best.when} 매달 ${won(best.value)} · ${best.company}`;
 }
 
 function remainingCell(value: number, extra: Omit<Shown, 'value'> = {}): Shown {

@@ -1782,31 +1782,6 @@ section.desk-sheet > .sheet-heading {
   color: var(--foreground);
 }
 
-/* 1년 정착 플랜 (plan-view.tsx): 왼쪽 세로줄 위에 칸(이사 전 → 이사한 달 → 달마다 → 언제든) */
-.plan-timeline {
-  display: grid;
-  gap: 1rem;
-  border-inline-start: 2px solid var(--border);
-  padding-inline-start: 1rem;
-}
-.plan-slot {
-  position: relative;
-}
-/* 세로줄 위의 점: 칸의 시작 */
-.plan-slot::before {
-  content: '';
-  position: absolute;
-  inset-inline-start: calc(-1rem - 6px);
-  top: 0.4rem;
-  width: 10px;
-  height: 10px;
-  border-radius: 999px;
-  background: var(--card);
-  box-shadow: 0 0 0 2px var(--primary);
-}
-.plan-slot.is-anytime::before {
-  box-shadow: 0 0 0 2px var(--border);
-}
 .plan-slot-label {
   display: flex;
   flex-wrap: wrap;
@@ -1875,15 +1850,6 @@ section.desk-sheet > .sheet-heading {
   border-radius: 0.25rem;
 }
 
-/* 정착 플랜의 참고 칸 (적금·재직자 강의): 점을 비워 계산·일정과 구분한다 */
-.plan-slot.is-extra::before {
-  box-shadow: 0 0 0 2px var(--border);
-}
-.plan-extra-lead {
-  margin-top: 0.25rem;
-  font-size: 0.875rem;
-  color: var(--muted-foreground);
-}
 .plan-extra-source {
   margin-top: 0.5rem;
   font-size: 0.75rem;
@@ -1892,12 +1858,6 @@ section.desk-sheet > .sheet-heading {
 .plan-extra-source a {
   text-decoration: underline;
   text-underline-offset: 0.2em;
-}
-.plan-amount-note {
-  margin-inline-start: 0.5rem;
-  font-size: 0.75rem;
-  font-weight: 400;
-  color: var(--muted-foreground);
 }
 /* 정착 플랜: 한 해 요약 띠, 한 줄 행, 접기, 남는 돈 단계의 미리보기 */
 .plan-chips {
@@ -1965,6 +1925,12 @@ section.desk-sheet > .sheet-heading {
   border-top: 1px solid var(--border);
   margin-top: 1.5rem;
   padding-top: 1.5rem;
+}
+/* 이사 순서: 번호 칸마다 제목 + 목록 */
+.plan-steps {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
 }
 .plan-section-title {
   display: flex;
