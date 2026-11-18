@@ -916,6 +916,7 @@ export default function NewPosting() {
                 <PlanView
                   plan={plan}
                   result={freshResult}
+                  rows={rows}
                   supportFailed={!support}
                   onEditLiving={() => changeStep('living')}
                 />
@@ -951,7 +952,7 @@ export default function NewPosting() {
           <div className="sheet-actions flex-wrap">
             {/* 다음 단계 미리보기는 버튼 줄과 한 덩어리로 */}
             {shown === 'result' && hasPlan && plan && (
-              <PlanPreview plan={plan} result={freshResult} />
+              <PlanPreview plan={plan} result={freshResult} rows={rows} />
             )}
             <div className="flex flex-wrap gap-2">
               {shown === 'plan' ? (
@@ -1259,7 +1260,8 @@ export default function NewPosting() {
               {checkWarned && cellsToCheck
                 ? '그대로 다음으로'
                 : edited
-                  ? '고친 내용으로 다음'
+                  ? // '이 값이 맞아요'로 확인만 해도 바뀐 것으로 친다 → '고친'이 아니라 '확인한'
+                    '확인한 내용으로 다음'
                   : '이대로 다음'}{' '}
               <ArrowRight aria-hidden />
             </Button>

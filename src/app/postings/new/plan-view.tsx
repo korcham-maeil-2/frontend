@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { api } from '@/lib/api/client';
 import type { components } from '@/lib/api/schema';
-import { formatWon, placeName, statusBadge } from './format';
+import { formatWon, placeName, statusBadge, type Row } from './format';
+import { livesInCompanyHousing } from './profile';
 import { SourceBadge } from './source-badge';
 
 // 결과 화면의 '1년 정착 플랜' (백엔드 plan.py의 SettlePlan, 이슈 #18).
@@ -384,6 +385,7 @@ function Rows({ items, twoColumns = false }: { items: PlanItem[]; twoColumns?: b
 function PostingPanel({
   plans,
   result,
+  row,
   savings,
   training,
   supportFailed,
@@ -391,6 +393,8 @@ function PostingPanel({
 }: {
   plans: Partial<Record<Case, PostingPlan>>;
   result: CalculationResult;
+  /** 이 공고의 조건 (사택·기숙사가 있는지) */
+  row: Row | undefined;
   savings: SavingsList | null;
   training: TrainingList | undefined;
   /** 청년 지원을 못 불러와 지원 일정이 빠졌는지 */
@@ -415,7 +419,9 @@ function PostingPanel({
   const moveMonth = itemsOf('move_month');
   const start = itemsOf('start');
   const anytime = itemsOf('anytime');
-  const deposit = before.find((i) => i.kind === 'deposit');
+  // 사택·기숙사에 들어가면(이사할 집 주거비 0원) 원룸 보증금 할 일은 뺀다 (백엔드는 시세로 넣어 보낸다)
+  const dorm = livesInCompanyHousing(row, scenarioOf(result, id, 'move')?.housing.value);
+  const deposit = dorm ? undefined : before.find((i) => i.kind === 'deposit');
   const showSavings =
     savings?.status === 'ok' &&
     savings.products.length > 0 &&
@@ -438,7 +444,7 @@ function PostingPanel({
     return r != null ? `약 ${won(r)}` : m ? minSalaryText(m) : '';
   };
   const steps = [
-    { label: '집 구하기 전', items: before },
+    { label: '집 구하기 전', items: dorm ? before.filter((i) => i.kind !== 'deposit') : before },
     { label: '이사하고 14일 안', items: moveMonth.filter((i) => i.kind === 'move_in') },
     { label: '전입한 뒤', items: moveMonth.filter((i) => i.kind === 'policy') },
   ].filter((s) => s.items.length);
@@ -462,12 +468,20 @@ function PostingPanel({
           ))}
         </div>
       )}
-      {(posting.region || cases.length === 1) && (
+      {posting.region && (
         <p className="plan-chips">
-          {posting.region && <span className="support-category">{posting.region}</span>}
-          {cases.length === 1 && (
-            <span className="support-category">{CASE_LABEL[chosen]}하는 경우</span>
-          )}
+          <span className="support-category">{posting.region}</span>
+        </p>
+      )}
+      {/* 경우가 하나뿐이면 왜인지 알린다: 해당 없는 경우는 ③에서 사용자가 끈 것뿐이다 (calc/remaining.py) */}
+      {cases.length === 1 && (
+        <p className="plan-one-case">
+          {chosen === 'move'
+            ? "'지금 집에서 다닐 수 있어요'를 꺼서 이사하는 경우만 보여요."
+            : "'이사도 생각하고 있어요'를 꺼서 지금 집에서 다니는 경우만 보여요."}{' '}
+          <button type="button" className="inline-link" onClick={onEditLiving}>
+            생활비에서 바꾸기
+          </button>
         </p>
       )}
       {/* 결론: 같은 세 칸이 경우마다 숫자만 바뀐다 (처음 드는 돈, 매달 남는 돈, 마감) */}
@@ -481,9 +495,15 @@ function PostingPanel({
         ) : (
           <div>
             <span>처음 준비할 돈</span>
-            <strong>{deposit?.amount_krw != null ? formatWon(deposit.amount_krw) : '모름'}</strong>
+            <strong>
+              {dorm ? '없음' : deposit?.amount_krw != null ? formatWon(deposit.amount_krw) : '모름'}
+            </strong>
             <small>
-              {deposit?.amount_krw != null ? '원룸 보증금 시세 (추정)' : '보증금 시세 없음'}
+              {dorm
+                ? '사택·기숙사에 들어가요'
+                : deposit?.amount_krw != null
+                  ? '원룸 보증금 시세 (추정)'
+                  : '보증금 시세 없음'}
             </small>
           </div>
         )}
@@ -631,14 +651,26 @@ function PostingPanel({
 }
 
 /** 남는 돈 단계 맨 아래: 다음 단계(정착 플랜) 미리보기, 공고마다 한 줄 (처음 보여 줄 경우 기준, 최대 3개) */
-export function PlanPreview({ plan, result }: { plan: SettlePlan; result: CalculationResult }) {
+export function PlanPreview({
+  plan,
+  result,
+  rows,
+}: {
+  plan: SettlePlan;
+  result: CalculationResult;
+  rows: Row[];
+}) {
   // 적금·강의를 미리 불러 둔다: 정착 플랜 단계에 들어가면 서버에 담아 둔 결과가 바로 온다
   usePlanExtras(extrasKeys(plan.postings));
   const lines = plan.postings.slice(0, 3).map((p) => {
     const plans = plansOf(plan, p);
     const c = defaultCase(result, plans);
     const items = plans[c]!.slots.flatMap((s) => s.items);
-    const deposit = items.find((i) => i.kind === 'deposit')?.amount_krw;
+    const dorm = livesInCompanyHousing(
+      rows.find((r) => r.id === p.posting_id),
+      scenarioOf(result, p.posting_id, 'move')?.housing.value,
+    );
+    const deposit = dorm ? null : items.find((i) => i.kind === 'deposit')?.amount_krw;
     // 회사 이름 + 사실 칩 (' · '로 잇지 않는다)
     const facts = [
       c === 'move' ? '이사' : '통근',
@@ -716,11 +748,14 @@ function usePlanExtras(keys: string[]) {
 export function PlanView({
   plan,
   result,
+  rows,
   supportFailed,
   onEditLiving,
 }: {
   plan: SettlePlan;
   result: CalculationResult;
+  /** 조건 확인 표 (사택·기숙사 여부를 본다) */
+  rows: Row[];
   /** 청년 지원을 못 불러왔는지 (세션의 local_support가 없음) */
   supportFailed: boolean;
   onEditLiving: () => void;
@@ -737,6 +772,7 @@ export function PlanView({
     <PostingPanel
       plans={plansOf(plan, posting)}
       result={result}
+      row={rows.find((r) => r.id === posting.posting_id)}
       savings={savings}
       training={training[trainingKey(posting) ?? '']}
       supportFailed={supportFailed}

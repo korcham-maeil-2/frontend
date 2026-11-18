@@ -665,7 +665,8 @@ export function ProfileFormView({
           return {
             remaining: missing.length,
             seen: true,
-            todoLabel: choose ? '골라 주세요' : undefined,
+            // 묶음 칩('채울 칸 N')과 같은 말로
+            todoLabel: choose ? '골라 주세요' : `채울 칸 ${missing.length}`,
           };
         }}
       >

@@ -2084,8 +2084,8 @@ details[open] > summary .when-closed {
 .offer-table.calc-table tbody tr:last-child :is(th, td) {
   border-block-end: 0; /* 접기 상자 테두리가 바로 아래에 있다 */
 }
-/* 표가 넘칠 때만 나오는 '옆으로 밀면…' 한 줄 (result-view.tsx CalcSteps가 재서 보인다) */
-.calc-scroll-hint {
+/* 표가 넘칠 때만 나오는 '옆으로 밀면…' 한 줄 (result-view.tsx useOverflowX가 재서 보인다) */
+.scroll-hint {
   margin-block-end: 0.5rem;
   font-size: 0.9375rem;
   color: var(--muted-foreground);
@@ -2209,6 +2209,11 @@ details[open] > summary .when-closed {
   flex-wrap: wrap;
   gap: 0.25rem;
   margin-top: 0.25rem;
+}
+/* 경우가 하나뿐인 이유 한 줄 (plan-view.tsx): 결과를 바꾸는 안내라 본문색 15px */
+.plan-one-case {
+  font-size: 0.9375rem;
+  color: var(--body);
 }
 .plan-conclusion {
   display: grid;

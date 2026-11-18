@@ -16,7 +16,7 @@ import {
   type Row,
   type Status,
 } from './format';
-import { FEW_TRADES, rentFailed } from './profile';
+import { FEW_TRADES, livesInCompanyHousing, rentFailed } from './profile';
 import { BadgeLegend, SourceBadge, type Detail } from './source-badge';
 
 // 결과 화면: 공고별 '매달 남는 돈'을 한 표로 비교한다 (DESIGN.md "비교표").
@@ -538,28 +538,40 @@ function StepCell({ step }: { step: Step }) {
 }
 
 /**
+ * 표를 감싼 칸이 가로로 넘치는지 ('옆으로 밀면 다른 공고도 보여요'를 넘칠 때만 보인다).
+ * 폭으로 짐작하면 안 넘치는데도 뜨거나, 넘치는데 안 떠서 뒤 공고를 놓친다 — 실제로 잰다.
+ * 접힌 상자 안이면 폭이 0이었다가 펼칠 때 바뀌므로 크기가 바뀔 때마다 다시 잰다.
+ */
+function useOverflowX() {
+  const ref = useRef<HTMLDivElement>(null);
+  const [overflows, setOverflows] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const observer = new ResizeObserver(() => setOverflows(el.scrollWidth > el.clientWidth + 1));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+  return [ref, overflows] as const;
+}
+
+function ScrollHint() {
+  return <p className="scroll-hint">옆으로 밀면 다른 공고도 보여요</p>;
+}
+
+/**
  * 계산 과정 비교: 위 표에 없는 세전 월급 → 세금·4대보험 → 세후 월급을 공고끼리 나란히 (접어 둔다).
  * 주거비·교통비·고정비·남는 돈은 위 표와 같아서 넣지 않는다. 공제 6개 항목은 한 번 더 펼친다.
  */
 function CalcSteps({ columns, style }: { columns: Column[]; style: CSSProperties }) {
   const [itemsOpen, setItemsOpen] = useState(false);
-  // 표가 칸보다 넓어 가로로 밀어야 할 때만 알린다 (폭으로 짐작하면 안 넘치는데도 뜬다)
-  const [overflows, setOverflows] = useState(false);
-  const scroller = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const el = scroller.current;
-    if (!el) return;
-    // 접혀 있으면 폭이 0이었다가 펼칠 때 바뀌므로, 펼친 순간에도 다시 잰다
-    const observer = new ResizeObserver(() => setOverflows(el.scrollWidth > el.clientWidth + 1));
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
+  const [scroller, overflows] = useOverflowX();
   const steps = columns.map(salarySteps);
   const hasNotes = steps.some((s) => s.notes.length > 0);
   return (
     <details className="result-details">
       <summary>세금·4대보험 계산 과정 비교</summary>
-      {overflows && <p className="calc-scroll-hint">옆으로 밀면 다른 공고도 보여요</p>}
+      {overflows && <ScrollHint />}
       <div ref={scroller} className="result-scroll">
         <table className="offer-table result-table calc-table" style={style}>
           <caption className="sr-only">공고별 세전 월급에서 세후 월급까지</caption>
@@ -807,10 +819,12 @@ function rentFailures(columns: Column[], estimates: RentEstimate[]) {
 function DepositSummary({ columns, estimates }: { columns: Column[]; estimates: RentEstimate[] }) {
   const byRegion = new Map<string, { rent: RentEstimate; companies: string[] }>();
   columns.forEach((column, i) => {
-    const moves = column.posting.scenarios.some((s) => s.case === 'move' && s.applicable);
+    const move = column.posting.scenarios.find((s) => s.case === 'move' && s.applicable);
     const code = column.row?.location?.value?.lawd_cd;
     const rent = estimates.find((e) => e.lawd_cd === code);
-    if (!moves || !code || rent?.status !== 'estimated' || rent.deposit_krw == null) return;
+    if (!move || !code || rent?.status !== 'estimated' || rent.deposit_krw == null) return;
+    // 사택·기숙사에 들어가면 원룸 보증금이 들지 않는다
+    if (livesInCompanyHousing(column.row, move.housing.value)) return;
     const entry = byRegion.get(code) ?? { rent, companies: [] };
     entry.companies.push(companyOf(column, i));
     byRegion.set(code, entry);
@@ -879,6 +893,7 @@ export function ResultView({
     ),
   );
   const computed = (column: Column) => (column.solved ? 'is-computed' : undefined);
+  const [tableScroller, tableOverflows] = useOverflowX();
   // 공고가 많으면 열마다 최소 폭을 주고 표를 가로로 넘겨 본다 (글자가 겹치지 않게)
   const tableWidth = { '--result-columns': columns.length } as CSSProperties;
   // 좁은 화면은 계산한 쪽(연봉 비공개 공고)을 먼저 보여 준다 (DESIGN.md)
@@ -903,7 +918,9 @@ export function ResultView({
 
       <SalaryAnswer result={result} columns={columns} />
       <div className="compare-view result-compare">
-        <div className="result-scroll">
+        {/* 공고가 많아 표가 넘치면 뒤 공고가 오른쪽에 숨는다 → 넘칠 때만 알린다 */}
+        {tableOverflows && <ScrollHint />}
+        <div ref={tableScroller} className="result-scroll">
           <table className="offer-table compare-table result-table" style={tableWidth}>
             <caption className="sr-only">공고별 매달 남는 돈 비교</caption>
             <thead>
