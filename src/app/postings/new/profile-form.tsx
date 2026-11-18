@@ -1,9 +1,10 @@
-import { useState, type ReactNode } from 'react';
+import { Fragment, useState, type ReactNode } from 'react';
 import { Plus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatWon, placeName, salaryText, statusBadge, type Row } from './format';
 import { SourceBadge } from './source-badge';
+import { AskBubble, type AskQuestion } from './ask-view';
 import { CONTROL_CLASS, MoneyInput } from './money-input';
 import { PostingTabs } from './posting-tabs';
 import {
@@ -82,6 +83,7 @@ function MoneyField({
   example,
   help,
   note,
+  ask,
 }: {
   id: string;
   label: string;
@@ -94,33 +96,41 @@ function MoneyField({
    * 바뀔 때 화면 읽기가 읽어 준다 (불러오는 중 → 시세·실패)
    */
   note?: ReactNode;
+  /** 되묻기: 에이전트가 이 칸의 값을 물었으면 칸 위에 질문을 붙인다 */
+  ask?: AskQuestion;
 }) {
   const hintId = `${id}-hint`;
   const noteId = `${id}-note`;
+  const askId = `${id}-ask`;
   const hasNote = note !== undefined;
+  const describedBy = [ask && askId, hintId, hasNote && noteId].filter(Boolean).join(' ');
   return (
-    <div className="row-field profile-field">
-      <label htmlFor={id}>
-        {label}
-        <span className="sr-only"> (단위: 원)</span>
-      </label>
-      <MoneyInput
-        id={id}
-        value={value}
-        onChange={onChange}
-        example={example}
-        describedBy={hasNote ? `${hintId} ${noteId}` : hintId}
-      />
-      <p id={hintId} className="row-field-hint">
-        {value != null && <span className="text-foreground">{formatWon(value)}</span>}
-        {value != null && help && ' · '}
-        {help}
-      </p>
-      {hasNote && (
-        <p id={noteId} className="row-field-hint rent-note" aria-live="polite">
-          {note}
+    // 되묻기: 질문을 칸 묶음 바로 위에 두고 둘을 함께 강조한다 (칸 안은 자리를 정해 둔 격자라 밖에 둔다)
+    <div className={ask ? 'ask-wrap' : 'contents'}>
+      {ask && <AskBubble question={ask} id={askId} />}
+      <div className="row-field profile-field">
+        <label htmlFor={id}>
+          {label}
+          <span className="sr-only"> (단위: 원)</span>
+        </label>
+        <MoneyInput
+          id={id}
+          value={value}
+          onChange={onChange}
+          example={example}
+          describedBy={describedBy}
+        />
+        <p id={hintId} className="row-field-hint">
+          {value != null && <span className="text-foreground">{formatWon(value)}</span>}
+          {value != null && help && ' · '}
+          {help}
         </p>
-      )}
+        {hasNote && (
+          <p id={noteId} className="row-field-hint rent-note" aria-live="polite">
+            {note}
+          </p>
+        )}
+      </div>
     </div>
   );
 }
@@ -340,6 +350,7 @@ export function ProfileFormView({
   rents,
   failedRents,
   onRetryRents,
+  asking = [],
 }: {
   form: Form;
   rows: Row[];
@@ -357,8 +368,14 @@ export function ProfileFormView({
   failedRents: readonly string[];
   /** 불러오지 못한 시세를 다시 불러오기 */
   onRetryRents: () => void;
+  /** 되묻기: 에이전트가 물은 값들 (원래 칸 위에 질문을 붙인다) */
+  asking?: AskQuestion[];
 }) {
   const set = (patch: Partial<Form>) => onChange({ ...form, ...patch });
+  const askFor = (key: AskQuestion['key']) => asking.find((q) => q.key === key);
+  const askFixed = askFor('fixed_expenses');
+  // 고정비 질문은 금액이 빈 첫 줄 위에 붙인다 (서버는 금액이 빈 줄이 있을 때만 고정비를 묻는다)
+  const askFixedIndex = askFixed ? form.fixedExpenses.findIndex((x) => x.amount == null) : -1;
   const setFixed = (fixedExpenses: Form['fixedExpenses']) => set({ fixedExpenses });
   /** 고정비 줄을 하나 더하고, 이름이 있으면 금액 칸·없으면 이름 칸으로 커서를 옮긴다. */
   const addFixed = (name = '') => {
@@ -380,6 +397,7 @@ export function ProfileFormView({
           value={form.currentHousing}
           onChange={(currentHousing) => set({ currentHousing })}
           help="월세 + 관리비. 본가라면 생활비로 드리는 돈"
+          ask={askFor('current_housing')}
         />
         <div className="row-field profile-field">
           <label htmlFor="family">가족 수 (본인 포함)</label>
@@ -410,50 +428,66 @@ export function ProfileFormView({
         </p>
         <ul className="space-y-3">
           {form.fixedExpenses.map((item, i) => (
-            <li key={i} className="fixed-expense">
-              <Input
-                id={`fixed-${i}-name`}
-                aria-label={`고정비 ${i + 1} 이름`}
-                value={item.name}
-                placeholder="예: 통신비"
-                onChange={(event) =>
-                  setFixed(
-                    form.fixedExpenses.map((x, j) =>
-                      j === i ? { ...x, name: event.target.value } : x,
-                    ),
-                  )
-                }
-                className={CONTROL_CLASS}
-              />
-              <MoneyInput
-                id={`fixed-${i}-amount`}
-                label={`고정비 ${i + 1} 금액 (단위: 원)`}
-                value={item.amount}
-                example="5만"
-                onChange={(amount) =>
-                  setFixed(form.fixedExpenses.map((x, j) => (j === i ? { ...x, amount } : x)))
-                }
-              />
-              <Button
-                type="button"
-                variant="ghost"
-                className="min-h-11"
-                aria-label={`고정비 ${i + 1} 지우기`}
-                onClick={() => {
-                  setFixed(form.fixedExpenses.filter((_, j) => j !== i));
-                  // 지운 줄의 버튼이 사라지므로 커서를 '고정비 넣기'로 옮긴다
-                  document.getElementById('add-fixed')?.focus();
-                }}
-              >
-                <X aria-hidden />
-              </Button>
-              {/* 친 금액을 한글 단위로 (다른 금액 칸의 안내 글씨와 같은 모양) */}
-              {item.amount != null && (
-                <p className="row-field-hint fixed-expense-hint">
-                  <span className="text-foreground">{formatWon(item.amount)}</span>
-                </p>
+            <Fragment key={i}>
+              {/* 되묻기: 금액이 빈 이 줄 위에 질문 (줄 안은 칸 순서로 자리를 잡아서 따로 둔다) */}
+              {askFixed && i === askFixedIndex && (
+                <li className="fixed-ask">
+                  <AskBubble
+                    // 서버는 '고정비 합계'로 묻지만, 화면은 금액이 빈 그 줄에서 답하므로 그 이름으로 묻는다
+                    question={{
+                      ...askFixed,
+                      question: `${item.name.trim() || `고정비 ${i + 1}`} 금액은 매달 얼마인가요?`,
+                    }}
+                    id={`fixed-${i}-ask`}
+                  />
+                </li>
               )}
-            </li>
+              <li className={`fixed-expense${i === askFixedIndex ? ' is-asked' : ''}`}>
+                <Input
+                  id={`fixed-${i}-name`}
+                  aria-label={`고정비 ${i + 1} 이름`}
+                  value={item.name}
+                  placeholder="예: 통신비"
+                  onChange={(event) =>
+                    setFixed(
+                      form.fixedExpenses.map((x, j) =>
+                        j === i ? { ...x, name: event.target.value } : x,
+                      ),
+                    )
+                  }
+                  className={CONTROL_CLASS}
+                />
+                <MoneyInput
+                  id={`fixed-${i}-amount`}
+                  label={`고정비 ${i + 1} 금액 (단위: 원)`}
+                  describedBy={askFixed && i === askFixedIndex ? `fixed-${i}-ask` : undefined}
+                  value={item.amount}
+                  example="5만"
+                  onChange={(amount) =>
+                    setFixed(form.fixedExpenses.map((x, j) => (j === i ? { ...x, amount } : x)))
+                  }
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="min-h-11"
+                  aria-label={`고정비 ${i + 1} 지우기`}
+                  onClick={() => {
+                    setFixed(form.fixedExpenses.filter((_, j) => j !== i));
+                    // 지운 줄의 버튼이 사라지므로 커서를 '고정비 넣기'로 옮긴다
+                    document.getElementById('add-fixed')?.focus();
+                  }}
+                >
+                  <X aria-hidden />
+                </Button>
+                {/* 친 금액을 한글 단위로 (다른 금액 칸의 안내 글씨와 같은 모양) */}
+                {item.amount != null && (
+                  <p className="row-field-hint fixed-expense-hint">
+                    <span className="text-foreground">{formatWon(item.amount)}</span>
+                  </p>
+                )}
+              </li>
+            </Fragment>
           ))}
         </ul>
         <div className="mt-3 flex flex-wrap gap-2" aria-label="자주 넣는 고정비">

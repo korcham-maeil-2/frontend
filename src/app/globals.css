@@ -1841,50 +1841,32 @@ section.desk-sheet > .sheet-heading {
   border-radius: 0.25rem;
 }
 
-/* 되묻기 대화 (ask-view.tsx): 에이전트 말풍선 + 답 칸 */
-.ask-box {
-  display: grid;
-  gap: 1rem;
-  margin-block: 1rem;
-  border: 1px solid color-mix(in srgb, var(--primary) 35%, transparent);
+/* 되묻기 (ask-view.tsx): 에이전트가 물은 원래 칸 위에 질문을 붙이고, 질문과 칸을 함께 강조한다 */
+.ask-wrap,
+.fixed-expense.is-asked {
   border-radius: 0.5rem;
-  background: var(--card);
-  padding: 1rem;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 45%, transparent);
 }
-.ask-title {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-weight: 700;
-  color: var(--foreground);
+.ask-wrap {
+  padding: 0.5rem 0.75rem 0;
 }
-.ask-title:focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: 2px;
+.fixed-expense.is-asked {
+  padding: 0.5rem;
 }
-.ask-list {
-  display: grid;
-  gap: 1rem;
-}
-.ask-item {
-  display: grid;
-  gap: 0.5rem;
+.fixed-ask {
+  list-style: none;
 }
 .ask-bubble {
-  justify-self: start;
-  max-width: min(36rem, 100%);
-  border-radius: 0 0.75rem 0.75rem 0.75rem;
-  background: var(--muted);
-  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  background: color-mix(in srgb, var(--primary) 8%, var(--card));
+  padding: 0.75rem;
   font-size: 0.875rem;
   color: var(--body);
 }
-.ask-answer {
-  max-width: 20rem;
-}
-.ask-actions {
+.ask-bubble-title {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 0.5rem;
+  align-items: center;
+  gap: 0.375rem;
+  font-weight: 700;
+  color: var(--foreground);
 }

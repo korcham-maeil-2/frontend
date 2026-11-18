@@ -55,7 +55,7 @@ import { ResultView, bestRemainingText, isCalculationResult } from './result-vie
 import { BadgeLegend } from './source-badge';
 import { SupportView, isLocalSupport } from './support-view';
 import { PlanView, isSettlePlan } from './plan-view';
-import { AskView, askQuestionsOf, type AskAnswers, type AskQuestion } from './ask-view';
+import { askQuestionsOf, askTargetId, type AskQuestion } from './ask-view';
 import { ReportView, isReport, type Report } from './report-view';
 import { RowEditor, fieldsToCheck, focusField } from './row-editor';
 
@@ -473,7 +473,6 @@ export default function NewPosting() {
       setSupport(null);
       setPlan(null);
       setAsking(null);
-      setAsking(null);
       setReport(null);
       // 새 표: 첫 공고를 고르고 그것만 '본 것'으로 (예전 표에서 연 탭 기록은 버린다)
       setActivePosting(table[0].id);
@@ -606,42 +605,25 @@ export default function NewPosting() {
 
   // 되묻기 대화 (계산 전에 서버가 빈 값을 물어볼 때)
   const [asking, setAsking] = useState<{ id: string; questions: AskQuestion[] } | null>(null);
+  // 질문이 뜨면 첫 질문의 원래 칸으로 스크롤하고 커서를 넣는다 (바로 답할 수 있게).
+  // 계산 중에는 입력칸이 잠겨 있어(fieldset disabled) 커서가 안 들어가므로, 계산이 끝난 뒤 한 번만.
+  const focusedAsk = useRef<object | null>(null);
+  useEffect(() => {
+    if (!asking || busy !== null || focusedAsk.current === asking) return;
+    focusedAsk.current = asking;
+    const fixedIndex = profile.fixedExpenses.findIndex((x) => x.amount == null);
+    const field = document.getElementById(askTargetId(asking.questions[0], fixedIndex));
+    field?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    field?.focus({ preventScroll: true });
+    // 질문이 새로 왔을 때만 (답을 치는 동안 폼이 바뀌어도 커서를 옮기지 않는다)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [asking, busy]);
 
-  /** 되묻기에 답하고 계산을 이어 간다. 답한 값은 생활비 칸에도 넣어 둔다 (다시 계산할 때 그대로) */
-  async function answer(answers: AskAnswers) {
-    if (!asking) return;
-    setBusy('confirming');
-    setError('');
-    let form = profile;
-    if (answers.current_housing != null)
-      form = { ...form, currentHousing: answers.current_housing };
-    if (answers.fixed_expenses != null) {
-      form = {
-        ...form,
-        fixedExpenses: answers.fixed_expenses
-          ? [{ name: '고정비 합계', amount: answers.fixed_expenses }]
-          : [],
-      };
-    }
-    setProfile(form);
-    try {
-      const { data, error: failed } = await api.POST('/sessions/{session_id}/answers', {
-        params: { path: { session_id: asking.id } },
-        body: { answers },
-      });
-      if (!data) {
-        setError(failed?.message ?? NETWORK_ERROR);
-        return;
-      }
-      finishCalculation(data, asking.id, rows, toUserProfile(form, rows));
-    } catch {
-      setError(NETWORK_ERROR);
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  async function calculate() {
+  /**
+   * 계산하기. 되묻기 중이면 답(원래 칸에 넣은 값)을 포함한 지금 폼 값을 통째로 /confirm에 다시 보낸다
+   * (질문 중에 고친 다른 칸·비교표도 함께 반영된다). skipMissing: '모르겠어요, 이대로 계산'
+   */
+  async function calculate({ skipMissing = false } = {}) {
     setBusy('confirming');
     setError('');
     const sentRows = rows;
@@ -650,7 +632,7 @@ export default function NewPosting() {
     const confirm = (id: string) =>
       api.POST('/sessions/{session_id}/confirm', {
         params: { path: { session_id: id } },
-        body: { approved: true, table: sentRows, profile: sentProfile },
+        body: { approved: true, table: sentRows, profile: sentProfile, skip_missing: skipMissing },
       });
     const recalculate = (id: string) =>
       api.POST('/sessions/{session_id}/recalculate', {
@@ -956,9 +938,11 @@ export default function NewPosting() {
               rents={rents}
               failedRents={failedRents}
               onRetryRents={retryFailedRents}
+              asking={asking?.questions}
             />
           </fieldset>
-          {missingProfile.length > 0 && (
+          {/* 되묻기 중에는 질문이 칸 위에 있으니 '비어 있는 값' 목록은 숨긴다 */}
+          {missingProfile.length > 0 && !asking && (
             <div className="salary-notice mt-6">
               <p className="font-semibold">비어 있는 값은 계산할 수 없다고 표시돼요</p>
               <ul>
@@ -977,9 +961,6 @@ export default function NewPosting() {
                 ))}
               </ul>
             </div>
-          )}
-          {asking && (
-            <AskView questions={asking.questions} busy={busy !== null} onAnswer={answer} />
           )}
           {/* 계산 실패: 빨간 한 줄 대신 눈에 띄는 상자로. 할 일은 오류 문구에, 넣은 값은 그대로라는 것을 함께 */}
           <div role="alert">
@@ -1000,10 +981,29 @@ export default function NewPosting() {
             >
               <ArrowLeft aria-hidden /> 조건 확인으로
             </Button>
-            <Button type="submit" className="main-action" disabled={busy !== null}>
-              {busy === 'confirming' ? '계산하는 중…' : '매달 남는 돈 계산하기'}{' '}
-              <Calculator aria-hidden />
-            </Button>
+            {asking ? (
+              // 되묻기 중: 메인 버튼 자리에 두 버튼. Enter(폼 제출)는 '답하고 계산 이어 가기'
+              <div className="flex flex-wrap justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="min-h-11"
+                  disabled={busy !== null}
+                  onClick={() => calculate({ skipMissing: true })}
+                >
+                  모르겠어요, 이대로 계산
+                </Button>
+                <Button type="submit" className="main-action" disabled={busy !== null}>
+                  {busy === 'confirming' ? '계산하는 중…' : '답하고 계산 이어 가기'}{' '}
+                  <Calculator aria-hidden />
+                </Button>
+              </div>
+            ) : (
+              <Button type="submit" className="main-action" disabled={busy !== null}>
+                {busy === 'confirming' ? '계산하는 중…' : '매달 남는 돈 계산하기'}{' '}
+                <Calculator aria-hidden />
+              </Button>
+            )}
           </div>
           {/* AI 리포트는 쓰고 검증하는 데 시간이 걸린다 (시연 모드는 리포트를 쓰지 않는다).
               화면 읽기 프로그램 알림은 카드 안에서 단계가 바뀔 때만 (agent-progress.tsx) */}

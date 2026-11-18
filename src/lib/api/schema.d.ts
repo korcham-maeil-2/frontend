@@ -509,6 +509,12 @@ export interface components {
       table?: components['schemas']['ComparisonRow'][] | null;
       /** @description 사용자 정보 (지금 집 주거비, 공고별 통근·이사 비용, 고정비, 지금 연봉 등). 보내면 월 잔여액·손익분기 연봉을 계산한다. 안 보내면 세후 월급까지만 계산 */
       profile?: components['schemas']['UserProfile'] | null;
+      /**
+       * Skip Missing
+       * @description 되묻기 중 '모르겠어요, 이대로 계산': 빈 값을 묻지 않고 계산한다 ('계산 못 함'으로 보임). 되묻기에 답할 때는 false로 지금 폼 값을 통째로 보낸다
+       * @default false
+       */
+      skip_missing: boolean;
     };
     /**
      * Cost
