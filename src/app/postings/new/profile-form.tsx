@@ -89,7 +89,6 @@ function MoneyField({
   help,
   note,
   ask,
-  askOrder,
   need = false,
   blank,
 }: {
@@ -106,8 +105,6 @@ function MoneyField({
   note?: ReactNode;
   /** 되묻기: 에이전트가 이 칸의 값을 물었으면 칸 위에 질문을 붙인다 */
   ask?: AskQuestion;
-  /** 질문이 여럿일 때 몇 번째인지 ('1/2') */
-  askOrder?: string;
   /** 계산에 꼭 필요한데 비어 있음 (파란 테두리) */
   need?: boolean;
   /** 비우면 어떻게 계산하는지 ('비우면 0원'). 칸 안 글로 보이고, 화면 읽기용으로도 남긴다 */
@@ -167,7 +164,7 @@ function MoneyField({
   // 되묻기: 질문을 칸 바로 위에 두고 둘을 함께 강조한다 (칸 안은 자리를 정해 둔 격자라 밖에 둔다)
   return (
     <div className="ask-wrap">
-      <AskBubble question={ask} id={askId} order={askOrder} />
+      <AskBubble question={ask} id={askId} />
       {field}
     </div>
   );
@@ -185,10 +182,14 @@ function GroupChip({ count, optional = false }: { count: number; optional?: bool
         채울 칸 {count}
       </span>
     );
+  // '선택'은 위 상자가 읽어 주지 않으니 화면 읽기에는 '(선택)'으로 남긴다
   return optional ? (
-    <span aria-hidden className="group-chip">
-      선택
-    </span>
+    <>
+      <span aria-hidden className="group-chip">
+        선택
+      </span>
+      <span className="sr-only">(선택)</span>
+    </>
   ) : null;
 }
 
@@ -222,7 +223,7 @@ function FamilyMore({ family, onChange }: { family: number; onChange: (n: number
         inputMode="numeric"
         value={text}
         onChange={(event) => {
-          const next = event.target.value.replace(/D/g, '').slice(0, 2);
+          const next = event.target.value.replace(/[^0-9]/g, '').slice(0, 2);
           setText(next);
           const n = Number(next);
           if (n >= 6 && n <= 20) onChange(n);
@@ -509,10 +510,6 @@ export function ProfileFormView({
   const need = new Set(missing.map((item) => item.fieldId));
   const needIn = (test: (id: string) => boolean) => [...need].filter(test).length;
   const askFor = (key: AskQuestion['key']) => asking.find((q) => q.key === key);
-  const askOrder = (key: AskQuestion['key']) =>
-    asking.length > 1
-      ? `${asking.findIndex((q) => q.key === key) + 1}/${asking.length}`
-      : undefined;
   const setFixed = (fixedExpenses: Form['fixedExpenses']) => set({ fixedExpenses });
   /** 고정비 줄을 하나 더하고, 이름이 있으면 금액 칸·없으면 이름 칸으로 커서를 옮긴다. */
   const addFixed = (name = '') => {
@@ -539,7 +536,6 @@ export function ProfileFormView({
           onChange={(currentHousing) => set({ currentHousing })}
           help="월세 + 관리비 (본가면 생활비로 드리는 돈)"
           ask={askFor('current_housing')}
-          askOrder={askOrder('current_housing')}
         />
         {/* 가족 수: 펼침 목록 대신 한 줄 라디오. 계산은 20명까지 받으니 '6명 이상'을 고르면 숫자 칸이 나온다 */}
         <div className="row-field profile-field">
@@ -661,7 +657,7 @@ export function ProfileFormView({
         activeId={activeId}
         onSelect={onSelectPosting}
         label="비용을 넣을 공고"
-        doneLabel="다 넣음"
+        doneLabel="채울 칸 없음"
         status={(row) => {
           const missing = missingFor(row);
           // 통근·이사를 둘 다 끈 공고는 칸이 아니라 고를 일이 남았다

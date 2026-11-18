@@ -41,7 +41,7 @@ export function PostingTabs({
   onSelect: (id: string) => void;
   status: (row: Row) => TabStatus;
   label: string;
-  /** 남은 일이 없을 때 탭에 쓸 말 (조건 확인: '열어 봄', 내 생활비: '다 넣음') */
+  /** 남은 일이 없을 때 탭에 쓸 말 (조건 확인: '열어 봄', 내 생활비: '채울 칸 없음') */
   doneLabel?: string;
   /** 고른 공고의 내용. 공고가 하나면 탭 없이 이것만 그린다. */
   children: ReactNode;

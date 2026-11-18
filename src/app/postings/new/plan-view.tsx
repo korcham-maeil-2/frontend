@@ -691,9 +691,9 @@ export function PlanView({
       ) : (
         <Tabs defaultValue={first.posting_id} className="min-w-0">
           <TabsList aria-label="볼 회사" className="posting-tabs">
-            {postings.map((posting) => (
+            {postings.map((posting, i) => (
               <TabsTrigger key={posting.posting_id} value={posting.posting_id}>
-                <span className="posting-tab-name">{posting.company || posting.posting_id}</span>
+                <span className="posting-tab-name">{posting.company || `공고 ${i + 1}`}</span>
               </TabsTrigger>
             ))}
           </TabsList>

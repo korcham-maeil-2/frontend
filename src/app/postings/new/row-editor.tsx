@@ -405,6 +405,9 @@ function QuestionList({ questions }: { questions: OpenQuestion[] }) {
 /** 칸으로 이동해 커서를 둔다 ('확인이 필요한 것', 연봉 빈칸 안내에서 쓴다) */
 export function focusField(id: string) {
   const element = document.getElementById(id);
+  // 접힌 묶음(비교 기준·고정비) 안의 칸이면 먼저 펼친다 (접힌 칸에는 커서가 안 들어간다)
+  const fold = element?.closest('details');
+  if (fold && !fold.open) fold.open = true;
   element?.scrollIntoView({ block: 'center' });
   // 라디오 묶음이면 고른 단추(없으면 첫 단추)로
   const target =

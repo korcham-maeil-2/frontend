@@ -786,8 +786,8 @@ export default function NewPosting() {
       shownIndex < 2 && !completed
         ? ''
         : missingProfile.length
-          ? `빈칸 ${missingProfile.length}개`
-          : '다 넣음',
+          ? `채울 칸 ${missingProfile.length}개`
+          : '채울 칸 없음', // 묶음 칩('채울 칸 N')과 같은 말. '다 넣음'은 선택 칸을 비워도 떠서 쓰지 않는다
     result: freshResult ? bestRemainingText(freshResult) : '',
     plan: '',
   };
@@ -892,11 +892,19 @@ export default function NewPosting() {
         >
           {shown === 'result' ? (
             <>
+              {/* 보이는 소제목은 위 제목과 같은 말이라 뺐다. 화면 읽기의 제목 단계(h1 → h2 → h3)는 남긴다 */}
+              <h2 className="sr-only">공고 {rows.length}개 비교</h2>
               <ReportView report={report} />
-              <ResultView result={freshResult} rows={rows} />
+              <ResultView
+                result={freshResult}
+                rows={rows}
+                // 결과는 지금 입력으로 계산한 것(freshResult)이라 지금 고정비 칸으로 판단해도 맞다
+                noFixed={!profile.fixedExpenses.some((item) => item.amount != null)}
+              />
             </>
           ) : (
             <>
+              <h2 className="sr-only">공고 {rows.length}개의 정착 플랜</h2>
               {plan && (
                 <PlanView
                   plan={plan}
@@ -1016,6 +1024,7 @@ export default function NewPosting() {
             calculate();
           }}
         >
+          <h2 className="sr-only">공고 {rows.length}개에 필요한 값</h2>
           {/* 계산을 막는 빈칸을 맨 위에 (오류처럼 보이지 않게 '할 일' 상자로). 되묻기 중에는 질문이 칸 위에 있으니 숨긴다 */}
           {!asking && (
             <div className="review-todo">

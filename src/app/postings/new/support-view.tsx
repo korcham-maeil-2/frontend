@@ -197,7 +197,7 @@ export function SupportView({
         regions.length > 1 && (
           <Tabs defaultValue={regions[0].lawd_cd} className="min-w-0">
             {/* 탭 줄이 화면보다 넓으면 줄 안에서 가로로 밀어 본다 (페이지가 넓어지지 않게) */}
-            <TabsList aria-label="볼 근무지" className="posting-tabs max-w-full justify-start">
+            <TabsList aria-label="볼 근무지" className="posting-tabs">
               {regions.map((region) => (
                 // 탭은 짧게 시군구만 (회사 이름은 탭 안 첫 줄에)
                 <TabsTrigger key={region.lawd_cd} value={region.lawd_cd}>

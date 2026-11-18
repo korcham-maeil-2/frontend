@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { components } from '@/lib/api/schema';
 import '../../landing.css'; // 비교표 모양(.offer-table, .compare-table)을 랜딩과 같이 쓴다
@@ -252,6 +252,7 @@ function buildColumn(
   row: Row | undefined,
   breakEven: BreakEven | undefined,
   mode: Mode,
+  noFixed: boolean,
 ): Column {
   const chosen = pickCase(posting, breakEven, mode);
   const scenario = posting.scenarios.find((s) => s.case === chosen && s.applicable);
@@ -399,8 +400,9 @@ function buildColumn(
           : cost(housing, chosen === 'move' ? aidNote(row) : undefined),
       // 비워 둬서 0원으로 계산한 교통비: 긴 출처 대신 짧게 (출처 전문은 배지 안에)
       transport: assumedTransport ? cost(transport, '비워 둬서 0원') : cost(transport),
-      // 고정비는 선택 항목: 넣지 않았으면 0원으로 계산했다는 걸 숨기지 않는다 (교통비와 같은 말투)
-      fixed: cost(fixed, fixed.value === 0 ? '넣지 않아서 0원' : undefined),
+      // 고정비는 선택 항목: 하나도 넣지 않았으면 0원으로 계산했다는 걸 숨기지 않는다.
+      // 넣은 값이 없으니 '입력' 배지도 달지 않는다 (금액 0을 직접 넣은 것과 구분)
+      fixed: noFixed ? { value: '0원', note: '넣지 않음' } : cost(fixed),
       remaining,
     },
   };
@@ -435,13 +437,19 @@ function rowClass(key: RowKey) {
   return key === 'housing' || key === 'transport' || key === 'fixed' ? 'is-cost' : undefined;
 }
 
+/** 기준 공고의 열과 이름 (표 머리와 같은 이름: 회사 이름이 없으면 '공고 N') */
+function baselinePosting(be: BreakEven, columns: Column[]) {
+  if (be.baseline.kind !== 'posting') return undefined;
+  const i = columns.findIndex((c) => c.posting.posting_id === be.baseline.posting_id);
+  return i >= 0 ? companyOf(columns[i], i) : undefined;
+}
+
 /** 연봉 비공개 공고의 비교 기준을 한 덩어리로: '(가상) 이음데이터랩(주) 통근 시 매달 약 242만원' */
 function baselineText(be: BreakEven, columns: Column[]): string {
-  const base = columns.find((c) => c.posting.posting_id === be.baseline.posting_id);
-  const who =
-    base?.posting.company && be.baseline.kind === 'posting'
-      ? `${base.posting.company} ${be.baseline.case === 'move' ? '이사 시' : '통근 시'}`
-      : be.baseline.label;
+  const name = baselinePosting(be, columns);
+  const who = name
+    ? `${name} ${be.baseline.case === 'move' ? '이사 시' : '통근 시'}`
+    : be.baseline.label;
   return `${who} 매달 ${won(be.baseline.monthly_remaining)}`;
 }
 
@@ -449,9 +457,8 @@ function baselineText(be: BreakEven, columns: Column[]): string {
 function baselineName(be: BreakEven, columns: Column[]): string {
   if (be.baseline.kind === 'current_job') return '지금 회사';
   if (be.baseline.kind === 'target') return be.baseline.label;
-  const base = columns.find((c) => c.posting.posting_id === be.baseline.posting_id);
-  // 백엔드 label은 경우까지 붙어 있어('○○ · 회사 근처로 이사') 문장에 넣으면 어색하다 (경우는 '기준' 줄에)
-  return base?.posting.company || '기준 공고';
+  // 백엔드 label은 경우까지 붙어 있어('○○ · 회사 근처로 이사') 문장에 넣으면 어색하다
+  return baselinePosting(be, columns) ?? '기준 공고';
 }
 
 function companyOf(column: Column, index: number) {
@@ -516,13 +523,24 @@ function StepCell({ step }: { step: Step }) {
  */
 function CalcSteps({ columns, style }: { columns: Column[]; style: CSSProperties }) {
   const [itemsOpen, setItemsOpen] = useState(false);
+  // 표가 칸보다 넓어 가로로 밀어야 할 때만 알린다 (폭으로 짐작하면 안 넘치는데도 뜬다)
+  const [overflows, setOverflows] = useState(false);
+  const scroller = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = scroller.current;
+    if (!el) return;
+    // 접혀 있으면 폭이 0이었다가 펼칠 때 바뀌므로, 펼친 순간에도 다시 잰다
+    const observer = new ResizeObserver(() => setOverflows(el.scrollWidth > el.clientWidth + 1));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
   const steps = columns.map(salarySteps);
   const hasNotes = steps.some((s) => s.notes.length > 0);
   return (
     <details className="result-details">
       <summary>세금·4대보험 계산 과정 비교</summary>
-      {columns.length > 1 && <p className="calc-scroll-hint">옆으로 밀면 다른 공고도 보여요</p>}
-      <div className="result-scroll">
+      {overflows && <p className="calc-scroll-hint">옆으로 밀면 다른 공고도 보여요</p>}
+      <div ref={scroller} className="result-scroll">
         <table className="offer-table result-table calc-table" style={style}>
           <caption className="sr-only">공고별 세전 월급에서 세후 월급까지</caption>
           <thead>
@@ -807,7 +825,16 @@ function DepositSummary({ columns, estimates }: { columns: Column[]; estimates: 
   );
 }
 
-export function ResultView({ result, rows }: { result: Result; rows: Row[] }) {
+export function ResultView({
+  result,
+  rows,
+  noFixed,
+}: {
+  result: Result;
+  rows: Row[];
+  /** 고정비를 하나도 넣지 않았는지 (금액을 넣은 줄이 없음 → 0원으로 계산) */
+  noFixed: boolean;
+}) {
   const [mode, setMode] = useState<Mode>('best');
   const columns = result.postings.map((posting) =>
     buildColumn(
@@ -815,6 +842,7 @@ export function ResultView({ result, rows }: { result: Result; rows: Row[] }) {
       rows.find((row) => row.id === posting.posting_id),
       result.break_even.find((b) => b.posting_id === posting.posting_id),
       mode,
+      noFixed,
     ),
   );
   const computed = (column: Column) => (column.solved ? 'is-computed' : undefined);
@@ -877,7 +905,7 @@ export function ResultView({ result, rows }: { result: Result; rows: Row[] }) {
           <TabsList aria-label="볼 공고" className="posting-tabs compare-switch">
             {columns.map((column, i) => (
               <TabsTrigger key={column.posting.posting_id} value={column.posting.posting_id}>
-                {companyOf(column, i)}
+                <span className="posting-tab-name">{companyOf(column, i)}</span>
               </TabsTrigger>
             ))}
           </TabsList>
