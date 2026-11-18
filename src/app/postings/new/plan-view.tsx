@@ -124,7 +124,7 @@ function SavingsSlot({
   );
   if (savings.status !== 'ok' || !savings.products.length) return null;
   const disclosed = month(savings.disclosed_month);
-  // 고른 금액을 넣을 수 있는(공시 한도가 없거나 그 이상인) 상품 중 금리가 가장 높은 것
+  // 고른 금액이 공시 한도 안인 상품 중 금리 1위
   const top =
     savings.products.find((p) => p.limit_krw == null || p.limit_krw >= (deposit ?? 0)) ??
     savings.products[0];
@@ -230,8 +230,7 @@ function CourseItem({ course, jobNcs }: { course: Course; jobNcs: string | null 
         {/* 컨소시엄은 '무료'만 보이면 누구나 들을 수 있다고 오해한다 → 대상(중소기업 재직자)도 함께 */}
         <span>{course.kind_label}</span>
         {course.fee_krw === 0 && <span>무료</span>}
-        {/* 강의는 어디서 듣는지가 중요해서 좁은 화면에서도 기관을 보인다
-            (support-agency는 청년 지원 목록용으로, 좁은 화면에서 숨겨진다) */}
+        {/* 강의는 장소가 중요해 좁은 화면에서도 기관을 보인다 (support-agency는 숨겨짐) */}
         {course.institute && <span>{course.institute}</span>}
       </p>
     </li>
@@ -346,7 +345,7 @@ function usePlanExtras(keys: string[]) {
   const [savings, setSavings] = useState<SavingsList | null>(null);
   const [training, setTraining] = useState<Record<string, TrainingList>>({});
   const key = keys.join(',');
-  // 적금은 전국이 같아서 한 번만 받는다 (근무지 목록이 바뀌어도 다시 받지 않는다)
+  // 적금은 전국이 같아 한 번만 받는다
   useEffect(() => {
     let cancelled = false;
     api
@@ -379,7 +378,6 @@ export function PlanView({ plan, result }: { plan: SettlePlan; result: Calculati
   const postings = plan.postings.filter((p) => p.slots.length > 0);
   const keys = [...new Set(postings.map(trainingKey).filter((k): k is string => !!k))].sort();
   const { savings, training } = usePlanExtras(keys);
-  /** 플랜의 경우(이사하면 이사, 아니면 통근)에 매달 남는 돈 */
   const remainingFor = (posting: PostingPlan) =>
     result.postings
       .find((p) => p.posting_id === posting.posting_id)

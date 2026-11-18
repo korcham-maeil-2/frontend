@@ -390,8 +390,6 @@ export function ProfileFormView({
       ? `${asking.findIndex((q) => q.key === key) + 1}/${asking.length}`
       : undefined;
   const askFixed = askFor('fixed_expenses');
-  // 고정비 질문은 이름은 있고 금액이 빈 첫 줄 위에 붙인다 (서버는 그런 줄이 있을 때만 고정비를 묻는다.
-  // 이름도 금액도 빈 줄은 보내지 않으므로 고르지 않는다)
   const fixedAskRow = askFixed ? askFixedIndex : -1;
   const setFixed = (fixedExpenses: Form['fixedExpenses']) => set({ fixedExpenses });
   /** 고정비 줄을 하나 더하고, 이름이 있으면 금액 칸·없으면 이름 칸으로 커서를 옮긴다. */

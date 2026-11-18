@@ -580,7 +580,7 @@ export default function NewPosting() {
     const questions = data.status === 'awaiting_answer' ? askQuestionsOf(data.pending) : null;
     if (questions) {
       setSessionId(id);
-      // 고정비를 물을 줄은 질문이 온 때 정한다 (답을 치면 '금액이 빈 줄'이 바뀌어 말풍선이 옮겨 가지 않게)
+      // 고정비 질문 줄은 질문이 온 때 정한다 (답을 치는 동안 말풍선이 옮겨 가지 않게)
       setAsking({ id, questions, fixedIndex: blankFixedIndex(profile.fixedExpenses) });
       return;
     }
@@ -611,7 +611,6 @@ export default function NewPosting() {
     questions: AskQuestion[];
     fixedIndex: number;
   } | null>(null);
-  // 질문한 칸들의 id (질문 순서)
   const askIds = asking?.questions.map((q) => askTargetId(q, asking.fixedIndex)) ?? [];
   // 질문이 뜨면 첫 질문의 원래 칸으로 스크롤하고 커서를 넣는다 (바로 답할 수 있게).
   // 계산 중에는 입력칸이 잠겨 있어(fieldset disabled) 커서가 안 들어가므로, 계산이 끝난 뒤 한 번만.
@@ -925,7 +924,7 @@ export default function NewPosting() {
           aria-label="내 생활비"
           aria-busy={busy === 'confirming'}
           onKeyDown={(event) => {
-            // 되묻기 중 질문한 칸에서 Enter: 다음 질문 칸으로, 마지막이면 '답하고 계산 이어 가기'
+            // 되묻기: 질문 칸에서 Enter는 다음 질문 칸, 마지막이면 계산
             const at = askIds.indexOf((event.target as HTMLElement).id);
             const composing = event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229;
             if (at < 0 || event.key !== 'Enter' || composing) {
@@ -933,7 +932,7 @@ export default function NewPosting() {
               return;
             }
             event.preventDefault();
-            // 답이 아직 없으면(빈 칸·금액이 아닌 글자) 그대로 둔다: 보내면 같은 질문이 다시 온다
+            // 답이 없으면 그대로 (보내면 같은 질문이 다시 온다)
             const empty =
               asking?.questions[at].key === 'current_housing'
                 ? profile.currentHousing == null
