@@ -1,9 +1,11 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { ExternalLink } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { api } from '@/lib/api/client';
 import type { components } from '@/lib/api/schema';
-import { formatWon, statusBadge } from './format';
+import { formatWon, placeName, statusBadge } from './format';
 import { SourceBadge } from './source-badge';
 
 // 결과 화면의 '1년 정착 플랜' (백엔드 plan.py의 SettlePlan, 이슈 #18).
@@ -15,6 +17,9 @@ type SettlePlan = components['schemas']['SettlePlan'];
 type PostingPlan = components['schemas']['PostingPlan'];
 type PlanSlot = components['schemas']['PlanSlot'];
 type PlanItem = components['schemas']['PlanItem'];
+type SavingsList = components['schemas']['SavingsList'];
+type TrainingList = components['schemas']['TrainingList'];
+type Course = components['schemas']['Course'];
 
 /** 서버·초안의 값이 이 화면이 아는 모양인지 (예전 백엔드·예전 초안이면 그리지 않는다) */
 export function isSettlePlan(value: unknown): value is SettlePlan {
@@ -79,7 +84,134 @@ function Item({ item }: { item: PlanItem }) {
   );
 }
 
-function PostingPanel({ posting }: { posting: PostingPlan }) {
+/** 금리 자릿수를 맞춘다: 3 → '3.00%', 3.85 → '3.85%' */
+function rate(value: number): string {
+  return `${value.toFixed(2)}%`;
+}
+
+/** '2026-12-01' → '12월 1일' */
+function md(iso: string): string {
+  const [, m, d] = iso.split('-');
+  return `${Number(m)}월 ${Number(d)}일`;
+}
+
+/** 공시 기준월 '202610' → '2026년 10월' */
+function month(yyyymm: string | null | undefined): string | null {
+  return yyyymm && yyyymm.length === 6
+    ? `${yyyymm.slice(0, 4)}년 ${Number(yyyymm.slice(4))}월`
+    : null;
+}
+
+/** 첫 월급부터 모으기: 은행 적금 12개월 기본금리 높은 순 (금감원 공시). 가입을 권하지 않는다. */
+function SavingsSlot({ savings }: { savings: SavingsList }) {
+  if (savings.status !== 'ok' || !savings.products.length) return null;
+  const disclosed = month(savings.disclosed_month);
+  return (
+    <li className="plan-slot is-extra">
+      <h4 className="plan-slot-label">
+        첫 월급 받은 뒤<small>남는 돈을 모으고 싶다면 · 참고</small>
+      </h4>
+      <p className="plan-extra-lead">
+        은행 적금 12개월 기본금리 높은 순이에요{disclosed && ` (${disclosed} 공시)`}. 가입을 권하는
+        게 아니에요. 우대금리 조건과 실제 금리는 가입 전에 은행에서 확인해 주세요.
+      </p>
+      <ul className="plan-items">
+        {savings.products.map((p) => (
+          <li key={`${p.bank}-${p.name}`} className="plan-item">
+            <p className="plan-item-head">
+              <span className="plan-item-title">{p.name}</span>
+              <span className="support-category">{p.bank}</span>
+            </p>
+            <p className="plan-amount">
+              연 {rate(p.rate)}
+              {p.max_rate != null && p.max_rate > p.rate && (
+                <small className="plan-amount-note"> 우대 최고 연 {rate(p.max_rate)}</small>
+              )}
+            </p>
+            <p className="support-meta">
+              <span>{p.saving_type}</span>
+              {p.join_way && <span>가입: {p.join_way.replaceAll(',', '·')}</span>}
+              {/* 금감원 공시의 '최고 한도'(max_limit). 월 한도인지 총액인지는 상품마다 달라 공시 이름 그대로 */}
+              {p.limit_krw != null && <span>공시 최고 한도 {formatWon(p.limit_krw)}</span>}
+            </p>
+          </li>
+        ))}
+      </ul>
+      <p className="plan-extra-source">
+        출처:{' '}
+        <a href={savings.source_url} target="_blank" rel="noopener noreferrer">
+          {savings.source}
+          <span className="sr-only"> (새 창)</span>
+        </a>
+      </p>
+    </li>
+  );
+}
+
+function CourseItem({ course }: { course: Course }) {
+  return (
+    <li className="plan-item">
+      <p className="plan-item-head">
+        {course.url ? (
+          <a href={course.url} target="_blank" rel="noopener noreferrer" className="support-link">
+            {course.title}
+            <ExternalLink aria-hidden className="size-3.5 shrink-0" />
+            <span className="sr-only"> (새 창)</span>
+          </a>
+        ) : (
+          <span className="plan-item-title">{course.title}</span>
+        )}
+        {course.weekend && <span className="support-category">주말반</span>}
+      </p>
+      <p className="support-meta">
+        <span className="support-open">
+          {md(course.start)} 시작{course.end && ` ~ ${md(course.end)}`}
+        </span>
+        {/* 컨소시엄은 '무료'만 보이면 누구나 들을 수 있다고 오해한다 → 대상(중소기업 재직자)도 함께 */}
+        <span>{course.kind_label}</span>
+        {course.fee_krw === 0 && <span>무료</span>}
+        {course.institute && <span className="support-agency">{course.institute}</span>}
+      </p>
+    </li>
+  );
+}
+
+/** 일하면서 배우기: 근무지 근처 재직자 오프라인 강의 (고용24). 자격은 상세 페이지에서 확인. */
+function TrainingSlot({ training }: { training: TrainingList | undefined }) {
+  if (!training || training.status !== 'ok' || !training.courses.length) return null;
+  const where = training.region ? placeName(training.region) : '근무지';
+  const scope =
+    training.scope === 'sido'
+      ? `${where}에는 3개월 안에 시작하는 과정이 없어 근무지 인근(시도) 과정이에요.`
+      : `${where}에서 3개월 안에 시작하는 과정이에요.`;
+  return (
+    <li className="plan-slot is-extra">
+      <h4 className="plan-slot-label">
+        일하면서 배우기<small>근무지 근처 재직자 강의</small>
+      </h4>
+      <p className="plan-extra-lead">
+        {scope} 주말반을 먼저 보여 줘요. 수강 자격(재직 여부, 내일배움카드 등)과 장소는 과정 상세
+        페이지에서 확인해 주세요.
+      </p>
+      <ul className="plan-items">
+        {training.courses.map((course) => (
+          <CourseItem key={`${course.title}-${course.start}-${course.institute}`} course={course} />
+        ))}
+      </ul>
+      <p className="plan-extra-source">출처: {training.source}</p>
+    </li>
+  );
+}
+
+function PostingPanel({
+  posting,
+  savings,
+  training,
+}: {
+  posting: PostingPlan;
+  savings: SavingsList | null;
+  training: TrainingList | undefined;
+}) {
   if (!posting.slots.length) {
     return <p className="support-empty">지금 넣을 할 일을 찾지 못했어요.</p>;
   }
@@ -104,6 +236,8 @@ function PostingPanel({ posting }: { posting: PostingPlan }) {
             </ul>
           </li>
         ))}
+        {savings && <SavingsSlot savings={savings} />}
+        <TrainingSlot training={training} />
       </ol>
       {posting.notes.map((note) => (
         <p key={note} className="text-sm text-muted-foreground">
@@ -114,9 +248,45 @@ function PostingPanel({ posting }: { posting: PostingPlan }) {
   );
 }
 
+/**
+ * 적금(전국 같음)과 근무지별 재직자 강의를 불러온다. 정착 플랜과 따로 받는 참고 정보라,
+ * 못 받거나 키가 없으면(status off·unavailable) 그 칸만 그리지 않는다.
+ */
+function usePlanExtras(codes: string[]) {
+  const [savings, setSavings] = useState<SavingsList | null>(null);
+  const [training, setTraining] = useState<Record<string, TrainingList>>({});
+  const key = codes.join(',');
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .GET('/plan/savings')
+      .then(({ data }) => !cancelled && data && setSavings(data))
+      .catch(() => {});
+    for (const code of key ? key.split(',') : []) {
+      api
+        .GET('/plan/training/{lawd_cd}', { params: { path: { lawd_cd: code } } })
+        .then(({ data }) => !cancelled && data && setTraining((t) => ({ ...t, [code]: data })))
+        .catch(() => {});
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [key]);
+  return { savings, training };
+}
+
 export function PlanView({ plan }: { plan: SettlePlan }) {
   const postings = plan.postings.filter((p) => p.slots.length > 0);
+  const codes = [...new Set(postings.map((p) => p.lawd_cd).filter((c): c is string => !!c))].sort();
+  const { savings, training } = usePlanExtras(codes);
   if (!postings.length) return null;
+  const panel = (posting: PostingPlan) => (
+    <PostingPanel
+      posting={posting}
+      savings={savings}
+      training={posting.lawd_cd ? training[posting.lawd_cd] : undefined}
+    />
+  );
   return (
     <section className="support-section space-y-4" aria-labelledby="plan-title">
       <div>
@@ -128,7 +298,7 @@ export function PlanView({ plan }: { plan: SettlePlan }) {
         </p>
       </div>
       {postings.length === 1 ? (
-        <PostingPanel posting={postings[0]} />
+        panel(postings[0])
       ) : (
         <Tabs defaultValue={postings[0].posting_id} className="min-w-0">
           <TabsList aria-label="볼 회사" className="posting-tabs max-w-full justify-start">
@@ -140,7 +310,7 @@ export function PlanView({ plan }: { plan: SettlePlan }) {
           </TabsList>
           {postings.map((posting) => (
             <TabsContent key={posting.posting_id} value={posting.posting_id} className="pt-3">
-              <PostingPanel posting={posting} />
+              {panel(posting)}
             </TabsContent>
           ))}
         </Tabs>

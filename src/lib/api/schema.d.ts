@@ -222,6 +222,46 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/plan/savings': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Savings
+     * @description 은행 적금 12개월 기본금리 높은 순 몇 개 (공시 기준월·출처 포함). 가입을 권하지 않는다.
+     */
+    get: operations['get_savings_plan_savings_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/plan/training/{lawd_cd}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Training
+     * @description 근무지(시군구 코드)의 재직자 오프라인 강의. 없으면 시도로 넓힌다 (scope='sido').
+     */
+    get: operations['get_training_plan_training__lawd_cd__get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -539,6 +579,42 @@ export interface components {
        * @description 값의 출처 (예: 국토부 실거래가 중앙값)
        */
       source?: string | null;
+    };
+    /** Course */
+    Course: {
+      /** Title */
+      title: string;
+      /** Institute */
+      institute: string | null;
+      /**
+       * Kind
+       * @enum {string}
+       */
+      kind: 'card' | 'consortium';
+      /** Kind Label */
+      kind_label: string;
+      /**
+       * Start
+       * @description 훈련 시작일 (YYYY-MM-DD)
+       */
+      start: string;
+      /** End */
+      end: string | null;
+      /**
+       * Weekend
+       * @description 주말반
+       */
+      weekend: boolean;
+      /**
+       * Fee Krw
+       * @description 수강비 (원). 컨소시엄은 0(무료)
+       */
+      fee_krw: number | null;
+      /**
+       * Url
+       * @description 고용24 과정 상세 (신청·장소·자격 확인)
+       */
+      url: string | null;
     };
     /**
      * CurrentJob
@@ -993,6 +1069,11 @@ export interface components {
        */
       region: string | null;
       /**
+       * Lawd Cd
+       * @description 근무지 시군구 코드 (화면이 재직자 강의를 찾을 때 쓴다)
+       */
+      lawd_cd: string | null;
+      /**
        * Moving
        * @description 이사하는 경우를 넣었는지 (이사 경우가 해당될 때)
        */
@@ -1237,6 +1318,73 @@ export interface components {
       /** Value */
       value?: ('annual' | 'monthly' | 'undisclosed' | 'to_propose') | null;
     };
+    /**
+     * SavingsList
+     * @description GET /plan/savings 응답.
+     */
+    SavingsList: {
+      /** Products */
+      products: components['schemas']['SavingsProduct'][];
+      /**
+       * Term Months
+       * @default 12
+       */
+      term_months: number;
+      /**
+       * Disclosed Month
+       * @description 공시 기준월 (YYYYMM)
+       */
+      disclosed_month: string | null;
+      /**
+       * Source
+       * @default 금융상품통합비교공시시스템(금융감독원) 금융회사 상품정보
+       */
+      source: string;
+      /**
+       * Source Url
+       * @default https://finlife.fss.or.kr
+       */
+      source_url: string;
+      /**
+       * Status
+       * @description ok / unavailable(불러오지 못함) / off(키 없음)
+       */
+      status: string;
+      /** Reason */
+      reason: string | null;
+    };
+    /** SavingsProduct */
+    SavingsProduct: {
+      /** Bank */
+      bank: string;
+      /** Name */
+      name: string;
+      /**
+       * Rate
+       * @description 12개월 기본금리 (연 %)
+       */
+      rate: number;
+      /**
+       * Max Rate
+       * @description 최고 우대금리 (연 %). 조건은 은행에서 확인
+       */
+      max_rate: number | null;
+      /**
+       * Saving Type
+       * @description 적립 방식 ('자유적립식' / '정액적립식')
+       */
+      saving_type: string;
+      /**
+       * Limit Krw
+       * @description 공시된 최고 한도 (원). 없으면 null
+       */
+      limit_krw: number | null;
+      /**
+       * Join Way
+       * @description 가입 방법 (예: '인터넷,스마트폰')
+       */
+      join_way: string | null;
+    };
     /** Scenario */
     Scenario: {
       /**
@@ -1435,6 +1583,36 @@ export interface components {
       from_image: boolean;
       /** Value */
       value?: string | null;
+    };
+    /**
+     * TrainingList
+     * @description GET /plan/training/{lawd_cd} 응답.
+     */
+    TrainingList: {
+      /** Lawd Cd */
+      lawd_cd: string;
+      /** Region */
+      region: string | null;
+      /**
+       * Scope
+       * @description sigungu=근무지 시군구 과정, sido=시군구에 없어 시도로 넓힘
+       * @enum {string}
+       */
+      scope: 'sigungu' | 'sido';
+      /** Courses */
+      courses: components['schemas']['Course'][];
+      /**
+       * Status
+       * @description ok / unavailable(불러오지 못함) / off(키 없음)
+       */
+      status: string;
+      /** Reason */
+      reason: string | null;
+      /**
+       * Source
+       * @default 고용24 훈련과정 (work24.go.kr)
+       */
+      source: string;
     };
     /**
      * UserProfile
@@ -2006,6 +2184,93 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['RentEstimate'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Unprocessable Content */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Internal Server Error */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  get_savings_plan_savings_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SavingsList'];
+        };
+      };
+      /** @description Unprocessable Content */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Internal Server Error */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  get_training_plan_training__lawd_cd__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        lawd_cd: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TrainingList'];
         };
       };
       /** @description Not Found */
