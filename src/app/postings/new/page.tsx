@@ -30,7 +30,7 @@ import {
   statusBadge,
   type Row,
 } from './format';
-import { MAX_MESSAGE_CHARS, MAX_POSTING_CHARS } from './limits';
+import { MAX_MESSAGE_CHARS, MAX_POSTING_CHARS, tidyPostingText } from './limits';
 import { AgentProgress } from './agent-progress';
 import { LINK_ONLY_ERROR, LinkHint, isLinkOnly } from './link-hint';
 import {
@@ -367,10 +367,9 @@ export default function NewPosting() {
     requestAnimationFrame(() => heading.current?.focus({ preventScroll: true }));
   }
 
-  const message = texts
-    .map((text) => text.trim())
-    .filter(Boolean)
-    .join(POSTING_SEPARATOR);
+  // 공백을 정리한 글을 보낸다 (세는 것도 이 글로 — 복사해 온 공백 때문에 상한에 걸리지 않게)
+  const tidied = texts.map(tidyPostingText);
+  const message = tidied.filter(Boolean).join(POSTING_SEPARATOR);
   const edited = rows.some((row, i) => JSON.stringify(row) !== JSON.stringify(originalRows[i]));
   const files = attachments.files.map(({ file }) => file);
   const signatures = files.map(fileSignature);
@@ -423,9 +422,9 @@ export default function NewPosting() {
       return;
     }
     // 공고 하나마다 MAX_POSTING_CHARS (전체는 서버 상한 MAX_MESSAGE_CHARS)
-    const tooLong = texts.findIndex((text) => text.trim().length > MAX_POSTING_CHARS);
+    const tooLong = tidied.findIndex((text) => text.length > MAX_POSTING_CHARS);
     if (tooLong >= 0 || message.length > MAX_MESSAGE_CHARS) {
-      const which = tooLong >= 0 ? texts[tooLong].trim().length : message.length;
+      const which = tooLong >= 0 ? tidied[tooLong].length : message.length;
       showError(
         (tooLong >= 0
           ? `${texts.length > 1 ? `공고 ${tooLong + 1}` : '붙여 넣은 글'}이 ${which.toLocaleString('ko-KR')}자예요. ` +
