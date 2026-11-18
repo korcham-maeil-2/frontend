@@ -59,7 +59,7 @@ import { SupportView, isLocalSupport } from './support-view';
 import { PlanPreview, PlanView, isSettlePlan } from './plan-view';
 import { askQuestionsOf, askTargetId, type AskQuestion } from './ask-view';
 import { ReportView, isReport, type Report } from './report-view';
-import { RowEditor, fieldsToCheck, focusField } from './row-editor';
+import { RowEditor, fieldsToCheck, focusField, salaryLeftBlank } from './row-editor';
 
 // 공고 넣기 → (백엔드가 Claude로 비교표를 만듦) → 조건 확인·수정 → 내 생활비 → 매달 남는 돈
 //   1) POST /sessions                 공고 글을 보내면 비교표(table)를 돌려받는다
@@ -209,6 +209,7 @@ export default function NewPosting() {
   const [seenPostings, setSeenPostings] = useState<string[]>([]);
   // 다른 회사 탭의 칸으로 갈 때, 탭이 바뀌어 그 칸이 그려진 뒤 커서를 옮길 칸
   const pendingFocus = useRef<string | null>(null);
+  const reviewTodo = useRef<HTMLDivElement>(null); // 조건 확인 맨 위 '할 일' 상자
   const [demoMode, setDemoMode] = useState(false);
   // 서버가 청년 지원을 찾을 수 있는지 (온통청년 키). 아니면 나이 칸을 숨긴다 (나이는 그것에만 쓴다)
   const [supportEnabled, setSupportEnabled] = useState(false);
@@ -527,44 +528,19 @@ export default function NewPosting() {
     pendingFocus.current = null;
   }, [activeId]);
 
-  /**
-   * 조건 확인에서 아직 볼 것: 안 연 공고, 다시 볼 칸 (누르면 그곳으로).
-   * 연봉 비공개는 넣지 않는다 — 비어 있어도 최소 연봉을 계산해 주는 게 이 서비스의 기능이다.
-   */
-  // 공고마다 다시 볼 칸 (탭 개수·확인 알림·단계 요약이 같이 쓴다. 비교표가 바뀔 때만 다시 센다)
+  // 조건 확인의 '할 일': 공고마다 다시 볼 칸 (탭 개수·위 상자·단계 요약이 같이 쓴다. 비교표가 바뀔 때만 다시 센다).
+  // 공고를 열어 보는 것 자체는 할 일로 세지 않는다 (볼 값이 없는 공고를 열라는 건 만든 숙제).
+  // 연봉 비공개도 세지 않는다 — 비어 있어도 최소 연봉을 계산해 주는 게 이 서비스의 기능이다.
   const toCheck = useMemo(() => new Map(rows.map((row) => [row.id, fieldsToCheck(row)])), [rows]);
-  const reviewChecks = rows.flatMap((row, i) => {
-    const name = companyName(row, i);
-    const todo = toCheck.get(row.id) ?? [];
-    // fieldId가 없으면 그 공고 탭만 연다
-    const items: { key: string; label: string; rowId: string; fieldId?: string }[] = [];
-    if (!seenPostings.includes(row.id)) {
-      items.push({
-        key: `${row.id}-unseen`,
-        label: `${name}: 아직 열어 보지 않았어요`,
-        rowId: row.id,
-      });
-    } else if (todo.length) {
-      items.push({
-        key: `${row.id}-todo`,
-        label: `${name}: 다시 볼 칸 ${todo.length}개`,
-        rowId: row.id,
-        fieldId: todo[0],
-      });
-    }
-    return items;
-  });
-  const unseenCount = rows.filter((row) => !seenPostings.includes(row.id)).length;
   const cellsToCheck = [...toCheck.values()].reduce((sum, ids) => sum + ids.length, 0);
-  const reviewSummary =
-    [unseenCount && `볼 공고 ${unseenCount}개`, cellsToCheck && `확인할 칸 ${cellsToCheck}개`]
-      .filter(Boolean)
-      .join(' · ') || '확인 끝';
+  const reviewSummary = cellsToCheck ? `다시 볼 값 ${cellsToCheck}개` : '고칠 값 없음';
 
   function goToLiving() {
-    // 아직 볼 것이 있으면 한 번 알려 준다. 막지는 않는다 (연봉을 몰라도 계산 단계로 갈 수 있다).
-    if (reviewChecks.length && !checkWarned) {
+    // 다시 볼 값이 남았으면 한 번만 위 상자로 올려 보여 준다. 막지는 않는다 (모르는 값은 두고 가도 된다).
+    if (cellsToCheck && !checkWarned) {
       setCheckWarned(true);
+      reviewTodo.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      reviewTodo.current?.focus({ preventScroll: true });
       return;
     }
     changeStep('living');
@@ -881,7 +857,7 @@ export default function NewPosting() {
                 : shown === 'living'
                   ? '공고에는 없는 내 사정을 알려 주세요. 빈칸은 계산할 수 없다고 표시하고, 지어내지 않아요.'
                   : reviewing
-                    ? '공고에서 읽은 값이 맞는지 확인하세요. 틀린 값은 고치고, 빠진 값은 직접 입력할 수 있어요.'
+                    ? '공고에서 가져온 조건이에요. 다시 볼 값은 아래에 모았어요.'
                     : '비교할 공고의 본문을 붙여 넣거나 공고 파일을 넣어 주세요. 여러 개를 함께 넣을 수 있어요.'}
           </p>
           {shown === 'input' && (
@@ -1135,18 +1111,57 @@ export default function NewPosting() {
       ) : reviewing ? (
         <section className="desk-sheet sheet-enter" aria-label="공고 조건 확인">
           {demoNotice}
-          <h2 className="sheet-heading">공고 {rows.length}개의 근무 조건</h2>
-          <BadgeLegend
-            className="mb-5"
-            badges={[
-              statusBadge.confirmed,
-              // 이 화면의 추정 = AI가 읽은 값이 공고와 맞는지 다시 볼 값
-              { ...statusBadge.estimated, meaning: '공고와 맞는지 다시 볼 값' },
-              statusBadge.user_input,
-              statusBadge.missing,
-              ...(hasImageCells ? [IMAGE_READ_BADGE] : []),
-            ]}
-          />
+          {/* 처음 온 사람이 가장 먼저 볼 것: 지금 할 일 (공고마다 한 줄, 누르면 그 칸·탭으로) */}
+          <div ref={reviewTodo} tabIndex={-1} className="review-todo">
+            <p className="review-todo-title">
+              {cellsToCheck ? `다시 볼 값 ${cellsToCheck}개` : '고칠 값이 없어요. 넘어가면 돼요'}
+            </p>
+            <ul>
+              {rows.map((row, i) => {
+                const ids = toCheck.get(row.id) ?? [];
+                const name = companyName(row, i);
+                const single = rows.length === 1;
+                if (ids.length)
+                  return (
+                    <li key={row.id}>
+                      <button
+                        type="button"
+                        className="question-link"
+                        onClick={() => goToField(row.id, ids[0])}
+                      >
+                        {single ? '첫 칸으로 가기' : name}
+                      </button>
+                      {!single && `: ${ids.length}개`}
+                    </li>
+                  );
+                if (salaryLeftBlank(row))
+                  return (
+                    <li key={row.id}>
+                      {single ? (
+                        '연봉 비공개'
+                      ) : (
+                        <button
+                          type="button"
+                          className="question-link"
+                          onClick={() => selectPosting(row.id)}
+                        >
+                          {name}
+                        </button>
+                      )}
+                      {single ? '. 비워 둬도 돼요' : ': 연봉 비공개. 비워 둬도 돼요'}
+                    </li>
+                  );
+                return null;
+              })}
+              {cellsToCheck > 0 &&
+                (() => {
+                  const rest = rows.filter(
+                    (row) => !toCheck.get(row.id)?.length && !salaryLeftBlank(row),
+                  ).length;
+                  return rest > 0 && <li>나머지 {rest}곳은 고칠 값이 없어요</li>;
+                })()}
+            </ul>
+          </div>
           {hasMaskedQuote(rows) && (
             <p className="-mt-3 mb-5 text-sm text-muted-foreground">
               공고 글의 [이메일]·[번지] 같은 표시는 AI에 보내기 전에 개인정보를 가린 자리예요.
@@ -1200,29 +1215,17 @@ export default function NewPosting() {
                 ),
             )}
           </PostingTabs>
-          {checkWarned && reviewChecks.length > 0 && (
-            <div role="alert" className="salary-notice">
-              <p className="font-semibold">넘어가기 전에 한 번 볼 것이 있어요</p>
-              <p>틀린 값은 계산을 틀리게 만들어요. 모르는 값은 그대로 두고 넘어가도 돼요.</p>
-              <ul>
-                {reviewChecks.map((item) => (
-                  <li key={item.key}>
-                    <button
-                      type="button"
-                      className="question-link"
-                      onClick={() =>
-                        item.fieldId
-                          ? goToField(item.rowId, item.fieldId)
-                          : selectPosting(item.rowId)
-                      }
-                    >
-                      {item.label}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+          <BadgeLegend
+            className="mt-6"
+            badges={[
+              statusBadge.confirmed,
+              // 이 화면의 추정 = AI가 읽은 값이 공고와 맞는지 다시 볼 값
+              { ...statusBadge.estimated, meaning: '공고와 맞는지 다시 볼 값' },
+              statusBadge.user_input,
+              statusBadge.missing,
+              ...(hasImageCells ? [IMAGE_READ_BADGE] : []),
+            ]}
+          />
           <p role="alert" className="form-hint">
             {error}
           </p>
@@ -1231,7 +1234,7 @@ export default function NewPosting() {
               <ArrowLeft aria-hidden /> 공고 넣기로
             </Button>
             <Button className="main-action" disabled={busy !== null} onClick={goToLiving}>
-              {checkWarned && reviewChecks.length
+              {checkWarned && cellsToCheck
                 ? '그대로 다음으로'
                 : edited
                   ? '고친 내용으로 다음'

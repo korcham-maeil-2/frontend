@@ -493,9 +493,38 @@ details[open] > summary .when-closed {
 .salary-notice ul {
   margin-top: 0.25rem;
 }
+/* 조건 확인 맨 위 '할 일' (page.tsx): 처음 온 사람이 가장 먼저 볼 상자. 늘 보이므로 경고색이 아니라 옅은 파랑 */
+.review-todo {
+  margin-bottom: 1.5rem;
+  padding: 1rem 1.25rem;
+  border: 1px solid color-mix(in oklab, var(--primary) 30%, transparent);
+  border-radius: 0.75rem;
+  background: var(--accent);
+  scroll-margin: 6rem;
+}
+.review-todo:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.review-todo-title {
+  font-size: 1.0625rem;
+  font-weight: 700;
+  color: var(--foreground);
+}
+.review-todo ul:not(:empty) {
+  margin-top: 0.25rem;
+}
+/* 다시 볼 칸: 옅은 노란 바탕 (탭의 'n개 남음'·위 상자와 같은 칸) */
+.row-field[data-check] {
+  margin-inline: -0.75rem;
+  padding-inline: 0.75rem;
+  border-radius: 0.5rem;
+  background: var(--estimated-bg);
+}
 /* 점 목록 (안내·결과 화면 공용). 위 여백은 쓰는 곳에서 정한다 */
 .row-questions ul,
 .salary-notice ul,
+.review-todo ul,
 .bullet-list {
   padding-inline-start: 1.1rem;
   list-style: disc;

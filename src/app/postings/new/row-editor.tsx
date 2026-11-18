@@ -212,6 +212,18 @@ function expectsAmount(row: Row) {
   return type !== 'undisclosed' && type !== 'to_propose';
 }
 
+const AMOUNT_KEYS = new Set<string>(['annual_salary_krw', 'monthly_salary_krw']);
+
+/** 연봉 비공개라 금액 칸이 비어 있는 공고: 비워 둬도 된다 (받아야 할 최소 연봉을 계산한다) */
+export function salaryLeftBlank(row: Row) {
+  return (
+    !expectsAmount(row) &&
+    visibleCells(row).every(
+      ({ key, cell }) => key === null || !AMOUNT_KEYS.has(key) || cell.value == null,
+    )
+  );
+}
+
 /**
  * 이 공고에서 다시 볼 칸의 id (화면 순서). 회사 탭의 'n개 남음'과 '첫 칸으로 이동'에 쓴다.
  * 서버가 준 질문 목록이 아니라 지금 칸 상태로 센다 → 고치면 바로 줄어든다.
@@ -219,10 +231,9 @@ function expectsAmount(row: Row) {
  *   - 금액을 받아야 하는데 비어 있는 급여 칸 (계산에 꼭 필요. 연봉 비공개는 빼고)
  */
 export function fieldsToCheck(row: Row): string[] {
-  const amountKeys = new Set(['annual_salary_krw', 'monthly_salary_krw']);
   return visibleCells(row)
     .filter(({ key, cell }) => {
-      const emptyAmount = key !== null && amountKeys.has(key) && cell.value == null;
+      const emptyAmount = key !== null && AMOUNT_KEYS.has(key) && cell.value == null;
       return needsCheck(cell) || (emptyAmount && expectsAmount(row));
     })
     .map(({ id }) => id);
@@ -309,14 +320,17 @@ function RowQuestions({
   // 서버의 check 질문(문장 하나에 칸 이름을 이어 붙임) 대신 칸 상태로 그린다 (cellsToCheck)
   const optional = questions.filter((q) => q.kind !== 'check');
   const { estimated, image } = cellsToCheck(row);
-  const total = estimated.length + image.length;
+  // 개수는 탭·위 '할 일' 상자와 같게 (fieldsToCheck): 받아야 하는데 빈 급여 칸도 센다
+  const ids = fieldsToCheck(row);
+  const empty = visibleCells(row).filter(({ id, cell }) => ids.includes(id) && !needsCheck(cell));
+  const total = ids.length;
   return (
     <>
       {total > 0 && (
         <div className="row-questions is-check">
           <p className="row-questions-title">
             <CircleAlert aria-hidden className="size-4 shrink-0" />
-            확인해 주세요 {total}개
+            다시 볼 값 {total}개
           </p>
           <ul>
             {estimated.map(({ id, label }) => (
@@ -324,19 +338,21 @@ function RowQuestions({
                 <button type="button" className="question-link" onClick={() => focusField(id)}>
                   {label}
                 </button>
-                <span className="row-questions-sub">
-                  {' '}
-                  · AI가 추정한 값이에요. 공고와 맞는지 봐 주세요
-                </span>
+                <span className="row-questions-sub"> · 공고에 없어 짐작한 값</span>
+              </li>
+            ))}
+            {empty.map(({ id, label }) => (
+              <li key={id}>
+                <button type="button" className="question-link" onClick={() => focusField(id)}>
+                  {label}
+                </button>
+                <span className="row-questions-sub"> · 비어 있어요</span>
               </li>
             ))}
             {image.length > 0 && (
               <li>
                 이미지에서 읽은 값 {image.length}개
-                <span className="row-questions-sub">
-                  {' '}
-                  · 틀렸다는 뜻이 아니라, 원본 그림과 한 번 비교해 주세요
-                </span>
+                <span className="row-questions-sub"> · 원본 그림과 한 번 비교해 주세요</span>
                 <span className="row-questions-actions">
                   <button
                     type="button"
@@ -411,6 +427,7 @@ export function RowEditor({
   const number = index + 1;
   const company = row.company?.value?.trim();
   const questions = openQuestions(row);
+  const toCheck = new Set(fieldsToCheck(row));
   const place = [row.location?.value?.sido, row.location?.value?.sigungu].filter(Boolean).join(' ');
 
   function set(key: CellKey | 'location', value: unknown) {
@@ -494,6 +511,7 @@ export function RowEditor({
       </header>
       <div className="row-card-body">
         <RowQuestions row={row} questions={questions} onConfirmImage={confirmImageValues} />
+        {/* 다시 볼 칸은 노란 바탕 (탭·위 상자와 같은 기준: fieldsToCheck) */}
         {groups.map((group) => (
           <fieldset key={group.title} className="row-group">
             <legend>{group.title}</legend>
@@ -505,6 +523,12 @@ export function RowEditor({
                   id={fieldId(row, field.key)}
                   field={{ ...field, label: labelOf(row, field) } as Field}
                   cell={cellOf(row, field.key)}
+                  check={toCheck.has(fieldId(row, field.key))}
+                  note={
+                    AMOUNT_KEYS.has(field.key) && salaryLeftBlank(row)
+                      ? '비워 둬도 돼요. 받아야 할 최소 연봉을 계산해요'
+                      : null
+                  }
                   onChange={(value) => set(field.key, value)}
                   onConfirm={() => confirm(field.key)}
                 />
@@ -521,6 +545,7 @@ export function RowEditor({
                     example: MONTHLY_EXAMPLE,
                   }}
                   cell={allowance.monthly_krw}
+                  check={toCheck.has(fieldId(row, `other-${i}`))}
                   onChange={(value) => setAllowance(i, (_, first) => changed(first, value))}
                   onConfirm={() => setAllowance(i, (cell) => confirmed(cell))}
                 />
@@ -536,12 +561,18 @@ function FieldRow({
   id,
   field,
   cell,
+  check = false,
+  note = null,
   onChange,
   onConfirm,
 }: {
   id: string;
   field: Field;
   cell: Cell;
+  /** 다시 볼 칸이면 노란 바탕 */
+  check?: boolean;
+  /** 칸 아래 한 줄 안내 (예: 연봉 비공개면 비워 둬도 된다고) */
+  note?: string | null;
   onChange: (value: unknown) => void;
   /** 다시 볼 칸(추정·이미지에서 읽음)의 값이 맞다고 확인 */
   onConfirm: () => void;
@@ -683,7 +714,7 @@ function FieldRow({
   }
 
   return (
-    <div className="row-field">
+    <div className="row-field" data-check={check || undefined}>
       {/* 배지는 항목 이름 바로 옆에 둔다 (이름과 배지 사이로 눈을 멀리 옮기지 않게) */}
       <div className="row-field-head">
         <label htmlFor={id}>
@@ -691,7 +722,16 @@ function FieldRow({
           {/* 화면에는 입력칸 옆에 단위가 보이고, 화면 읽기 프로그램은 라벨에서 단위를 듣는다. */}
           {unit && <span className="sr-only"> (단위: {unit})</span>}
         </label>
-        <SourceBadge badge={badge} />
+        {/* 다시 볼 필요 없는 칸은 공고 원문을 배지 안에 (누르면 보임): 화면이 짧아지고 볼 칸이 드러난다 */}
+        <SourceBadge
+          badge={badge}
+          subject={field.label}
+          details={
+            cell.source_text && !needsCheck(cell)
+              ? [{ label: cell.from_image ? '이미지에서 옮긴 글' : '공고', text: cell.source_text }]
+              : []
+          }
+        />
       </div>
       {input}
       <p id={hintId} className="row-field-hint">
@@ -701,7 +741,8 @@ function FieldRow({
           </button>
         )}
         {hint && <span className="text-foreground">{hint}</span>}
-        {cell.source_text && (
+        {note && <span className="text-foreground">{note}</span>}
+        {cell.source_text && needsCheck(cell) && (
           <span>
             {hint ? ' · ' : ''}
             {cell.from_image ? '이미지에서 옮긴 글' : '공고'}: “{cell.source_text}”
