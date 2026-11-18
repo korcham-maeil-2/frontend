@@ -1258,7 +1258,7 @@ section.desk-sheet > .sheet-heading {
   background: var(--estimated-bg);
   color: var(--estimated);
 }
-/* '확인 끝'은 '확인' 배지와 같은 모양 (흰 바탕 + 코발트 테두리) */
+/* '열어 봄'·'다 넣음'은 '확인' 배지와 같은 모양 (흰 바탕 + 코발트 테두리) */
 .posting-tab-status[data-state='done'] {
   background: var(--card);
   color: var(--confirmed);
@@ -1312,7 +1312,7 @@ section.desk-sheet > .sheet-heading {
   float: left; /* fieldset 테두리 위에 걸치지 않고 일반 제목처럼 */
   width: 100%;
   margin-bottom: 0.75rem;
-  /* 묶음 제목은 항목 이름(14px)보다 확실히 크게: 어디서 묶음이 바뀌는지 한눈에 */
+  /* 묶음 제목은 항목 이름(17px)보다 확실히 크게(22px): 어디서 묶음이 바뀌는지 한눈에 */
   font-size: 1.375rem;
   font-weight: 700;
   color: var(--foreground);
@@ -1363,7 +1363,7 @@ section.desk-sheet > .sheet-heading {
   .desk-spread.is-wide .desk-intro {
     padding: 1rem 1.25rem 1.25rem;
   }
-  /* 좁은 화면: 회사 이름 아래에 상태(확인 끝 등)를 내려 반 칸에도 이름이 들어가게 */
+  /* 좁은 화면: 회사 이름 아래에 상태(열어 봄 등)를 내려 반 칸에도 이름이 들어가게 */
   .posting-tabs [role='tab'] {
     flex-direction: column;
     gap: 0.125rem;
