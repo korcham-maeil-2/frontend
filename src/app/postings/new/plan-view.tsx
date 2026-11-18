@@ -352,7 +352,7 @@ function PostingPanel({
   onEditLiving: () => void;
 }) {
   const cases = (['commute', 'move'] as const).filter((c) => plans[c]);
-  const [picked, setChosen] = useState<Case>(() => defaultCase(result, plans));
+  const [picked, setPicked] = useState<Case>(() => defaultCase(result, plans));
   // 플랜이 새로 와서 고른 경우가 없어졌으면 남은 쪽으로
   const chosen = plans[picked] ? picked : cases[0];
   const posting = plans[chosen]!;
@@ -360,6 +360,7 @@ function PostingPanel({
   const scenario = scenarioOf(result, id, chosen);
   const remaining = scenario?.monthly_remaining ?? null;
   const minSalary = remaining == null ? minSalaryOf(result, id, chosen) : null;
+  const salaryHidden = !!scenario?.missing.includes('세후 월급');
   const moving = chosen === 'move';
   const itemsOf = (kind: PlanSlot['kind']) =>
     posting.slots.filter((s) => s.kind === kind).flatMap((s) => s.items);
@@ -404,7 +405,7 @@ function PostingPanel({
       {cases.length > 1 && (
         <div role="group" aria-label="볼 경우" className="source-tabs mode-switch">
           {cases.map((c) => (
-            <button key={c} type="button" aria-pressed={c === chosen} onClick={() => setChosen(c)}>
+            <button key={c} type="button" aria-pressed={c === chosen} onClick={() => setPicked(c)}>
               {CASE_LABEL[c]}
               {/* 폰에서는 금액을 아랫줄로 (중간에서 끊기지 않게) */}
               {amountOf(c) && (
@@ -417,12 +418,14 @@ function PostingPanel({
           ))}
         </div>
       )}
-      <p className="plan-chips">
-        {posting.region && <span className="support-category">{posting.region}</span>}
-        {cases.length === 1 && (
-          <span className="support-category">{CASE_LABEL[chosen]}하는 경우</span>
-        )}
-      </p>
+      {(posting.region || cases.length === 1) && (
+        <p className="plan-chips">
+          {posting.region && <span className="support-category">{posting.region}</span>}
+          {cases.length === 1 && (
+            <span className="support-category">{CASE_LABEL[chosen]}하는 경우</span>
+          )}
+        </p>
+      )}
       {/* 결론: 같은 세 칸이 경우마다 숫자만 바뀐다 (처음 드는 돈, 매달 남는 돈, 마감) */}
       <div className="plan-conclusion">
         {!moving ? (
@@ -467,6 +470,13 @@ function PostingPanel({
               기준: {minSalary.basis}
             </small>
           </div>
+        ) : salaryHidden ? (
+          // 연봉 비공개인데 비교할 기준(다른 공고·목표 금액)이 없으면 생활비를 채워도 계산되지 않는다
+          <div>
+            <span>{moving ? '이사하면' : '통근하면'} 매달 남는 돈</span>
+            <strong>계산할 수 없어요</strong>
+            <small>연봉 비공개라 남는 돈을 알 수 없어요</small>
+          </div>
         ) : (
           <div>
             <span>{moving ? '이사하면' : '통근하면'} 매달 남는 돈</span>
@@ -487,7 +497,10 @@ function PostingPanel({
           <small>
             {supportFailed
               ? '청년 지원을 불러오지 못했어요'
-              : (deadlines[0]?.when ?? '지원은 모두 상시 신청이에요')}
+              : (deadlines[0]?.when ??
+                (start.length + anytime.length
+                  ? '지원은 모두 상시 신청이에요'
+                  : '넣을 지원이 없어요'))}
           </small>
         </div>
       </div>
@@ -519,7 +532,8 @@ function PostingPanel({
         <section className="plan-section">
           <h3 className="plan-section-title">입사하면 챙겨 볼 것</h3>
           <p className="plan-section-desc">
-            첫 취업이면 누구나 · 어느 회사든 같아요 · 자격은 신청 페이지에서 확인해 주세요
+            첫 취업 때 많이 챙기는 전국 지원 · 어느 회사든 같아요 · 자격은 신청 페이지에서 확인해
+            주세요
           </p>
           {/* 모두 전국이라 칩은 빼고 */}
           <Rows items={start.map((item) => ({ ...item, scope: null }))} />
