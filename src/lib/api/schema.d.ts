@@ -21,6 +21,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/examples': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Examples
+     * @description '예시로 사용법 보기'에 넣을 공고 글. 이 글만 넣으면 공고 정리에 Claude를 안 부른다.
+     */
+    get: operations['get_examples_examples_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/sessions': {
     parameters: {
       query?: never;
@@ -828,7 +848,7 @@ export interface components {
       regions: components['schemas']['RegionSupport'][];
       /**
        * National
-       * @description 전국 정책 (어느 근무지든 같다). 신청할 수 있는 것만
+       * @description 전국 정책 (어느 근무지든 같다). 신청할 수 있는 것만. 앞 MAX_POLICIES개 + 거기 못 든 첫 취업 지원(FIRST_JOB_MAX개까지, 정착 플랜용)
        */
       national: components['schemas']['SupportPolicy'][];
       /**
@@ -1730,6 +1750,26 @@ export interface operations {
           'application/json': {
             [key: string]: string | boolean;
           };
+        };
+      };
+    };
+  };
+  get_examples_examples_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': string[];
         };
       };
     };

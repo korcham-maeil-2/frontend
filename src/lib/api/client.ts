@@ -15,3 +15,12 @@ export async function getHealth() {
   }
   return data;
 }
+
+/** '예시로 사용법 보기'에 넣을 공고 글. 글은 백엔드에만 둔다 (그 글이면 공고 정리 비용이 0원). */
+export async function getExamples() {
+  const { data, error } = await api.GET('/examples');
+  if (error || !data) {
+    throw new Error('예시 공고를 불러오지 못함');
+  }
+  return data;
+}

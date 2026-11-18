@@ -18,9 +18,8 @@ import noticeArt from '@public/posting-notice.webp';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
-import { api, getHealth } from '@/lib/api/client';
+import { api, getExamples, getHealth } from '@/lib/api/client';
 import type { components } from '@/lib/api/schema';
-import { examplePostings } from './examples';
 import {
   IMAGE_READ_BADGE,
   cellsOf,
@@ -221,6 +220,8 @@ export default function NewPosting() {
   const [restored, setRestored] = useState(false);
   // 예시로 사용법 보기: 지금 말풍선 번호 (tour.tsx). null이면 보지 않는 중
   const [tour, setTour] = useState<number | null>(null);
+  // 예시 공고 글 (백엔드 GET /examples). 못 받았으면 예시 버튼을 숨긴다
+  const [examples, setExamples] = useState<string[]>([]);
   const heading = useRef<HTMLHeadingElement>(null);
   const firstTextarea = useRef<HTMLTextAreaElement>(null);
 
@@ -259,22 +260,17 @@ export default function NewPosting() {
       setSeenPostings(draft.seenPostings ?? draft.rows.map((row) => row.id));
     }
     setRestored(true);
-    // 서버가 막 깨어나는 중이면 첫 확인이 실패할 수 있어 한 번 더 묻는다 (나이 칸·시연 표시가 빠지지 않게)
-    const applyHealth = (health: Awaited<ReturnType<typeof getHealth>>) => {
-      setDemoMode(health?.normalize_mode === 'fixture');
-      setSupportEnabled(health?.local_support === true);
-    };
-    getHealth()
-      .then(applyHealth)
-      .catch(() => {
-        setTimeout(
-          () =>
-            getHealth()
-              .then(applyHealth)
-              .catch(() => {}),
-          3000,
-        );
-      });
+    // 서버가 막 깨어나는 중이면 첫 요청이 실패할 수 있어 3초 뒤 한 번 더 묻는다
+    // (나이 칸·시연 표시·예시 버튼이 빠지지 않게)
+    const askTwice = (ask: () => Promise<void>) =>
+      ask().catch(() => setTimeout(() => ask().catch(() => {}), 3000));
+    askTwice(() =>
+      getHealth().then((health) => {
+        setDemoMode(health?.normalize_mode === 'fixture');
+        setSupportEnabled(health?.local_support === true);
+      }),
+    );
+    askTwice(() => getExamples().then(setExamples));
   }, []);
 
   // 글자를 칠 때마다 저장하지 않고, 입력이 0.3초 멈추면 한 번 저장한다 (긴 글을 매번 저장하면 느리다).
@@ -473,7 +469,7 @@ export default function NewPosting() {
       if (!table.length) {
         showError(
           demoMode
-            ? '시연 모드에서는 "예시로 사용법 보기"의 공고와 시연용 파일만 읽을 수 있어요.'
+            ? '시연 모드에서는 예시 공고와 시연용 파일만 읽을 수 있어요.'
             : '공고에서 근무 조건을 찾지 못했어요. 회사명·근무지·급여가 적힌 부분을 넣어 주세요.',
           where,
         );
@@ -799,9 +795,7 @@ export default function NewPosting() {
     plan: '',
   };
   const demoNotice = demoMode && (
-    <p className="demo-notice">
-      시연 모드라서 &ldquo;예시로 사용법 보기&rdquo;의 공고와 시연용 공고 파일만 읽을 수 있어요.
-    </p>
+    <p className="demo-notice">시연 모드라서 예시 공고와 시연용 공고 파일만 읽을 수 있어요.</p>
   );
 
   return (
@@ -1411,15 +1405,15 @@ export default function NewPosting() {
           <div className="sheet-actions">
             {/* 빈 칸이거나, 예시를 넣은 채 사용법을 닫았을 때 (다시 볼 수 있게) */}
             {tour === null &&
-            (texts.every((text) => !text.trim()) ||
-              texts.join('\n') === examplePostings.join('\n')) ? (
+            examples.length > 0 &&
+            (texts.every((text) => !text.trim()) || texts.join('\n') === examples.join('\n')) ? (
               <Button
                 type="button"
                 variant="ghost"
                 className="min-h-11 text-foreground"
                 onClick={() => {
                   setError('');
-                  setTexts(examplePostings);
+                  setTexts(examples);
                   setSourceTab('text');
                   setTour(0); // 말풍선이 공고 칸을 가리킨다 (커서는 말풍선의 '다음'에)
                 }}
