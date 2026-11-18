@@ -29,7 +29,7 @@ import {
   statusBadge,
   type Row,
 } from './format';
-import { MAX_MESSAGE_CHARS } from './limits';
+import { MAX_MESSAGE_CHARS, MAX_POSTING_CHARS } from './limits';
 import { AgentProgress } from './agent-progress';
 import { LINK_ONLY_ERROR, LinkHint, isLinkOnly } from './link-hint';
 import {
@@ -405,12 +405,22 @@ export default function NewPosting() {
       requestAnimationFrame(() => document.getElementById(`posting-text-${linkOnly}`)?.focus());
       return;
     }
-    if (message.length > MAX_MESSAGE_CHARS) {
+    // 공고 하나마다 MAX_POSTING_CHARS (전체는 서버 상한 MAX_MESSAGE_CHARS)
+    const tooLong = texts.findIndex((text) => text.trim().length > MAX_POSTING_CHARS);
+    if (tooLong >= 0 || message.length > MAX_MESSAGE_CHARS) {
+      const which = tooLong >= 0 ? texts[tooLong].trim().length : message.length;
       showError(
-        `붙여 넣은 글이 ${message.length.toLocaleString('ko-KR')}자예요. ` +
-          `${MAX_MESSAGE_CHARS.toLocaleString('ko-KR')}자까지 넣을 수 있어요. 근무 조건 부분만 넣어 주세요.`,
+        (tooLong >= 0
+          ? `${texts.length > 1 ? `공고 ${tooLong + 1}` : '붙여 넣은 글'}이 ${which.toLocaleString('ko-KR')}자예요. ` +
+            `공고 하나는 ${MAX_POSTING_CHARS.toLocaleString('ko-KR')}자까지 넣을 수 있어요.`
+          : `붙여 넣은 글이 모두 ${which.toLocaleString('ko-KR')}자예요. ` +
+            `${MAX_MESSAGE_CHARS.toLocaleString('ko-KR')}자까지 넣을 수 있어요.`) +
+          ' 근무 조건 부분만 넣어 주세요.',
         'text',
       );
+      if (tooLong >= 0) {
+        requestAnimationFrame(() => document.getElementById(`posting-text-${tooLong}`)?.focus());
+      }
       return;
     }
     // 새로고침으로 첨부만 사라진 상태에서 글을 바꾸면, 파일로 만든 공고는 새 표에서 빠진다 → 묻는다.
