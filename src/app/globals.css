@@ -1024,12 +1024,32 @@ details[open] > summary .when-closed {
 .result-details > summary {
   min-height: 2.75rem;
   display: flex;
+  list-style: none;
   flex-wrap: wrap; /* 제목 뒤 칩(지역별 개수 등)이 좁으면 다음 줄로 */
   align-items: center;
   gap: 0.25rem 0.5rem;
   font-weight: 600;
   color: var(--foreground);
   cursor: pointer;
+}
+/* 접기 줄 끝의 ⌄: 접혀 있어도 눌러서 열 수 있다는 표시 (펼치면 위로) */
+.result-details > summary::-webkit-details-marker {
+  display: none;
+}
+.result-details > summary::after {
+  content: '';
+  margin-inline-start: auto;
+  width: 0.5rem;
+  height: 0.5rem;
+  flex: none;
+  border-right: 2px solid var(--primary);
+  border-bottom: 2px solid var(--primary);
+  rotate: 45deg;
+  translate: 0 -0.15rem;
+}
+.result-details[open] > summary::after {
+  rotate: 225deg;
+  translate: 0 0.15rem;
 }
 /* 계산 과정 표의 '참고' 칸 목록 (result-view.tsx CalcSteps) */
 .result-notes {
@@ -2376,7 +2396,7 @@ details[open] > summary .when-closed {
     grid-template-columns: 7.5rem minmax(0, 1fr) minmax(0, 15rem);
   }
   .plan-row.is-saving {
-    grid-template-columns: minmax(0, 1fr) 6rem minmax(0, 18rem);
+    grid-template-columns: minmax(0, 1fr) 6rem minmax(0, 14rem); /* 상품 이름이 두 줄로 꺾이지 않게 */
   }
 }
 .plan-row-meta {

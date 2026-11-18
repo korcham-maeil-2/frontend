@@ -516,7 +516,8 @@ function PostingPanel({
           // 연봉 비공개: 4단계 '면접에서 확인할 연봉' 카드와 같은 말 ('… 이상', 그만큼 받으면 매달 얼마)
           <div>
             <span>받아야 할 최소 연봉 (추정)</span>
-            <strong>{minSalaryText(minSalary)}</strong>
+            {/* 이름표가 '최소 연봉'이라 숫자만 크게 ('… 이상'을 붙이면 좁은 칸에서 '이상'만 떨어진다) */}
+            <strong>{formatWon(minSalary.salary)}</strong>
             <small>
               {minSalary.floor
                 ? '최저임금 수준만 받아도 기준보다 많이 남아요'
