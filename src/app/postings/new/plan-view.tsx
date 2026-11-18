@@ -138,9 +138,7 @@ function SavingsSlot({
   const chosen = options.find((e) => e.monthly_krw === deposit);
   return (
     <section className="plan-section">
-      <h3 className="plan-section-title">
-        남는 돈 모으기 <span className="support-category">참고</span>
-      </h3>
+      <h3 className="plan-section-title">남는 돈 모으기</h3>
       <p className="plan-section-desc">
         은행 적금 12개월 기본금리 높은 순{disclosed && ` · ${disclosed} 공시`}
       </p>
@@ -183,7 +181,6 @@ function SavingsSlot({
               원금 {formatWon(chosen.principal_krw)} + 세전 이자 약 {formatWon(chosen.interest_krw)}{' '}
               ({top.bank} 연 {rate(top.rate)})
             </span>
-            <span className="block">실제 금리는 은행에서 확인해 주세요</span>
           </p>
         </div>
       )}
@@ -191,7 +188,7 @@ function SavingsSlot({
         {savings.products.map((p) => (
           <li key={`${p.bank}-${p.name}`} className="plan-row is-saving">
             <span className="plan-row-title">
-              {p.name} <span className="support-category">{p.bank}</span>
+              {p.name} <span className="plan-row-meta">{p.bank}</span>
             </span>
             <strong className="tabular-nums">연 {rate(p.rate)}</strong>
             {/* 우대·가입 방법·공시 최고 한도(월 한도인지 총액인지는 상품마다 달라 공시 이름 그대로) */}
@@ -262,9 +259,7 @@ function TrainingSlot({
   const where = training.region ? placeName(training.region) : '근무지';
   return (
     <section className="plan-section">
-      <h3 className="plan-section-title">
-        일하면서 배우기 <span className="support-category">참고</span>
-      </h3>
+      <h3 className="plan-section-title">일하면서 배우기</h3>
       <p className="plan-section-desc">
         {training.scope === 'sido' ? `${where} 근처 (시군구엔 과정이 없어 시도 전체)` : where}{' '}
         재직자 강의 · 3개월 안에 시작 · {matched ? '직무 관련과 주말반 먼저' : '주말반 먼저'}
@@ -278,9 +273,7 @@ function TrainingSlot({
           />
         ))}
       </ul>
-      <p className="plan-extra-source">
-        출처: {training.source} · 수강 자격·장소는 과정 페이지에서 확인해 주세요
-      </p>
+      <p className="plan-extra-source">출처: {training.source}</p>
     </section>
   );
 }
@@ -539,9 +532,7 @@ function PostingPanel({
       {start.length > 0 && (
         <section className="plan-section">
           <h3 className="plan-section-title">입사하면 챙겨 볼 것</h3>
-          <p className="plan-section-desc">
-            첫 취업 때 많이 챙기는 전국 지원이에요. 자격은 신청 페이지에서 확인해 주세요
-          </p>
+          <p className="plan-section-desc">첫 취업 때 많이 챙기는 전국 지원이에요</p>
           {/* 모두 전국이라 칩은 빼고 */}
           <Rows items={start.map((item) => ({ ...item, scope: null }))} />
         </section>
