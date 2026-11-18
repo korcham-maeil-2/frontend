@@ -522,7 +522,11 @@ export function RowEditor({
             <fieldset key={group.title} className="row-group">
               <legend>
                 {group.title}
-                {toReview > 0 && <span className="group-chip is-need">다시 볼 값 {toReview}</span>}
+                {toReview > 0 && (
+                  <span aria-hidden className="group-chip is-need">
+                    다시 볼 값 {toReview}
+                  </span>
+                )}
               </legend>
               {group.fields
                 .filter((field) => !hidden(row, field.key))

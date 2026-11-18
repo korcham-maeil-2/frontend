@@ -682,7 +682,8 @@ details[open] > summary .when-closed {
     align-items: start;
     column-gap: 2.5rem;
   }
-  /* 두 묶음의 줄을 맞춘다: 제목 | 체크 | 주거비 | 교통비 — 같은 줄끼리 통근과 이사를 비교 */
+  /* 두 묶음의 줄을 맞춘다: 제목 | 체크 | 주거비 | 교통비 — 같은 줄끼리 통근과 이사를 비교.
+     묶음마다 정확히 이 4줄이라 span 4 (묶음에 줄을 더하면 이 숫자도 함께 바꾼다) */
   .cost-cases {
     grid-template-rows: repeat(4, auto);
   }
@@ -1965,6 +1966,9 @@ section.desk-sheet > .sheet-heading {
   color: var(--body);
 }
 /* 표 아래 상자들과 계산 내역 접기: 좁으면 위아래, 넓으면 나란히 (하나뿐이면 한 줄 전체) */
+.result-boxes:empty {
+  display: none; /* 통근 보기에 연봉 비공개 공고도 없으면 상자가 하나도 없다 */
+}
 .result-boxes,
 .result-folds {
   display: grid;

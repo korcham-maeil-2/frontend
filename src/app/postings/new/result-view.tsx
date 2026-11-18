@@ -438,8 +438,8 @@ function rowClass(key: RowKey) {
 function baselineText(be: BreakEven, columns: Column[]): string {
   const base = columns.find((c) => c.posting.posting_id === be.baseline.posting_id);
   const who =
-    base && be.baseline.kind === 'posting'
-      ? `${base.posting.company || be.baseline.label} ${be.baseline.case === 'move' ? '이사 시' : '통근 시'}`
+    base?.posting.company && be.baseline.kind === 'posting'
+      ? `${base.posting.company} ${be.baseline.case === 'move' ? '이사 시' : '통근 시'}`
       : be.baseline.label;
   return `${who} 매달 ${won(be.baseline.monthly_remaining)}`;
 }

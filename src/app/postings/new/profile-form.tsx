@@ -116,8 +116,9 @@ function MoneyField({
   const noteId = `${id}-note`;
   const askId = `${id}-ask`;
   const helpId = `${id}-help`;
+  const blankId = `${id}-blank`;
   const hasNote = note !== undefined;
-  const describedBy = [ask && askId, help && helpId, hintId, hasNote && noteId]
+  const describedBy = [ask && askId, help && helpId, blank && blankId, hintId, hasNote && noteId]
     .filter(Boolean)
     .join(' ');
   const field = (
@@ -142,10 +143,15 @@ function MoneyField({
         placeholder={blank}
         describedBy={describedBy}
       />
-      {/* 칸 아래는 넣은 값 확인('52만원')만. 비울 때 결과는 칸 안 글과 같은 말을 화면 읽기용으로 */}
+      {/* 비울 때 결과: 칸 안 글과 같은 말을 화면 읽기용으로 (칸 안 글은 읽어 주지 않는 경우가 있다) */}
+      {blank && (
+        <span id={blankId} className="sr-only">
+          {blank}
+        </span>
+      )}
+      {/* 칸 아래는 넣은 값 확인('52만원')만 — 비어 있으면 줄도 없다 */}
       <p id={hintId} className="row-field-hint">
         {value != null && <span className="text-foreground">{formatWon(value)}</span>}
-        {blank && <span className="sr-only">{blank}</span>}
       </p>
       {hasNote && (
         <p id={noteId} className="row-field-hint rent-note" aria-live="polite">
@@ -168,8 +174,18 @@ function MoneyField({
 
 /** 묶음 제목 오른쪽 칩: 비어 있는 필수 칸 수, 또는 '선택'. 둘 다 아니면 없음 ('다 넣음'은 선택 칸이 0원이 돼 거짓이 될 수 있다) */
 function GroupChip({ count, optional = false }: { count: number; optional?: boolean }) {
-  if (count > 0) return <span className="group-chip is-need">필수 {count}칸</span>;
-  return optional ? <span className="group-chip">선택</span> : null;
+  // 화면용 표시: 묶음 이름에 섞이지 않게 숨긴다 (개수는 위 상자가 읽어 준다)
+  if (count > 0)
+    return (
+      <span aria-hidden className="group-chip is-need">
+        필수 {count}칸
+      </span>
+    );
+  return optional ? (
+    <span aria-hidden className="group-chip">
+      선택
+    </span>
+  ) : null;
 }
 
 function Check({
@@ -311,7 +327,6 @@ function PostingCosts({
         <div role="group" aria-labelledby={id('commute-title')} className="row-group">
           <h4 id={id('commute-title')} className="row-group-title">
             지금 집에서 다니기
-            <GroupChip count={need.has(id('can-commute')) ? 1 : 0} />
           </h4>
           <Check
             id={id('can-commute')}
@@ -373,16 +388,11 @@ function PostingCosts({
                 id={id('move-housing')}
                 need={need.has(id('move-housing'))}
                 label="이사할 집 주거비 (매달)"
-                // 예시는 실제로 들어갈 시세로 (예시와 비울 때 값이 달라 헷갈리지 않게)
-                example={
-                  // 사택·기숙사 공고는 비워도 시세로 채우지 않으니 시세를 예시로 쓰지 않는다
-                  rent?.monthly_rent_krw && !row.company_housing?.value
-                    ? `${Math.round(rent.monthly_rent_krw / 10_000)}만`
-                    : '50만'
-                }
+                example="50만"
                 value={costs.moveHousing}
                 onChange={(moveHousing) => set({ moveHousing })}
                 help={moveHousingHelp(aid, row.company_housing?.value === true)}
+                // 시세가 있으면 칸 안에 '비우면 65만원' (사택·기숙사 공고는 비워도 시세로 채우지 않으니 예시 그대로)
                 blank={
                   rent?.monthly_rent_krw && !row.company_housing?.value
                     ? `비우면 ${formatWon(rent.monthly_rent_krw)}`
@@ -448,6 +458,8 @@ export function ProfileFormView({
   askFixedIndex?: number;
 }) {
   const set = (patch: Partial<Form>) => onChange({ ...form, ...patch });
+  // 비교 기준 접기는 처음 그릴 때만 정한다 (넣어 둔 값이 있으면 펼친 채로). 체크를 풀어도 접히지 않게
+  const [basisOpen] = useState(() => form.hasCurrentJob || form.target != null);
   const missingFor = (row: Row) => missing.filter((item) => item.rowId === row.id);
   const need = new Set(missing.map((item) => item.fieldId));
   const needIn = (test: (id: string) => boolean) => [...need].filter(test).length;
@@ -657,10 +669,7 @@ export function ProfileFormView({
       {/* 연봉 비공개 공고가 있을 때만: 최소 연봉을 무엇에 맞춰 계산할지 */}
       {rows.some(salaryLeftBlank) && (
         // 선택 항목은 접어 둔다 (값을 넣어 둔 적이 있으면 펼친 채로: 돌아왔을 때 넣은 값이 숨지 않게)
-        <details
-          className="optional-group"
-          open={form.hasCurrentJob || form.target != null || undefined}
-        >
+        <details className="optional-group" open={basisOpen || undefined}>
           <summary>
             비교 기준
             <GroupChip
