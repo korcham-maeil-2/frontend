@@ -375,20 +375,17 @@ function PostingPanel({
     savings.products.length > 0 &&
     !(remaining != null && remaining < 0);
   const showTraining = training?.status === 'ok' && training.courses.length > 0;
-  // 남는 돈 칸 설명: 무엇을 빼고 남는지 (통근은 교통비, 이사는 주거비·교통비).
-  // 비워 둔 교통비는 '0원'을 강조하지 않고 비워 둬서 0원으로 계산했다고 알린다
+  // 남는 돈 칸 아래 한 줄: 뺀 돈만 짧게 (통근은 교통비, 이사는 주거비·교통비). 문장으로 늘이지 않는다
   const costs = scenario
     ? [
         moving && scenario.housing.value != null ? `주거비 ${won(scenario.housing.value)}` : '',
         (scenario.assumed_zero ?? []).includes('교통비')
-          ? '교통비는 비워 둬서 0원으로 계산했어요 · 더 들 수 있어요'
+          ? '교통비 0원(비워 둠)'
           : scenario.transport.value != null
-            ? `${moving ? '' : '출퇴근 '}교통비 ${won(scenario.transport.value)} 빼고`
+            ? `교통비 ${won(scenario.transport.value)}`
             : '',
-      ]
-        .filter(Boolean)
-        .join(' · ')
-    : '';
+      ].filter(Boolean)
+    : [];
   const amountOf = (c: Case) => {
     const r = scenarioOf(result, id, c)?.monthly_remaining;
     const m = minSalaryOf(result, id, c)?.salary;
@@ -439,9 +436,7 @@ function PostingPanel({
             <span>처음 준비할 돈</span>
             <strong>{deposit?.amount_krw != null ? formatWon(deposit.amount_krw) : '모름'}</strong>
             <small>
-              {deposit?.amount_krw != null
-                ? '원룸 보증금 시세 (추정)'
-                : '이 지역 보증금 시세를 찾지 못했어요'}
+              {deposit?.amount_krw != null ? '원룸 보증금 시세 (추정)' : '보증금 시세 없음'}
             </small>
           </div>
         )}
@@ -457,7 +452,17 @@ function PostingPanel({
                 </button>
               </small>
             ) : (
-              costs && <small>{costs}</small>
+              costs.length > 0 && (
+                // 줄이 바뀌면 항목 사이에서만 (항목 중간에서 끊기지 않게)
+                <small>
+                  {costs.map((c, i) => (
+                    <span key={c} className="whitespace-nowrap">
+                      {i > 0 && ' · '}
+                      {c}
+                    </span>
+                  ))}
+                </small>
+              )
             )}
           </div>
         ) : minSalary ? (
@@ -465,9 +470,8 @@ function PostingPanel({
             <span>연봉 비공개 · 받아야 할 최소 연봉 (추정)</span>
             <strong>최소 {formatWon(minSalary.salary)}</strong>
             <small>
-              {minSalary.monthly != null &&
-                `이 이상이면 매달 약 ${won(minSalary.monthly)} 남아요 · `}
-              기준: {minSalary.basis}
+              {minSalary.monthly != null && `매달 약 ${won(minSalary.monthly)} · `}
+              기준 {minSalary.basis}
             </small>
           </div>
         ) : salaryHidden ? (
@@ -475,16 +479,16 @@ function PostingPanel({
           <div>
             <span>{moving ? '이사하면' : '통근하면'} 매달 남는 돈</span>
             <strong>계산할 수 없어요</strong>
-            <small>연봉 비공개라 남는 돈을 알 수 없어요</small>
+            <small>연봉 비공개 · 비교할 기준 없음</small>
           </div>
         ) : (
           <div>
             <span>{moving ? '이사하면' : '통근하면'} 매달 남는 돈</span>
             <strong>아직 계산 전</strong>
             <small>
-              생활비 빈칸을 채우면 계산돼요 ·{' '}
+              생활비 빈칸 있음 ·{' '}
               <button type="button" className="inline-link" onClick={onEditLiving}>
-                내 생활비로 가기
+                채우러 가기
               </button>
             </small>
           </div>
@@ -496,11 +500,9 @@ function PostingPanel({
           </strong>
           <small>
             {supportFailed
-              ? '청년 지원을 불러오지 못했어요'
+              ? '청년 지원 불러오기 실패'
               : (deadlines[0]?.when ??
-                (start.length + anytime.length
-                  ? '지원은 모두 상시 신청이에요'
-                  : '넣을 지원이 없어요'))}
+                (start.length + anytime.length ? '모두 상시 신청' : '넣을 지원 없음'))}
           </small>
         </div>
       </div>
