@@ -1026,7 +1026,7 @@ export interface components {
        * Kind
        * @enum {string}
        */
-      kind: 'before' | 'move_month' | 'month' | 'anytime';
+      kind: 'before' | 'move_month' | 'month' | 'start' | 'anytime';
       /**
        * Label
        * @description '이사 전', '이사한 달', '2026년 12월', '언제든'
@@ -1329,12 +1329,34 @@ export interface components {
       value?: ('annual' | 'monthly' | 'undisclosed' | 'to_propose') | null;
     };
     /**
+     * SavingsEstimate
+     * @description 매달 같은 금액을 12개월 넣으면 (금리 1위 상품의 기본금리, 세전).
+     */
+    SavingsEstimate: {
+      /** Monthly Krw */
+      monthly_krw: number;
+      /** Principal Krw */
+      principal_krw: number;
+      /**
+       * Interest Krw
+       * @description 세전 이자 (단리, 1,000원 단위 반올림)
+       */
+      interest_krw: number;
+      /** Total Krw */
+      total_krw: number;
+    };
+    /**
      * SavingsList
      * @description GET /plan/savings 응답.
      */
     SavingsList: {
       /** Products */
       products: components['schemas']['SavingsProduct'][];
+      /**
+       * Estimates
+       * @description DEPOSITS 금액마다 12개월 뒤 금액 (products[0] 기본금리 기준). 상품 없으면 []
+       */
+      estimates: components['schemas']['SavingsEstimate'][];
       /**
        * Term Months
        * @default 12
@@ -1492,6 +1514,8 @@ export interface components {
     SettlePlan: {
       /** Postings */
       postings: components['schemas']['PostingPlan'][];
+      /** Alternates */
+      alternates: components['schemas']['PostingPlan'][];
       /**
        * Start Month
        * @description 달력의 첫 달 (조회한 날의 달, YYYY-MM)
