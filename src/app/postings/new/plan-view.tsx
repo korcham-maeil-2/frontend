@@ -138,7 +138,9 @@ function SavingsSlot({
   const chosen = options.find((e) => e.monthly_krw === deposit);
   return (
     <section className="plan-section">
-      <h3 className="plan-section-title">남는 돈 모으기</h3>
+      <h3 className="plan-section-title">
+        남는 돈 모으기 <span className="support-category">참고</span>
+      </h3>
       <p className="plan-section-desc">
         은행 적금 12개월 기본금리 높은 순{disclosed && ` · ${disclosed} 공시`}
       </p>
@@ -181,6 +183,7 @@ function SavingsSlot({
               원금 {formatWon(chosen.principal_krw)} + 세전 이자 약 {formatWon(chosen.interest_krw)}{' '}
               ({top.bank} 연 {rate(top.rate)})
             </span>
+            <span className="block">실제 금리는 은행에서 확인해 주세요</span>
           </p>
         </div>
       )}
@@ -188,7 +191,7 @@ function SavingsSlot({
         {savings.products.map((p) => (
           <li key={`${p.bank}-${p.name}`} className="plan-row is-saving">
             <span className="plan-row-title">
-              {p.name} <span className="plan-row-meta">{p.bank}</span>
+              {p.name} <span className="support-category">{p.bank}</span>
             </span>
             <strong className="tabular-nums">연 {rate(p.rate)}</strong>
             {/* 우대·가입 방법·공시 최고 한도(월 한도인지 총액인지는 상품마다 달라 공시 이름 그대로) */}

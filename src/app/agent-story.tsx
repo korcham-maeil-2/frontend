@@ -1,7 +1,7 @@
 'use client';
 
 import Image, { type StaticImageData } from 'next/image';
-import { Paperclip } from 'lucide-react';
+import { Bot, Paperclip } from 'lucide-react';
 import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useReveal } from './use-reveal';
@@ -116,7 +116,13 @@ export function AgentStory() {
             {scene.messages.map((message) => (
               <li key={message.text} className={`bubble is-${message.from}`}>
                 <span className="bubble-who">
-                  {message.from === 'agent' ? '월급지도 AI' : '윤하늘(가상)'}
+                  {message.from === 'agent' ? (
+                    <>
+                      <Bot aria-hidden /> 월급지도 AI
+                    </>
+                  ) : (
+                    '윤하늘(가상)'
+                  )}
                 </span>
                 <p>{message.text}</p>
                 {message.files && (
