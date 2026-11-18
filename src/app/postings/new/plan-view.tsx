@@ -59,8 +59,10 @@ function Item({ item }: { item: PlanItem }) {
       <li className="plan-row">
         {/* 날짜가 있으면 줄 앞에 (날짜순 목록을 세로로 훑을 수 있게). 상시는 대부분이라 쓰지 않는다 */}
         {item.when && item.when !== '상시' && <span className="support-open">{item.when}</span>}
-        <ItemTitle item={item} />
-        <LocalChip item={item} />
+        {/* 제목과 칩을 한 덩어리로: 좁은 화면에서 칩만 홀로 다음 줄로 떨어지지 않게 */}
+        <span>
+          <ItemTitle item={item} /> <LocalChip item={item} />
+        </span>
       </li>
     );
   }
@@ -171,7 +173,7 @@ function SavingsSlot({
   savings: SavingsList;
   /** 계산에 쓸 매달 남는 돈 (연봉 비공개면 최소 연봉일 때 금액). 모르면 null */
   remaining: number | null;
-  /** 그 금액이 무엇 기준인지 ('이사하면', '최소 연봉 3,963만원을 받는다면') */
+  /** 그 금액이 무엇 기준인지 ('이사하면', '최소 연봉 3,963만원을 받으면') */
   basis: string;
 }) {
   // 12개월 뒤 금액은 백엔드가 계산해 보낸다 (estimates). 화면은 남는 돈 안의 금액만 고르게 한다
@@ -224,15 +226,17 @@ function SavingsSlot({
             </strong>
           </p>
           {/* 한 줄에 한 가지만: 무엇 기준인지 / 어떻게 나온 금액인지 / 주의 */}
+          {/* 한 줄에 한 문장: 고를 수 있는 범위 / 금액이 어떻게 나왔는지 / 주의 */}
           <p className="savings-note">
             <span className="block">
-              {basis} 매달 남는 돈 약 {formatWon(Math.round(remaining / 10_000) * 10_000)} 기준
+              {basis} 매달 약 {formatWon(Math.round(remaining / 10_000) * 10_000)}이 남아요. 그
+              안에서 넣을 금액을 골라 보세요.
             </span>
             <span className="block">
-              원금 {formatWon(chosen.principal_krw)} + 세전 이자 약 {formatWon(chosen.interest_krw)}{' '}
-              ({top.bank} 연 {rate(top.rate)})
+              원금 {formatWon(chosen.principal_krw)}에 세전 이자 약 {formatWon(chosen.interest_krw)}
+              이 붙어요 ({top.bank} 연 {rate(top.rate)} 기준).
             </span>
-            <span className="block">실제 금리는 은행에서 확인해 주세요</span>
+            <span className="block">실제 금리는 은행에서 확인해 주세요.</span>
           </p>
         </div>
       )}
@@ -308,8 +312,9 @@ function TrainingSlot({
   return (
     <section className="plan-section">
       <SectionHead title="일하면서 배우기">
-        {where} 재직자 강의 중 3개월 안에 시작하는 것을 모았어요.{' '}
-        {training.scope === 'sido' && '시군구에는 과정이 없어 시도 전체에서 찾았어요. '}
+        {training.scope === 'sido'
+          ? `${where}에는 과정이 없어 시도 전체에서 3개월 안에 시작하는 재직자 강의를 모았어요.`
+          : `${where} 재직자 강의 중 3개월 안에 시작하는 것을 모았어요.`}{' '}
         {matched ? '직무 관련과 주말반을' : '주말반을'} 먼저 보여 드려요.
       </SectionHead>
       <ul className="plan-items">
@@ -333,7 +338,11 @@ type Case = 'commute' | 'move';
 type Scenario = CalculationResult['postings'][number]['scenarios'][number];
 
 const CASE_LABEL: Record<Case, string> = { commute: '지금 집에서 통근', move: '회사 근처로 이사' };
-const won = (v: number) => formatWon(Math.round(v / 10_000) * 10_000);
+/** 만 원 단위로 반올림. 마이너스는 부호를 앞에 ('−31만원': formatWon은 음수를 받지 않는다) */
+const won = (v: number) =>
+  (v < 0 ? '−' : '') + formatWon(Math.round(Math.abs(v) / 10_000) * 10_000);
+/** 받아야 할 최소 연봉: 4단계 카드와 같은 말 ('… 이상', 최저임금으로 올린 답은 '이상' 없이) */
+const minSalaryText = (m: MinSalary) => `${formatWon(m.salary)}${m.floor ? '' : ' 이상'}`;
 
 /** 공고의 플랜들: 이사 플랜(postings)과 통근 플랜(alternates). 예전 백엔드면 하나뿐 */
 function plansOf(plan: SettlePlan, posting: PostingPlan): Partial<Record<Case, PostingPlan>> {
@@ -436,8 +445,8 @@ function PostingPanel({
     : [];
   const amountOf = (c: Case) => {
     const r = scenarioOf(result, id, c)?.monthly_remaining;
-    const m = minSalaryOf(result, id, c)?.salary;
-    return r != null ? `약 ${won(r)}` : m != null ? `최소 ${formatWon(m)}` : '';
+    const m = minSalaryOf(result, id, c);
+    return r != null ? `약 ${won(r)}` : m ? minSalaryText(m) : '';
   };
   const steps = [
     { label: '집 구하기 전', items: before },
@@ -517,16 +526,15 @@ function PostingPanel({
         ) : minSalary ? (
           // 연봉 비공개: 4단계 '면접에서 확인할 연봉' 카드와 같은 말 ('… 이상', 그만큼 받으면 매달 얼마)
           <div>
-            <span>받아야 할 최소 연봉</span>
-            <strong>
-              {formatWon(minSalary.salary)}
-              {!minSalary.floor && ' 이상'}
-            </strong>
+            <span>받아야 할 최소 연봉 (추정)</span>
+            <strong>{minSalaryText(minSalary)}</strong>
             <small>
               {minSalary.floor
                 ? '최저임금 수준만 받아도 기준보다 많이 남아요'
                 : minSalary.monthly != null
-                  ? `그만큼 받으면 매달 약 ${won(minSalary.monthly)}이 남아요`
+                  ? minSalary.monthly < 0
+                    ? `그만큼 받아도 매달 약 ${won(-minSalary.monthly)}이 모자라요`
+                    : `그만큼 받으면 매달 약 ${won(minSalary.monthly)}이 남아요`
                   : '공고에 연봉이 없어 계산했어요'}
             </small>
           </div>
@@ -627,7 +635,7 @@ function PostingPanel({
           remaining={remaining ?? minSalary?.monthly ?? null}
           basis={
             remaining == null && minSalary
-              ? `최소 연봉 ${formatWon(minSalary.salary)}을 받는다면`
+              ? `최소 연봉 ${formatWon(minSalary.salary)}을 받으면`
               : moving
                 ? '이사하면'
                 : '통근하면'

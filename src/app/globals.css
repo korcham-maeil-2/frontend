@@ -1923,6 +1923,13 @@ details[open] > summary .when-closed {
 .salary-answer-company {
   font-weight: 600;
 }
+/* 회사 이름은 띄어쓰기 없이 길 수 있다 (keep-all이라 안 끊긴다): 넘칠 때만 아무 데서나 끊어 칸 밖으로 안 나가게 */
+.salary-answer-company,
+.result-table thead th,
+.plan-preview-line,
+.deposit-list {
+  overflow-wrap: anywhere;
+}
 /* 금액(초록·크게) + '이상' + 추정 배지: 한 줄로 */
 .salary-answer-amount {
   margin-top: 0.25rem;

@@ -452,14 +452,20 @@ const HERE: Record<Case, string> = {
  * own: 이 공고에서 고른 경우(통근·이사), floor: 최저임금으로 올린 답이면 '…보다 많이 남아요'.
  */
 function answerSentence(be: BreakEven, columns: Column[], own: Case, floor: boolean): string {
-  const monthly = won(be.baseline.monthly_remaining);
+  const value = be.baseline.monthly_remaining;
+  const monthly = won(value);
+  // 기준이 마이너스면 '−31만원이 남아요'가 아니라 '31만원이 모자라요'
+  const left = value < 0 ? `${won(-value)}이 모자라요` : `${monthly}이 남아요`;
+  const same = value < 0 ? '그 정도로 맞추려면' : '그만큼 남으려면';
+  // 기준 공고가 주거지원비를 받으면, 기준은 지원이 끝난 뒤 금액이다 (표의 그 공고 칸은 받는 동안 금액)
+  const afterAid = baselineDuringAid(be, columns) != null ? '주거지원비가 끝난 뒤 ' : '';
   if (be.baseline.kind === 'target') {
     return floor
       ? `최저임금 수준만 받아도 목표한 매달 ${monthly}보다 많이 남아요.`
       : `${HERE[own]} 목표한 매달 ${monthly}을 남기려면 이만큼은 받아야 해요.`;
   }
   let when = '지금 회사에 다닐 때';
-  let fact = `지금 회사에서는 매달 ${monthly}이 남아요.`;
+  let fact = `지금 회사에서는 매달 ${left}.`;
   // 기준이 같은 경우(통근끼리·이사끼리)면 '여기서도', 다르면 이 공고의 경우를 적는다
   let here = HERE[own];
   if (be.baseline.kind === 'posting') {
@@ -467,12 +473,12 @@ function answerSentence(be: BreakEven, columns: Column[], own: Case, floor: bool
     const baseCase = be.baseline.case ?? 'commute'; // 예전 결과엔 경우가 없을 수 있다 (통근으로 읽는다)
     const go = baseCase === 'move' ? `${name} 근처로 이사해서` : `${name}에 집에서`;
     when = `${go} 다닐 때`;
-    fact = `${go} 다니면 매달 ${monthly}이 남아요.`;
+    fact = `${go} 다니면 ${afterAid}매달 ${left}.`;
     if (baseCase === own) here = '여기서도';
   }
   return floor
     ? `최저임금 수준만 받아도 ${when}보다 많이 남아요.`
-    : `${fact} ${here} 그만큼 남으려면 이만큼은 받아야 해요.`;
+    : `${fact} ${here} ${same} 이만큼은 받아야 해요.`;
 }
 
 function companyOf(column: Column, index: number) {
@@ -731,8 +737,6 @@ function SalaryAnswerBody({
   const tag = column.cells.salary.tag;
   const onTop = column.posting.pay_on_top?.value ? column.posting.pay_on_top : null;
   const aidMonths = column.row?.housing_allowance_months?.value;
-  const baseAid = baselineDuringAid(be, columns) != null;
-  const baseName = baselinePosting(be, columns);
   return (
     <AnswerRow
       head={
@@ -762,10 +766,6 @@ function SalaryAnswerBody({
           주거지원비가 나오는 {aidMonths ? `처음 ${aidMonths}개월은` : '동안은'}{' '}
           {won(chosen.during_support_annual_salary_krw)}만 받아도 돼요.
         </p>
-      )}
-      {/* 기준은 지원이 끝난 뒤 금액이라 표의 그 공고 금액과 다를 수 있다 */}
-      {baseAid && baseName && (
-        <p className="salary-answer-text">{baseName}의 주거지원비가 끝난 뒤를 기준으로 했어요.</p>
       )}
       {/* 최소 연봉에 안 들어 있는 돈 (식대·수당은 연봉과 따로) */}
       {onTop && (
@@ -819,7 +819,7 @@ function DepositSummary({ columns, estimates }: { columns: Column[]; estimates: 
   return (
     <div className="rounded-2xl bg-muted p-5">
       <h3 className="mb-2 font-semibold text-foreground">이사하면 처음에 준비할 돈</h3>
-      <ul className="space-y-2 text-sm text-body">
+      <ul className="deposit-list space-y-2 text-sm text-body">
         {[...byRegion.values()].map(({ rent, companies }) => {
           const place = placeName(rent.region);
           return (
@@ -882,7 +882,8 @@ export function ResultView({
   // 공고가 많으면 열마다 최소 폭을 주고 표를 가로로 넘겨 본다 (글자가 겹치지 않게)
   const tableWidth = { '--result-columns': columns.length } as CSSProperties;
   // 좁은 화면은 계산한 쪽(연봉 비공개 공고)을 먼저 보여 준다 (DESIGN.md)
-  const firstTab = (columns.find((c) => c.solved) ?? columns[0])?.posting.posting_id;
+  // 비교 방식에 따라 바뀌지 않게 (기본값이 바뀌면 탭이 경고를 낸다): 연봉 비공개 공고 → 첫 공고
+  const firstTab = result.break_even[0]?.posting_id ?? columns[0]?.posting.posting_id;
 
   return (
     <div className="space-y-6">

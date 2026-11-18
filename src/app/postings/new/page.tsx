@@ -920,11 +920,14 @@ export default function NewPosting() {
                     <summary>
                       근무지별 청년 지원 전체 보기
                       {support.regions
-                        .map((r) => `${placeName(r.region)} ${r.matched}개`)
-                        .concat(`전국 ${support.national_matched}개`)
-                        .map((count) => (
-                          <span key={count} className="support-category">
-                            {count}
+                        .map((r) => ({
+                          key: r.region,
+                          text: `${placeName(r.region)} ${r.matched}개`,
+                        }))
+                        .concat({ key: 'national', text: `전국 ${support.national_matched}개` })
+                        .map(({ key, text }) => (
+                          <span key={key} className="support-category">
+                            {text}
                           </span>
                         ))}
                     </summary>
