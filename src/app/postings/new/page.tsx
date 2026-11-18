@@ -921,21 +921,23 @@ export default function NewPosting() {
                 />
               )}
               {support && (
-                <details className="result-details plan-section">
-                  <summary>
-                    근무지별 청년 지원 전체 보기 (
-                    {support.regions
-                      .map((r) => `${placeName(r.region)} ${r.matched}개`)
-                      .concat(`전국 ${support.national_matched}개`)
-                      .join(' · ')}
-                    )
-                  </summary>
-                  <SupportView
-                    support={support}
-                    rows={rows}
-                    stale={support.checked_on === staleFor}
-                  />
-                </details>
+                <div className="plan-section">
+                  <details className="result-details">
+                    <summary>
+                      근무지별 청년 지원 전체 보기 (
+                      {support.regions
+                        .map((r) => `${placeName(r.region)} ${r.matched}개`)
+                        .concat(`전국 ${support.national_matched}개`)
+                        .join(' · ')}
+                      )
+                    </summary>
+                    <SupportView
+                      support={support}
+                      rows={rows}
+                      stale={support.checked_on === staleFor}
+                    />
+                  </details>
+                </div>
               )}
             </>
           )}
