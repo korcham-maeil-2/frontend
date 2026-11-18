@@ -866,7 +866,10 @@ export default function NewPosting() {
             {shown === 'plan'
               ? '이 회사에 가면 1년 동안 챙길 일을 모았어요.'
               : shown === 'result'
-                ? '세금과 4대보험, 주거비·교통비·고정비를 빼고 매달 남는 돈이에요.'
+                ? '세금과 4대보험, 주거비·교통비·고정비를 빼고 매달 남는 돈이에요.' +
+                  (freshResult?.break_even.length
+                    ? ' 연봉이 없는 공고는 받아야 할 최소 연봉을 계산했어요.'
+                    : '')
                 : shown === 'living'
                   ? '공고에 없는 내 생활비를 넣어 주세요.'
                   : reviewing

@@ -1964,27 +1964,65 @@ section.desk-sheet > .sheet-heading {
   border-block-end: 0;
 }
 
-/* 연봉 비공개 공고 요약 카드의 이름표 + 값 (result-view.tsx BreakEvenSummary) */
+/* ④ 연봉 비공개 공고의 답 카드 '면접에서 확인할 연봉' (result-view.tsx SalaryAnswer).
+   초록 최소 연봉은 화면에 이 카드 하나뿐 (표 칸은 기본색). 금액 말고 글자는 진한 색 (옅은 초록 바탕 대비) */
+.salary-answer {
+  border-radius: 1rem;
+  background: var(--positive-soft);
+  padding: 1.25rem;
+  color: var(--foreground);
+}
+.salary-answer-title {
+  font-size: 0.9375rem;
+  font-weight: 700;
+}
+.salary-answer li {
+  margin-top: 0.75rem;
+}
+.salary-answer li + li {
+  border-top: 1px solid color-mix(in srgb, var(--positive) 25%, transparent);
+  padding-top: 0.75rem;
+}
+.salary-answer-company {
+  font-weight: 600;
+}
+.salary-answer-amount {
+  white-space: nowrap;
+}
+.salary-answer-amount strong {
+  margin-inline-end: 0.25rem;
+  font-size: 1.625rem;
+  font-weight: 800;
+  color: var(--positive);
+  font-variant-numeric: tabular-nums;
+}
+.salary-answer.is-many .salary-answer-amount strong {
+  font-size: 1.375rem;
+}
+/* 답 카드의 이름표 + 값 */
 .be-facts {
   margin-top: 0.5rem;
   display: grid;
-  gap: 0.25rem;
+  /* 이름표 칸은 가장 긴 이름표 폭에 맞춘다 ('주거지원비 받는 동안'이 두 줄로 꺾이지 않게) */
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 0.25rem 1rem;
   font-size: 0.9375rem;
 }
 .be-facts > div {
-  display: grid;
-  grid-template-columns: 7.5rem minmax(0, 1fr);
-  gap: 0.5rem;
+  display: contents;
 }
 /* 좁은 화면: 이름표를 값 위로 (값 칸이 좁아져 여러 줄로 꺾이지 않게) */
 @media (max-width: 39.99rem) {
-  .be-facts > div {
+  .be-facts {
     grid-template-columns: minmax(0, 1fr);
-    gap: 0;
+    row-gap: 0;
+  }
+  .be-facts dd + dt {
+    margin-top: 0.25rem;
   }
 }
 .be-facts dt {
-  color: var(--muted-foreground);
+  color: var(--body);
 }
 
 /* 결과 화면 좁은 화면 명세: 최소 연봉 칸의 '공고엔 비공개' 칩이 바로 앞 신뢰도 배지와 붙지 않게 */
@@ -2003,11 +2041,7 @@ section.desk-sheet > .sheet-heading {
   font-weight: 400;
   color: var(--body);
 }
-/* 표 아래 상자들과 계산 내역 접기: 좁으면 위아래, 넓으면 나란히 (하나뿐이면 한 줄 전체) */
-.result-boxes:empty {
-  display: none; /* 통근 보기에 연봉 비공개 공고도 없으면 상자가 하나도 없다 */
-}
-.result-boxes,
+/* 계산 내역 접기: 좁으면 위아래, 넓으면 나란히 (하나뿐이면 한 줄 전체) */
 .result-folds {
   display: grid;
   gap: 1rem;
@@ -2017,20 +2051,10 @@ section.desk-sheet > .sheet-heading {
   gap: 0.5rem 1rem;
 }
 @media (min-width: 64rem) {
-  .result-boxes {
-    grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr));
-  }
   .result-folds {
     grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr));
   }
 }
-/* 표 위 '연봉 비공개 공고의 기준' 한 줄 (result-view.tsx) */
-.compare-basis {
-  margin-top: -0.75rem;
-  font-size: 0.9375rem;
-  color: var(--muted-foreground);
-}
-
 /* 결과 표의 답 줄 '매달 남는 돈': 이름도 크게 (옆의 큰 초록 금액이 무엇인지 바로 읽히게) */
 .result-table .compare-result th {
   font-size: 1.25rem;
@@ -2038,12 +2062,6 @@ section.desk-sheet > .sheet-heading {
 }
 .result-compare .compare-list .compare-result dt {
   font-size: 1.0625rem;
-}
-
-/* 연봉 비공개 공고 요약: 회색 카드 한 겹, 공고가 여럿이면 사이에 선 */
-.be-item + .be-item {
-  border-top: 1px solid var(--border);
-  padding-top: 0.75rem;
 }
 
 /* '새로 비교하기' 확인 (page.tsx): 버튼 자리에 질문과 두 버튼 */

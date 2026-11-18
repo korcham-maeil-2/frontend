@@ -444,6 +444,14 @@ function baselineText(be: BreakEven, columns: Column[]): string {
   return `${who} 매달 ${won(be.baseline.monthly_remaining)}`;
 }
 
+/** 답 문장에 넣을 기준 이름: '이음데이터랩만큼 남아요' (통근·이사는 아래 '기준' 줄에) */
+function baselineName(be: BreakEven, columns: Column[]): string {
+  if (be.baseline.kind === 'current_job') return '지금 회사';
+  if (be.baseline.kind === 'target') return be.baseline.label;
+  const base = columns.find((c) => c.posting.posting_id === be.baseline.posting_id);
+  return base?.posting.company || be.baseline.label;
+}
+
 function companyOf(column: Column, index: number) {
   return column.posting.company || `공고 ${index + 1}`;
 }
@@ -610,69 +618,93 @@ function baselineDuringAid(be: BreakEven, columns: Column[]): number | undefined
 }
 
 /**
- * 연봉 비공개 공고 요약 카드: 답(최소 연봉)을 크게 먼저, 기준·지원받는 동안·따로 받는 돈은 이름표 붙은 줄로.
- * 문구 '최소 ○○ 이상이면 같은 금액이 남아요'는 이슈 backend#14 완료 조건이라 그대로 둔다.
+ * 연봉 비공개 공고의 답 카드 '면접에서 확인할 연봉' (표 위, 비교 방식을 따라 숫자가 바뀐다).
+ * 최소 연봉을 초록으로 크게 쓰는 곳은 화면에 이 카드 하나뿐 (표 칸은 기본색).
+ * 기준·지원받는 동안·따로 받는 돈은 이름표 붙은 줄로.
+ * 문구 '○○ 이상이면 … 남아요'는 이슈 backend#14 완료 조건이다.
  */
-function BreakEvenSummary({
-  be,
-  column,
-  baseline,
-  baselineDuringAid,
-}: {
-  be: BreakEven;
-  column: Column | undefined;
-  /** 비교 기준 한 덩어리 (baselineText) */
-  baseline: string;
-  baselineDuringAid: number | undefined;
-}) {
+function SalaryAnswer({ result, columns }: { result: Result; columns: Column[] }) {
+  if (!result.break_even.length) return null;
   return (
-    <li className="be-item">
-      <p className="font-semibold text-foreground">{be.company || be.posting_id}</p>
-      <BreakEvenAnswer column={column} baseline={baseline} baselineDuringAid={baselineDuringAid} />
-    </li>
+    <section
+      aria-labelledby="salary-answer-title"
+      className={result.break_even.length >= 3 ? 'salary-answer is-many' : 'salary-answer'}
+    >
+      <h3 id="salary-answer-title" className="salary-answer-title">
+        면접에서 확인할 연봉
+      </h3>
+      <ul>
+        {result.break_even.map((be) => (
+          <li key={be.posting_id}>
+            <p className="salary-answer-company">{be.company || be.posting_id}</p>
+            <SalaryAnswerLine
+              be={be}
+              column={columns.find((c) => c.posting.posting_id === be.posting_id)}
+              columns={columns}
+            />
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
-function BreakEvenAnswer({
+function SalaryAnswerLine({
+  be,
   column,
-  baseline,
-  baselineDuringAid,
+  columns,
 }: {
+  be: BreakEven;
   column: Column | undefined;
-  baseline: string;
-  baselineDuringAid: number | undefined;
+  columns: Column[];
 }) {
   const chosen = column?.breakEven;
   if (!column?.scenario) return <p>이 경우는 해당 없어요. 다른 경우를 골라 보세요.</p>;
   if (!chosen || chosen.annual_salary_krw == null) {
-    return (
-      <p>이 경우는 최소 연봉을 계산하지 못했어요{chosen?.reason ? ` (${chosen.reason})` : ''}.</p>
-    );
+    // 빈 값이 이유면 표의 '매달 남는 돈' 칸과 같은 말로 무엇이 필요한지 적는다
+    const why = chosen?.missing.length ? `필요한 값: ${chosen.missing.join(', ')}` : chosen?.reason;
+    return <p>이 경우는 최소 연봉을 계산하지 못했어요{why ? ` (${why})` : ''}.</p>;
   }
-  // 최소 연봉에는 따로 받는 식대·수당이 빠져 있다 → 요약에도 적는다
+  // 최소 연봉에는 따로 받는 식대·수당이 빠져 있다 → 카드에도 적는다
   const onTop = column.posting.pay_on_top?.value ? column.posting.pay_on_top : null;
+  const tag = column.cells.salary.tag;
+  const name = baselineName(be, columns);
+  const duringAid = baselineDuringAid(be, columns);
+  // 금액과 배지는 한 덩어리 (좁아도 배지만 다음 줄로 떨어지지 않게)
   const salary = (
-    <strong className="text-xl font-bold text-foreground tabular-nums">
-      {won(chosen.annual_salary_krw)}
-    </strong>
+    <span className="salary-answer-amount">
+      <strong>{won(chosen.annual_salary_krw)}</strong>
+      {tag && (
+        <SourceBadge
+          badge={tag.badge}
+          details={tag.details}
+          subject="최소 연봉"
+          className="result-badge"
+        />
+      )}
+    </span>
   );
   return (
     <>
-      <p className="mt-0.5">
+      <p className="salary-answer-line">
         {chosen.floor === 'minimum_wage' ? (
-          <>최저임금 수준인 {salary}만 받아도 기준보다 많이 남아요</>
+          <>
+            최저임금 수준인 {salary}만 받아도 {name}보다 많이 남아요
+          </>
         ) : (
-          <>최소 {salary} 이상이면 같은 금액이 남아요</>
+          <>
+            연봉 {salary} 이상이면 {name}만큼 남아요
+          </>
         )}
       </p>
       <dl className="be-facts">
         <div>
           <dt>기준</dt>
           <dd>
-            {baseline}
-            {baselineDuringAid != null && (
-              <span className="block text-muted-foreground">
-                주거지원비가 끝난 뒤 기준이에요 (받는 동안은 매달 {won(baselineDuringAid)})
+            {baselineText(be, columns)}
+            {duringAid != null && (
+              <span className="block">
+                주거지원비가 끝난 뒤 기준이에요 (받는 동안은 매달 {won(duringAid)})
               </span>
             )}
           </dd>
@@ -810,12 +842,7 @@ export function ResultView({ result, rows }: { result: Result; rows: Row[] }) {
         ))}
       </div>
 
-      {/* 연봉 비공개 공고의 최소 연봉이 무엇에 맞춘 값인지 표 위에서 먼저 (이사 탭에서 옆 열 금액과 헷갈리지 않게) */}
-      {[...new Set(result.break_even.map((be) => baselineText(be, columns)))].map((text) => (
-        <p key={text} className="compare-basis">
-          연봉 비공개 공고의 기준: {text}
-        </p>
-      ))}
+      <SalaryAnswer result={result} columns={columns} />
       <div className="compare-view result-compare">
         <div className="result-scroll">
           <table className="offer-table compare-table result-table" style={tableWidth}>
@@ -913,30 +940,7 @@ export function ResultView({ result, rows }: { result: Result; rows: Row[] }) {
           </div>
         ))}
 
-      {/* 표 아래 상자: 넓은 화면에서는 나란히 (답=연봉 비공개는 파랑, 참고=보증금은 회색) */}
-      <div className="result-boxes">
-        {result.break_even.length > 0 && (
-          // 답의 일부라 옅은 파랑 (보증금·계산 내역 같은 참고는 회색)
-          <div className="rounded-2xl bg-accent p-5">
-            <h3 className="mb-2 font-semibold text-foreground">연봉이 공개되지 않은 공고</h3>
-            <ul className="space-y-3 text-sm text-body">
-              {result.break_even.map((be) => (
-                <BreakEvenSummary
-                  key={be.posting_id}
-                  be={be}
-                  column={columns.find((c) => c.posting.posting_id === be.posting_id)}
-                  baseline={baselineText(be, columns)}
-                  baselineDuringAid={baselineDuringAid(be, columns)}
-                />
-              ))}
-            </ul>
-          </div>
-        )}
-
-        {mode !== 'commute' && (
-          <DepositSummary columns={columns} estimates={result.rent_estimates} />
-        )}
-      </div>
+      {mode !== 'commute' && <DepositSummary columns={columns} estimates={result.rent_estimates} />}
 
       {(result.break_even_note || result.errors.length > 0) && (
         <div role="status" className="salary-notice">
