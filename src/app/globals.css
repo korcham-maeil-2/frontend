@@ -1031,40 +1031,6 @@ section.desk-sheet > .sheet-heading {
   color: var(--foreground);
   cursor: pointer;
 }
-.breakdown > div {
-  display: grid;
-  grid-template-columns: minmax(0, 8rem) minmax(0, 1fr);
-  gap: 0.75rem;
-  padding-block: 0.6rem;
-  border-block-end: 1px solid var(--border);
-  font-size: 0.9375rem;
-}
-/* 내역의 마지막 줄 '매달 남는 돈': 위 2px 선 + 굵게, 금액은 남는 돈 초록 (DESIGN.md) */
-.breakdown > div.breakdown-total {
-  border-block-start: 2px solid var(--foreground);
-  border-block-end: 0;
-  font-weight: 700;
-}
-.breakdown-total dt,
-.breakdown-total dd {
-  color: var(--foreground);
-}
-.breakdown-total .tabular-nums {
-  font-size: 1.375rem;
-  color: var(--positive);
-}
-.breakdown-total dt {
-  font-size: 1.0625rem;
-}
-.breakdown dt {
-  color: var(--muted-foreground);
-  font-weight: 600;
-}
-.breakdown dd {
-  text-align: end;
-  color: var(--foreground);
-}
-.breakdown .cell-note,
 .result-notes {
   display: block;
   margin-block-start: 0.2rem;
@@ -1919,51 +1885,6 @@ section.desk-sheet > .sheet-heading {
   margin-top: 0.25rem;
 }
 
-/* 계산 내역 묶음 (result-view.tsx Breakdown): 월급 / 매달 나가는 돈 (끝에 매달 남는 돈) */
-.breakdown-group {
-  margin-top: 0.75rem;
-  font-size: 0.8125rem;
-  font-weight: 700;
-  color: var(--foreground); /* 아래 줄 이름(회색)과 구분되는 묶음 제목 */
-}
-/* 세금·4대보험 6줄은 접어 두고 합계만 한 줄로 */
-.breakdown-fold {
-  border-block-end: 1px solid var(--border);
-  font-size: 0.9375rem;
-}
-.breakdown-fold > summary {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  min-height: 2.75rem; /* 누르는 줄: 44px */
-  padding-block: 0.6rem;
-  list-style: none; /* 삼각형 표시 대신 '6개 항목 보기 / 접기' 글자로 알린다 */
-  cursor: pointer;
-  font-weight: 600;
-  color: var(--muted-foreground);
-}
-.breakdown-fold > summary::-webkit-details-marker {
-  display: none;
-}
-.breakdown-fold > summary .tabular-nums {
-  margin-inline-start: auto;
-  font-weight: 400;
-  color: var(--foreground);
-}
-.breakdown-fold-hint {
-  margin-inline-start: 0.25rem;
-  font-size: 0.9375rem;
-  font-weight: 400;
-  text-decoration: underline;
-  text-underline-offset: 0.2em;
-}
-.breakdown-fold .breakdown {
-  padding-inline-start: 0.75rem;
-}
-.breakdown-fold .breakdown > div:last-child {
-  border-block-end: 0;
-}
-
 /* ④ 연봉 비공개 공고의 답 카드 '면접에서 확인할 연봉' (result-view.tsx SalaryAnswer).
    초록 최소 연봉은 화면에 이 카드 하나뿐 (표 칸은 기본색). 금액 말고 글자는 진한 색 (옅은 초록 바탕 대비) */
 .salary-answer {
@@ -2041,20 +1962,90 @@ section.desk-sheet > .sheet-heading {
   font-weight: 400;
   color: var(--body);
 }
-/* 계산 내역 접기: 좁으면 위아래, 넓으면 나란히 (하나뿐이면 한 줄 전체) */
-.result-folds {
-  display: grid;
-  gap: 1rem;
-  align-items: start;
+/* ④ 계산 과정 비교 표 (result-view.tsx CalcSteps): 금액은 오른쪽 정렬, 공제 6개 항목은 한 칸 들여 쓴다 */
+/* landing.css .offer-table의 왼쪽 정렬보다 앞서게 두 클래스로 */
+.offer-table.calc-table td,
+.offer-table.calc-table thead th:not(:first-child) {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
 }
-.result-folds {
-  gap: 0.5rem 1rem;
+.calc-table thead th {
+  font-size: 1.0625rem;
 }
-@media (min-width: 64rem) {
-  .result-folds {
-    grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr));
+.calc-table .cell-note {
+  display: block;
+  margin-block-start: 0.15rem;
+  font-size: 0.9375rem;
+  color: var(--muted-foreground);
+}
+.calc-toggle {
+  display: block;
+  min-height: 2.75rem; /* 누르는 칸: 44px */
+  font-size: 0.9375rem;
+  font-weight: 400;
+  color: var(--primary);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  cursor: pointer;
+}
+.calc-item :is(th, td) {
+  padding-block: 0.5rem;
+  font-weight: 400;
+  color: var(--body);
+}
+.calc-item th {
+  padding-inline-start: 0.75rem;
+}
+.calc-net td .cell-value {
+  font-weight: 700;
+}
+/* 참고는 문장이라 왼쪽 정렬 */
+/* 줄 사이 선은 칸에 긋는다: 좁은 화면에서 붙여 둔(sticky) 이름 칸이 겹친 선(collapse)을 가리지 않게 */
+.offer-table.calc-table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+.offer-table.calc-table tbody tr {
+  border-block-end: 0;
+}
+.calc-table tbody :is(th, td) {
+  border-block-end: 1px solid var(--border);
+}
+.calc-table tbody tr:last-child :is(th, td) {
+  border-block-end: 0; /* 접기 상자 테두리가 바로 아래에 있다 */
+}
+.calc-scroll-hint {
+  display: none;
+}
+/* 좁은 화면: 가로로 넘겨 보는 표. 항목 이름 열은 붙여 두고, 넘길 수 있다고 한 줄로 알린다 */
+@media (max-width: 39.99rem) {
+  .offer-table.calc-table {
+    min-width: calc(6.5rem + var(--result-columns, 2) * 10rem);
+  }
+  .offer-table.calc-table thead th:first-child {
+    width: 6.5rem;
+  }
+  .calc-table :is(th, td):first-child {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: var(--card);
+  }
+  .calc-scroll-hint {
+    display: block;
+    margin-block-end: 0.5rem;
+    font-size: 0.9375rem;
+    color: var(--muted-foreground);
   }
 }
+.offer-table.calc-table .calc-notes td {
+  text-align: start;
+  font-variant-numeric: normal;
+}
+.calc-notes .result-notes {
+  margin-block-start: 0;
+}
+
 /* 결과 표의 답 줄 '매달 남는 돈': 이름도 크게 (옆의 큰 초록 금액이 무엇인지 바로 읽히게) */
 .result-table .compare-result th {
   font-size: 1.25rem;

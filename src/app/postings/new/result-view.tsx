@@ -22,7 +22,7 @@ import { BadgeLegend, SourceBadge, type Detail } from './source-badge';
 // 결과 화면: 공고별 '매달 남는 돈'을 한 표로 비교한다 (DESIGN.md "비교표").
 //   열 = 공고, 행 = 연봉 → 세후 월급 → 집 → 교통비 → 고정비 → 매달 남는 돈
 //   '더 남는 쪽 / 지금 집에서 통근 / 회사 근처로 이사'를 바꿔 볼 수 있고,
-//   공고마다 '계산 내역'을 펼치면 공제 항목과 각 값의 출처를 볼 수 있다.
+//   값마다 배지를 누르면 출처가, 아래 '계산 과정 비교'를 펼치면 세전 → 공제 → 세후가 보인다.
 // 숫자는 모두 백엔드가 계산한 값을 그대로 보여 준다 (화면에서 다시 계산하지 않는다).
 
 type Result = components['schemas']['CalculationResult'];
@@ -142,7 +142,7 @@ function won(value: number): string {
   return abs === rounded ? `${minus}${formatWon(abs)}` : `약 ${minus}${formatWon(rounded)}`;
 }
 
-/** 정확한 금액: −137,880 → '−13만 7,880원'. 사용자가 넣은 값, 계산 내역처럼 한 원까지 볼 곳에 쓴다. */
+/** 정확한 금액: −137,880 → '−13만 7,880원'. 사용자가 넣은 값, 계산 과정 표처럼 한 원까지 볼 곳에 쓴다. */
 function exact(value: number): string {
   return value < 0 ? `−${formatWon(-value)}` : formatWon(value);
 }
@@ -397,7 +397,7 @@ function buildColumn(
         solved && be?.support_excluded
           ? cost(housing, '주거지원비가 끝난 뒤')
           : cost(housing, chosen === 'move' ? aidNote(row) : undefined),
-      // 비워 둬서 0원으로 계산한 교통비: 긴 출처 대신 짧게 (출처 전문은 계산 내역에)
+      // 비워 둬서 0원으로 계산한 교통비: 긴 출처 대신 짧게 (출처 전문은 배지 안에)
       transport: assumedTransport ? cost(transport, '비워 둬서 0원') : cost(transport),
       fixed: cost(fixed),
       remaining,
@@ -456,117 +456,6 @@ function companyOf(column: Column, index: number) {
   return column.posting.company || `공고 ${index + 1}`;
 }
 
-/** 공고 하나의 계산 내역: 세전 → 공제 → 세후 → 집·교통·고정비, 값마다 출처·신뢰도 */
-function Breakdown({ column, index }: { column: Column; index: number }) {
-  const { posting, row, housing, transport, breakEven } = column;
-  const slip = posting.payslip;
-  // 월급 묶음: 세전 월급 → 세금·4대보험(접어 둠) → 세후 월급
-  const onTop = posting.pay_on_top?.value ? posting.pay_on_top : null;
-  const gross: Line | null = slip
-    ? {
-        label: '세전 월급',
-        value: exact(slip.gross),
-        // 세전 월급에 연봉 외 수당이 들어 있으면 무엇인지 그 줄에서 바로 보인다
-        note: onTop ? `${onTop.label} ${onTop.source} 포함` : undefined,
-      }
-    : null;
-  const missingNote = netMissingNote(posting, row);
-  const net: Line | null = slip
-    ? {
-        label: '세후 월급',
-        value: exact(posting.net_income.value ?? 0),
-        note: posting.net_income.source,
-        status: 'estimated', // 표와 같이: 세후 월급은 간이세액표로 낸 예상값
-      }
-    : column.solved && breakEven?.net_income_krw != null
-      ? {
-          // 연봉 비공개 공고: 공제 내역 대신, 최소 연봉일 때의 세후 월급 한 줄
-          label: '세후 월급',
-          value: exact(breakEven.net_income_krw),
-          // 백엔드가 그 연봉일 때 계산한 문장 (별도 식대·수당 포함). 예전 백엔드엔 없다.
-          note:
-            breakEven.net_income_source ??
-            `연봉 ${exact(breakEven.annual_salary_krw!)}일 때 (4대보험·소득세를 뺀 값)`,
-          status: 'estimated',
-        }
-      : missingNote
-        ? // 연봉을 넣었는데 계산하지 않은 이유 (단위 실수 등)
-          { label: '세후 월급', value: '모름', note: missingNote }
-        : null;
-  // 매달 나가는 돈 묶음 (값마다 출처·신뢰도가 달라 한 줄로 합치지 않는다) + 끝의 매달 남는 돈
-  const remaining = column.solved
-    ? breakEven?.monthly_remaining
-    : column.scenario?.monthly_remaining;
-  const costs: Line[] =
-    housing && transport
-      ? [
-          ...[housing, transport, posting.fixed_expenses].map((item) => ({
-            label: item.label,
-            value: item.value == null ? '모름' : exact(-item.value),
-            note: item.source,
-            status: item.status,
-          })),
-          {
-            // 세후 월급에서 위 비용을 뺀 값 (표의 마지막 줄과 같은 값, 한 원까지)
-            label: '매달 남는 돈',
-            value: remaining == null ? '계산 못 함' : exact(remaining),
-            note: column.solved ? '최소 연봉일 때' : undefined,
-            total: true,
-          },
-        ]
-      : [];
-  const notes = [...posting.notes, ...(breakEven?.notes ?? [])];
-  return (
-    <details className="result-details">
-      <summary>{companyOf(column, index)} 계산 내역</summary>
-      {(gross || net) && (
-        <>
-          <h4 className="breakdown-group">월급</h4>
-          {gross && <BreakdownLines lines={[gross]} />}
-          {slip && (
-            // 공제 6줄은 접어 두고 합계만 (합계는 백엔드가 계산한 payslip.deductions)
-            <details className="breakdown-fold">
-              <summary>
-                <span>
-                  세금·4대보험{' '}
-                  <span className="breakdown-fold-hint">
-                    <span className="when-closed">{DEDUCTIONS.length}개 항목 보기</span>
-                    <span className="when-open">접기</span>
-                  </span>
-                </span>
-                {/* 예전 응답에 합계가 없으면 금액은 비워 둔다 (화면에서 더하지 않는다) */}
-                {slip.deductions != null && (
-                  <span className="tabular-nums">{exact(-slip.deductions)}</span>
-                )}
-              </summary>
-              <BreakdownLines
-                lines={DEDUCTIONS.map(([key, label]) => ({
-                  label,
-                  value: exact(-(slip[key] ?? 0)),
-                }))}
-              />
-            </details>
-          )}
-          {net && <BreakdownLines lines={[net]} />}
-        </>
-      )}
-      {costs.length > 0 && (
-        <>
-          <h4 className="breakdown-group">매달 나가는 돈</h4>
-          <BreakdownLines lines={costs} />
-        </>
-      )}
-      {notes.length > 0 && (
-        <ul className="result-notes">
-          {notes.map((note) => (
-            <li key={note}>{note}</li>
-          ))}
-        </ul>
-      )}
-    </details>
-  );
-}
-
 /** 세금·4대보험 공제 항목 (payslip 키, 이름) */
 const DEDUCTIONS = [
   ['national_pension', '국민연금'],
@@ -577,32 +466,134 @@ const DEDUCTIONS = [
   ['local_income_tax', '지방소득세'],
 ] as const;
 
-/** 계산 내역 한 줄 */
-type Line = {
-  label: string;
-  value: string;
-  note?: string | null;
-  status?: Status;
-  total?: boolean; // 마지막 '매달 남는 돈' 줄
-};
+const NONE = '—'; // 이 공고엔 없는 값 (연봉 비공개 공고의 세전 월급·공제 등)
 
-function BreakdownLines({ lines }: { lines: Line[] }) {
+/** 계산 과정 표 한 칸: 금액 + 짧은 한 줄 (긴 출처는 위 표의 배지 안에 있다) */
+type Step = { value: string; note?: string | null };
+
+/** 공고 한 열의 세전 → 세금·4대보험 → 세후 (모두 백엔드가 계산한 값, 화면에서 다시 계산하지 않는다) */
+function salarySteps(column: Column) {
+  const { posting, row, breakEven, solved } = column;
+  const slip = posting.payslip;
+  const onTop = posting.pay_on_top?.value ? posting.pay_on_top : null;
+  const missingNote = netMissingNote(posting, row);
+  const net: Step = slip
+    ? { value: exact(posting.net_income.value ?? 0) }
+    : solved && breakEven?.net_income_krw != null
+      ? // 연봉 비공개 공고: 공제 내역 대신 최소 연봉일 때의 세후 월급
+        { value: exact(breakEven.net_income_krw), note: '최소 연봉일 때' }
+      : { value: missingNote ? '모름' : NONE, note: missingNote };
+  return {
+    // 세전 월급에 연봉 외 수당이 들어 있으면 무엇인지 그 칸에서 바로 보인다
+    gross: slip
+      ? { value: exact(slip.gross), note: onTop ? `${onTop.label} ${onTop.source} 포함` : null }
+      : { value: NONE },
+    // 예전 응답에 합계가 없으면 비워 둔다 (화면에서 더하지 않는다)
+    deductions: { value: slip?.deductions != null ? exact(-slip.deductions) : NONE },
+    items: DEDUCTIONS.map(([key]) => ({ value: slip ? exact(-(slip[key] ?? 0)) : NONE })),
+    net,
+    notes: [...posting.notes, ...(breakEven?.notes ?? [])],
+  };
+}
+
+function StepCell({ step }: { step: Step }) {
   return (
-    <dl className="breakdown">
-      {lines.map((line) => (
-        <div key={line.label} className={line.total ? 'breakdown-total' : undefined}>
-          <dt>{line.label}</dt>
-          <dd>
-            <span className="tabular-nums">{line.value}</span>
-            {/* 내역은 출처를 줄마다 글로 보여 주므로, 배지는 뜻만 알려 준다 */}
-            {line.status && line.status !== 'confirmed' && line.status !== 'missing' && (
-              <SourceBadge badge={statusBadge[line.status]} className="result-badge" />
+    <td>
+      <span className={step.value === NONE ? 'cell-value is-muted' : 'cell-value'}>
+        {step.value}
+      </span>
+      {step.note && <small className="cell-note">{step.note}</small>}
+    </td>
+  );
+}
+
+/**
+ * 계산 과정 비교: 위 표에 없는 세전 월급 → 세금·4대보험 → 세후 월급을 공고끼리 나란히 (접어 둔다).
+ * 주거비·교통비·고정비·남는 돈은 위 표와 같아서 넣지 않는다. 공제 6개 항목은 한 번 더 펼친다.
+ */
+function CalcSteps({ columns, style }: { columns: Column[]; style: CSSProperties }) {
+  const [itemsOpen, setItemsOpen] = useState(false);
+  const steps = columns.map(salarySteps);
+  const hasNotes = steps.some((s) => s.notes.length > 0);
+  return (
+    <details className="result-details">
+      <summary>세금·4대보험 계산 과정 비교</summary>
+      {columns.length > 1 && <p className="calc-scroll-hint">옆으로 밀면 다른 공고도 보여요</p>}
+      <div className="result-scroll">
+        <table className="offer-table result-table calc-table" style={style}>
+          <caption className="sr-only">공고별 세전 월급에서 세후 월급까지</caption>
+          <thead>
+            <tr>
+              <th scope="col">
+                <span className="sr-only">항목</span>
+              </th>
+              {columns.map((column, i) => (
+                <th key={column.posting.posting_id} scope="col">
+                  {companyOf(column, i)}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row">세전 월급</th>
+              {steps.map((s, i) => (
+                <StepCell key={i} step={s.gross} />
+              ))}
+            </tr>
+            <tr>
+              <th scope="row">
+                세금·4대보험
+                <button
+                  type="button"
+                  className="calc-toggle"
+                  aria-expanded={itemsOpen}
+                  onClick={() => setItemsOpen(!itemsOpen)}
+                >
+                  {itemsOpen ? '접기' : `${DEDUCTIONS.length}개 항목 보기`}
+                </button>
+              </th>
+              {steps.map((s, i) => (
+                <StepCell key={i} step={s.deductions} />
+              ))}
+            </tr>
+            {itemsOpen &&
+              DEDUCTIONS.map(([key, label], k) => (
+                <tr key={key} className="calc-item">
+                  <th scope="row">{label}</th>
+                  {steps.map((s, i) => (
+                    <StepCell key={i} step={s.items[k]} />
+                  ))}
+                </tr>
+              ))}
+            <tr className="calc-net">
+              <th scope="row">세후 월급</th>
+              {steps.map((s, i) => (
+                <StepCell key={i} step={s.net} />
+              ))}
+            </tr>
+            {hasNotes && (
+              <tr className="calc-notes">
+                <th scope="row">참고</th>
+                {steps.map((s, i) => (
+                  <td key={i}>
+                    {s.notes.length ? (
+                      <ul className="result-notes">
+                        {s.notes.map((note) => (
+                          <li key={note}>{note}</li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <span className="cell-value is-muted">{NONE}</span>
+                    )}
+                  </td>
+                ))}
+              </tr>
             )}
-            {line.note && <small className="cell-note">{line.note}</small>}
-          </dd>
-        </div>
-      ))}
-    </dl>
+          </tbody>
+        </table>
+      </div>
+    </details>
   );
 }
 
@@ -951,12 +942,7 @@ export function ResultView({ result, rows }: { result: Result; rows: Row[] }) {
         </div>
       )}
 
-      {/* 공고마다 계산 내역: 넓은 화면에서는 표의 열처럼 나란히 */}
-      <div className="result-folds">
-        {columns.map((column, i) => (
-          <Breakdown key={column.posting.posting_id} column={column} index={i} />
-        ))}
-      </div>
+      <CalcSteps columns={columns} style={tableWidth} />
     </div>
   );
 }
