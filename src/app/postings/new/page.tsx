@@ -59,6 +59,8 @@ import { PlanPreview, PlanView, isSettlePlan } from './plan-view';
 import { askQuestionsOf, type AskQuestion } from './ask-view';
 import { ReportView, isReport, type Report } from './report-view';
 import { RowEditor, fieldsToCheck, focusField, salaryLeftBlank } from './row-editor';
+import { STEPS, type Step } from './steps';
+import { Tour, stopAfterStep, tutorialProfile } from './tour';
 
 // 공고 넣기 → (백엔드가 Claude로 비교표를 만듦) → 조건 확인·수정 → 내 생활비 → 매달 남는 돈
 //   1) POST /sessions                 공고 글을 보내면 비교표(table)를 돌려받는다
@@ -68,7 +70,6 @@ import { RowEditor, fieldsToCheck, focusField, salaryLeftBlank } from './row-edi
 //   4) POST /sessions/{id}/confirm      고친 비교표 + 생활비를 보내면 계산 결과(result)를 돌려받는다
 //      POST /sessions/{id}/recalculate  결과를 본 뒤 생활비·비교표를 고치면 계산만 다시 한다 (AI 호출 없음)
 
-type Step = 'input' | 'review' | 'living' | 'result' | 'plan';
 type CalculationResult = components['schemas']['CalculationResult'];
 type LocalSupport = components['schemas']['LocalSupport'];
 type SettlePlan = components['schemas']['SettlePlan'];
@@ -106,13 +107,6 @@ function enterMovesToNextField(event: KeyboardEvent<HTMLFormElement>) {
   (next ?? event.currentTarget.querySelector<HTMLElement>('button[type=submit]'))?.focus();
 }
 
-const STEPS: { key: Step; label: string }[] = [
-  { key: 'input', label: '공고 넣기' },
-  { key: 'review', label: '조건 확인' },
-  { key: 'living', label: '내 생활비' },
-  { key: 'result', label: '남는 돈' },
-  { key: 'plan', label: '정착 플랜' },
-];
 type SourceTab = 'text' | 'files';
 
 // 마지막으로 보낸 입력. 같은 입력으로 다시 '조건 확인하기'를 누르면 새로 읽지 않고 고치던 표로 간다.
@@ -225,6 +219,8 @@ export default function NewPosting() {
   const [failedRents, setFailedRents] = useState<string[]>([]);
   const requestedRents = useRef(new Set<string>()); // 한 번 물은 지역 (응답 전에 또 묻지 않게)
   const [restored, setRestored] = useState(false);
+  // 예시로 사용법 보기: 지금 말풍선 번호 (tour.tsx). null이면 보지 않는 중
+  const [tour, setTour] = useState<number | null>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const firstTextarea = useRef<HTMLTextAreaElement>(null);
 
@@ -362,6 +358,7 @@ export default function NewPosting() {
       }
     }
     setStep(next);
+    setTour((at) => (at === null ? null : stopAfterStep(at, next)));
     // 넓은 화면에서는 왼쪽 제목이 따라다녀서(sticky) 포커스만으로는 위로 안 올라간다.
     window.scrollTo({ top: 0 });
     requestAnimationFrame(() => heading.current?.focus({ preventScroll: true }));
@@ -404,7 +401,7 @@ export default function NewPosting() {
       showError(
         filesGone
           ? '새로고침해서 첨부 파일이 목록에서 사라졌어요. 파일을 다시 넣거나 본문을 붙여 넣어 주세요.'
-          : '공고 본문을 붙여 넣거나 파일을 넣어 주세요. 예시 공고로 먼저 해 봐도 돼요.',
+          : '공고 본문을 붙여 넣거나 파일을 넣어 주세요. 예시로 사용법을 먼저 봐도 돼요.',
         filesGone ? 'files' : 'text',
       );
       return;
@@ -476,7 +473,7 @@ export default function NewPosting() {
       if (!table.length) {
         showError(
           demoMode
-            ? '시연 모드에서는 "예시 공고 넣기"의 공고와 시연용 파일만 읽을 수 있어요.'
+            ? '시연 모드에서는 "예시로 사용법 보기"의 공고와 시연용 파일만 읽을 수 있어요.'
             : '공고에서 근무 조건을 찾지 못했어요. 회사명·근무지·급여가 적힌 부분을 넣어 주세요.',
           where,
         );
@@ -494,8 +491,11 @@ export default function NewPosting() {
       setRows(table);
       setOriginalRows(table);
       // 새 표는 공고 ID(posting-1 …)가 다른 회사를 가리킬 수 있어 공고별 비용과 결과는 비운다.
-      // 지금 집 주거비·고정비처럼 공고와 관계없는 값은 그대로 둔다.
-      setProfile((form) => ({ ...form, postings: {} }));
+      // 지금 집 주거비·고정비처럼 공고와 관계없는 값은 그대로 둔다. 사용법을 보는 중이면 예시 생활비로 채운다.
+      setProfile((form) => {
+        const kept = { ...form, postings: {} };
+        return tour !== null ? tutorialProfile(kept, table) : kept;
+      });
       setResult(null);
       setSupport(null);
       setPlan(null);
@@ -712,6 +712,7 @@ export default function NewPosting() {
     setResultKey('');
     setActivePosting('');
     setSeenPostings([]);
+    setTour(null);
     changeStep('input');
   }
 
@@ -799,7 +800,7 @@ export default function NewPosting() {
   };
   const demoNotice = demoMode && (
     <p className="demo-notice">
-      시연 모드라서 &ldquo;예시 공고 넣기&rdquo;의 공고와 시연용 공고 파일만 읽을 수 있어요.
+      시연 모드라서 &ldquo;예시로 사용법 보기&rdquo;의 공고와 시연용 공고 파일만 읽을 수 있어요.
     </p>
   );
 
@@ -844,7 +845,7 @@ export default function NewPosting() {
               );
             })}
           </ol>
-          <h1 ref={heading} tabIndex={-1} className="desk-title outline-none">
+          <h1 ref={heading} tabIndex={-1} className="desk-title outline-none" data-tour="title">
             {shown === 'plan' ? (
               '1년 정착 플랜'
             ) : shown === 'result' ? (
@@ -981,7 +982,11 @@ export default function NewPosting() {
             </div>
             {/* 남는 돈 단계의 다음 행동은 하나: 정착 플랜 (새로 비교하기는 정착 플랜 단계에만) */}
             {shown === 'result' && hasPlan ? (
-              <Button className="main-action" onClick={() => changeStep('plan')}>
+              <Button
+                className="main-action"
+                data-tour="plan-next"
+                onClick={() => changeStep('plan')}
+              >
                 1년 정착 플랜 보기 <ArrowRight aria-hidden />
               </Button>
             ) : confirmingRestart ? (
@@ -1122,7 +1127,12 @@ export default function NewPosting() {
                 </Button>
               </div>
             ) : (
-              <Button type="submit" className="main-action" disabled={busy !== null}>
+              <Button
+                type="submit"
+                className="main-action"
+                disabled={busy !== null}
+                data-tour="calculate"
+              >
                 {busy === 'confirming' ? '계산하는 중…' : '매달 남는 돈 계산하기'}{' '}
                 <Calculator aria-hidden />
               </Button>
@@ -1137,7 +1147,7 @@ export default function NewPosting() {
       ) : reviewing ? (
         <section className="desk-sheet sheet-enter review-sheet" aria-label="공고 조건 확인">
           {/* 처음 온 사람이 가장 먼저 볼 것: 지금 할 일 (공고마다 한 줄, 누르면 그 칸·탭으로) */}
-          <div ref={reviewTodo} tabIndex={-1} className="review-todo">
+          <div ref={reviewTodo} tabIndex={-1} className="review-todo" data-tour="review-todo">
             <p className="review-todo-title">
               {cellsToCheck ? `다시 볼 값 ${cellsToCheck}개` : '고칠 값이 없어요. 넘어가면 돼요'}
             </p>
@@ -1257,7 +1267,12 @@ export default function NewPosting() {
             <Button variant="ghost" className="min-h-11" onClick={() => changeStep('input')}>
               <ArrowLeft aria-hidden /> 공고 넣기로
             </Button>
-            <Button className="main-action" disabled={busy !== null} onClick={goToLiving}>
+            <Button
+              className="main-action"
+              disabled={busy !== null}
+              onClick={goToLiving}
+              data-tour="review-next"
+            >
               {checkWarned && cellsToCheck
                 ? '그대로 다음으로'
                 : edited
@@ -1394,7 +1409,10 @@ export default function NewPosting() {
             {error}
           </p>
           <div className="sheet-actions">
-            {texts.every((text) => !text.trim()) ? (
+            {/* 빈 칸이거나, 예시를 넣은 채 사용법을 닫았을 때 (다시 볼 수 있게) */}
+            {tour === null &&
+            (texts.every((text) => !text.trim()) ||
+              texts.join('\n') === examplePostings.join('\n')) ? (
               <Button
                 type="button"
                 variant="ghost"
@@ -1403,15 +1421,15 @@ export default function NewPosting() {
                   setError('');
                   setTexts(examplePostings);
                   setSourceTab('text');
-                  requestAnimationFrame(() => firstTextarea.current?.focus());
+                  setTour(0); // 말풍선이 공고 칸을 가리킨다 (커서는 말풍선의 '다음'에)
                 }}
               >
-                <FileText aria-hidden /> 예시 공고 넣기
+                <FileText aria-hidden /> 예시로 사용법 보기
               </Button>
             ) : (
               <span />
             )}
-            <Button type="submit" className="main-action" disabled={busy !== null}>
+            <Button type="submit" className="main-action" disabled={busy !== null} data-tour="read">
               {busy === 'reading'
                 ? '읽는 중…'
                 : sameInput && (message || submitted.files.length)
@@ -1421,6 +1439,15 @@ export default function NewPosting() {
             </Button>
           </div>
         </form>
+      )}
+      {tour !== null && (
+        <Tour
+          at={tour}
+          shown={shown}
+          paused={busy !== null} // 읽는 중·계산하는 중에는 진행 안내를 가리지 않게 숨긴다
+          onNext={() => setTour(tour + 1)}
+          onEnd={() => setTour(null)}
+        />
       )}
     </div>
   );
