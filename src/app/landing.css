@@ -99,7 +99,7 @@ main.site-shell:has(> .landing) {
 .hero-stat span {
   display: block;
   margin-top: 0.3rem;
-  font-size: 1rem;
+  font-size: 1.0625rem;
   line-height: 1.55;
   font-weight: 400;
   color: var(--body);
@@ -112,7 +112,7 @@ main.site-shell:has(> .landing) {
 .hero-stat small {
   display: block;
   margin-top: 0.35rem;
-  font-size: 0.75rem;
+  font-size: 0.9375rem;
   font-weight: 400;
   color: var(--muted-foreground);
 }
@@ -177,7 +177,7 @@ main.site-shell:has(> .landing) {
 .offer-table thead small {
   display: block;
   margin-block-start: 0.2rem;
-  font-size: 0.75rem;
+  font-size: 0.9375rem;
   font-weight: 400;
   color: var(--muted-foreground);
 }
@@ -185,12 +185,12 @@ main.site-shell:has(> .landing) {
   border-block-end: 1px solid var(--border);
 }
 .offer-table tbody th {
-  font-size: 0.875rem;
+  font-size: 0.9375rem;
   color: var(--muted-foreground);
   font-weight: 600;
 }
 .offer-table .offer-salary td {
-  font-size: 1.25rem;
+  font-size: 1.375rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
@@ -205,7 +205,7 @@ main.site-shell:has(> .landing) {
   border-radius: 0.25rem;
   background: var(--secondary);
   color: var(--body);
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   font-weight: 600;
   white-space: nowrap;
   vertical-align: 0.1em;
@@ -219,7 +219,7 @@ main.site-shell:has(> .landing) {
 @media (max-width: 47.99rem) {
   .map-intro p {
     margin-top: 1rem;
-    font-size: 1rem;
+    font-size: 1.0625rem;
   }
   .map-intro .start-posting {
     margin-top: 1.25rem;
@@ -349,7 +349,7 @@ main.site-shell:has(> .landing) {
   border: 2px solid var(--input);
   background: var(--background);
   color: var(--muted-foreground);
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   font-weight: 700;
 }
 .story-tab:has(~ .story-tab[data-active]) .story-tab-num {
@@ -363,10 +363,10 @@ main.site-shell:has(> .landing) {
 }
 .story-tab-label {
   font-weight: 700;
-  font-size: 1rem;
+  font-size: 1.0625rem;
 }
 .story-tab-time {
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   font-weight: 400;
   color: var(--muted-foreground);
 }
@@ -407,7 +407,7 @@ main.site-shell:has(> .landing) {
 }
 /* 말풍선: 줄은 꽉 채우되 단어 중간에서 끊지 않고(keep-all), 마지막 줄에 한 단어만 남지 않게 */
 .bubble p {
-  font-size: 1rem;
+  font-size: 1.0625rem;
   text-wrap: pretty;
 }
 @media (min-width: 48rem) {
@@ -432,7 +432,7 @@ main.site-shell:has(> .landing) {
   align-items: center;
   gap: 0.3rem;
   margin-block-end: 0.25rem;
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   font-weight: 700;
   opacity: 0.85;
 }
@@ -453,7 +453,7 @@ main.site-shell:has(> .landing) {
   padding: 0.2rem 0.5rem;
   border-radius: 0.25rem;
   background: rgb(255 255 255 / 0.16);
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
 }
 .bubble-files svg {
   width: 0.8rem;
@@ -482,7 +482,7 @@ main.site-shell:has(> .landing) {
 .compare-table .cell-note {
   display: block;
   margin-block-start: 0.15rem;
-  font-size: 0.75rem;
+  font-size: 0.9375rem;
   color: var(--muted-foreground);
 }
 .compare-table tbody tr.compare-result {
@@ -496,7 +496,7 @@ main.site-shell:has(> .landing) {
 }
 .compare-table .compare-result .cell-value {
   font-family: var(--font-score-dream);
-  font-size: 1.5rem;
+  font-size: 1.625rem;
   color: var(--positive);
 }
 /* 표 아래 캡션: 예시라는 안내 한 문장 */
@@ -505,7 +505,7 @@ main.site-shell:has(> .landing) {
   padding-block: 0.85rem 0;
   margin-block-end: 1.75rem;
   text-align: start;
-  font-size: 0.75rem;
+  font-size: 0.9375rem;
   line-height: 1.6;
   color: var(--muted-foreground);
 }
@@ -524,7 +524,7 @@ main.site-shell:has(> .landing) {
     margin-block-end: 0.75rem;
   }
   .compare-company {
-    font-size: 0.75rem;
+    font-size: 0.8125rem;
     color: var(--muted-foreground);
   }
   .compare-list {
@@ -539,7 +539,7 @@ main.site-shell:has(> .landing) {
     border-block-end: 1px solid var(--border);
   }
   .compare-list dt {
-    font-size: 0.875rem;
+    font-size: 0.9375rem;
     font-weight: 600;
     color: var(--muted-foreground);
   }
@@ -555,7 +555,7 @@ main.site-shell:has(> .landing) {
   .compare-list .offer-badge {
     display: block;
     margin-block-start: 0.2rem;
-    font-size: 0.75rem;
+    font-size: 0.8125rem;
     color: var(--muted-foreground);
   }
   .compare-list .offer-badge {
@@ -572,7 +572,7 @@ main.site-shell:has(> .landing) {
   }
   .compare-list .compare-result .cell-value {
     font-family: var(--font-score-dream);
-    font-size: 1.5rem;
+    font-size: 1.625rem;
     color: var(--positive);
   }
 }

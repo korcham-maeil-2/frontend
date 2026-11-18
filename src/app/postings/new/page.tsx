@@ -1148,7 +1148,7 @@ export default function NewPosting() {
             ]}
           />
           {hasMaskedQuote(rows) && (
-            <p className="-mt-3 mb-5 text-xs text-muted-foreground">
+            <p className="-mt-3 mb-5 text-sm text-muted-foreground">
               공고 글의 [이메일]·[번지] 같은 표시는 AI에 보내기 전에 개인정보를 가린 자리예요.
               비교에는 쓰지 않는 값이에요.
             </p>
@@ -1353,7 +1353,7 @@ export default function NewPosting() {
                 }}
                 showTotal
               />
-              <p className="text-xs leading-relaxed text-muted-foreground">
+              <p className="text-sm leading-relaxed text-muted-foreground">
                 파일 원본은 서버에 저장하지 않고, 읽은 글만 비교표를 만드는 데 써요. 글자를 복사할
                 수 없는 이미지는 글자를 읽기 위해 AI(Claude)에 보내요.
               </p>

@@ -222,7 +222,7 @@ export function SupportView({
         </details>
       )}
 
-      <p className="text-xs text-muted-foreground">
+      <p className="text-sm text-muted-foreground">
         출처: {support.source} · {day(support.checked_on, thisYear)} 기준
       </p>
     </section>

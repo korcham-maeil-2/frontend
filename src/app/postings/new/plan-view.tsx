@@ -701,7 +701,7 @@ export function PlanView({
         </Tabs>
       )}
       {plan.notes.map((note) => (
-        <p key={note} className="text-xs text-muted-foreground">
+        <p key={note} className="text-sm text-muted-foreground">
           {note}
         </p>
       ))}

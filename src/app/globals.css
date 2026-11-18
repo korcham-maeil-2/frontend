@@ -10,6 +10,10 @@
   --font-sans: var(--font-suit);
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --font-heading: var(--font-score-dream);
+  /* 글씨 단계 13/15/17 (나이 많은 사용자·심사위원도 읽기 쉽게). 버튼·입력·text-* 유틸이 같이 따른다 */
+  --text-xs: 0.8125rem;
+  --text-sm: 0.9375rem;
+  --text-base: 1.0625rem;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -143,7 +147,7 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-base text-foreground;
   }
   html {
     @apply font-sans;
@@ -203,7 +207,7 @@
   place-items: center;
   border-bottom: 3px solid transparent;
   padding-top: 3px;
-  font-size: 0.875rem;
+  font-size: 0.9375rem;
   color: var(--muted-foreground);
 }
 @media (hover: hover) {
@@ -235,7 +239,7 @@
 .site-foot {
   border-top: 1px solid var(--border);
   color: var(--muted-foreground);
-  font-size: 0.75rem;
+  font-size: 0.9375rem;
 }
 .foot-row {
   min-height: 4.25rem;
@@ -298,7 +302,7 @@ main.site-shell:has(> .desk-spread) {
   margin-top: 1.5rem;
   max-width: 26rem;
   color: var(--body);
-  font-size: 1.04rem;
+  font-size: 1.0625rem;
   line-height: 1.8;
   word-break: keep-all;
 }
@@ -309,7 +313,7 @@ main.site-shell:has(> .desk-spread) {
   padding: 0.75rem 1.25rem;
   gap: 1.25rem;
   font-weight: 600;
-  font-size: 1rem;
+  font-size: 1.0625rem;
 }
 .desk-title {
   font-size: clamp(2.4rem, 4vw, 3.6rem);
@@ -325,7 +329,7 @@ main.site-shell:has(> .desk-spread) {
   gap: var(--step-gap);
   margin-bottom: 1.6rem;
   color: var(--muted-foreground);
-  font-size: 0.875rem;
+  font-size: 0.9375rem;
   font-weight: 600;
 }
 .step-track li,
@@ -371,7 +375,7 @@ main.site-shell:has(> .desk-spread) {
   display: none;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   font-weight: 400;
   color: var(--muted-foreground);
 }
@@ -425,18 +429,18 @@ details[open] > summary .when-closed {
   border-radius: 50%;
   background: var(--foreground);
   color: var(--primary-foreground);
-  font-size: 1rem;
+  font-size: 1.0625rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 .row-card-index {
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   font-weight: 600;
   color: var(--muted-foreground);
 }
 .row-card-meta {
   margin-top: 0.25rem;
-  font-size: 0.875rem;
+  font-size: 0.9375rem;
   color: var(--body);
   overflow-wrap: anywhere;
 }
@@ -444,7 +448,7 @@ details[open] > summary .when-closed {
   padding: 0 1.25rem 1.25rem;
 }
 .row-title {
-  font-size: 1.25rem;
+  font-size: 1.375rem;
   font-weight: 700;
   line-height: 1.3;
   color: var(--foreground);
@@ -455,7 +459,7 @@ details[open] > summary .when-closed {
   border-radius: 0.5rem;
   background: var(--muted);
   padding: 0.75rem 1rem;
-  font-size: 0.875rem;
+  font-size: 0.9375rem;
   color: var(--body);
 }
 .row-questions-title {
@@ -516,7 +520,7 @@ details[open] > summary .when-closed {
   border-radius: 0.5rem;
   background: var(--muted);
   padding: 0.75rem 1rem;
-  font-size: 0.875rem;
+  font-size: 0.9375rem;
   color: var(--body);
 }
 .demo-notice {
@@ -524,7 +528,7 @@ details[open] > summary .when-closed {
   border-radius: 0.5rem;
   background: var(--secondary);
   padding: 0.6rem 0.9rem;
-  font-size: 0.875rem;
+  font-size: 0.9375rem;
   color: var(--body);
 }
 .row-field {
@@ -553,7 +557,7 @@ details[open] > summary .when-closed {
 .row-field > label,
 .row-field-head > label {
   font-weight: 600;
-  font-size: 0.875rem;
+  font-size: 1.0625rem;
   color: var(--foreground);
 }
 .row-field > :is(input, select, .unit-input) {
@@ -579,7 +583,7 @@ details[open] > summary .when-closed {
 }
 .row-field-hint {
   grid-column: 1 / -1;
-  font-size: 0.75rem;
+  font-size: 0.9375rem;
   line-height: 1.4;
   color: var(--muted-foreground);
   overflow-wrap: anywhere;
@@ -600,7 +604,7 @@ details[open] > summary .when-closed {
   white-space: nowrap;
   border-radius: 0.25rem;
   padding: 0.15rem 0.5rem;
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   font-weight: 600;
 }
 .unit-input {
@@ -615,17 +619,17 @@ details[open] > summary .when-closed {
 .unit-input span {
   flex: none;
   width: var(--unit-width);
-  font-size: 0.875rem;
+  font-size: 0.9375rem;
   color: var(--body);
 }
 @media (min-width: 64rem) {
   .row-field {
-    grid-template-columns: 8.5rem minmax(0, 1fr) 5.5rem;
+    grid-template-columns: 11.5rem minmax(0, 1fr) 5.5rem;
   }
   /* 조건 확인 화면(이름 + 배지 묶음이 있는 칸)만 이름 칸을 넓혀 배지를 그 끝에 둔다.
      내 생활비 화면(profile-form.tsx)은 배지가 없어 원래 칸 나눔 그대로 */
   .row-field:has(> .row-field-head) {
-    grid-template-columns: 12rem minmax(0, 1fr);
+    grid-template-columns: 15rem minmax(0, 1fr);
   }
   /* 넓은 화면: 배지를 이름 칸 오른쪽 끝(입력칸 바로 앞)에 세로로 줄 맞춘다 — '확인할 칸'을 위아래로 훑기 쉽게.
      이름과 배지가 한 줄에 안 들어가면('이미지에서 읽음' 등) 배지가 아랫줄 오른쪽으로 내려간다 */
@@ -661,7 +665,7 @@ details[open] > summary .when-closed {
   border: 1px solid transparent;
   border-radius: 0.4rem;
   font-weight: 600;
-  font-size: 0.875rem;
+  font-size: 0.9375rem;
   color: var(--muted-foreground);
 }
 .source-tabs [aria-selected='true'] {
@@ -673,7 +677,7 @@ details[open] > summary .when-closed {
   padding-top: 1rem;
 }
 .sheet-heading {
-  font-size: 1.5rem;
+  font-size: 1.625rem;
   font-weight: 600;
   letter-spacing: -0.02em;
   color: var(--foreground);
@@ -688,7 +692,7 @@ section.desk-sheet > .sheet-heading {
 }
 .form-hint {
   margin-top: 0.75rem;
-  font-size: 0.875rem;
+  font-size: 0.9375rem;
   line-height: 1.5;
   color: var(--destructive);
 }
@@ -855,7 +859,7 @@ section.desk-sheet > .sheet-heading {
   }
   .intro-copy {
     margin-top: 0.8rem;
-    font-size: 1rem;
+    font-size: 1.0625rem;
   }
   .desk-intro .intro-copy {
     max-width: 28rem;
@@ -887,7 +891,7 @@ section.desk-sheet > .sheet-heading {
   align-items: center;
   gap: 0.6rem;
   min-height: 2.75rem;
-  font-size: 0.875rem;
+  font-size: 1.0625rem;
   font-weight: 600;
   color: var(--foreground);
   cursor: pointer;
@@ -949,7 +953,7 @@ section.desk-sheet > .sheet-heading {
   gap: 0.75rem;
   padding-block: 0.6rem;
   border-block-end: 1px solid var(--border);
-  font-size: 0.875rem;
+  font-size: 0.9375rem;
 }
 /* 내역의 마지막 줄 '매달 남는 돈': 위 2px 선 + 굵게, 금액은 남는 돈 초록 (DESIGN.md) */
 .breakdown > div.breakdown-total {
@@ -962,11 +966,11 @@ section.desk-sheet > .sheet-heading {
   color: var(--foreground);
 }
 .breakdown-total .tabular-nums {
-  font-size: 1.25rem;
+  font-size: 1.375rem;
   color: var(--positive);
 }
 .breakdown-total dt {
-  font-size: 1rem;
+  font-size: 1.0625rem;
 }
 .breakdown dt {
   color: var(--muted-foreground);
@@ -980,7 +984,7 @@ section.desk-sheet > .sheet-heading {
 .result-notes {
   display: block;
   margin-block-start: 0.2rem;
-  font-size: 0.75rem;
+  font-size: 0.9375rem;
   color: var(--muted-foreground);
 }
 .result-notes {
@@ -998,7 +1002,7 @@ section.desk-sheet > .sheet-heading {
   padding-inline: 0.5rem;
   border: 1px solid transparent;
   border-radius: 0.4rem;
-  font-size: 0.875rem;
+  font-size: 0.9375rem;
   font-weight: 600;
   color: var(--muted-foreground);
   cursor: pointer;
@@ -1012,22 +1016,22 @@ section.desk-sheet > .sheet-heading {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
 }
-/* 공고가 많으면 열마다 최소 폭(9rem)을 주고 표를 가로로 넘겨 본다 */
+/* 공고가 많으면 열마다 최소 폭(11rem)을 주고 표를 가로로 넘겨 본다 */
 .result-scroll {
   overflow-x: auto;
 }
 .result-table {
-  min-width: calc(6.5rem + var(--result-columns, 2) * 9rem);
+  min-width: calc(8.5rem + var(--result-columns, 2) * 11rem);
 }
 /* 항목 이름 열('매달 남는 돈'이 한 줄에 들어가는 폭)은 좁게, 나머지는 공고 열이 나눠 갖는다 */
 .offer-table.result-table thead th:first-child {
-  width: 6.5rem;
+  width: 8.5rem;
 }
 /* 결과 줄의 초록은 남는 돈에만: 숫자가 아닌 칸과 마이너스는 초록으로 칠하지 않는다 */
 .compare-table .compare-result .cell-value.is-muted,
 .compare-list .compare-result .cell-value.is-muted {
   font-family: inherit;
-  font-size: 0.875rem;
+  font-size: 0.9375rem;
   color: var(--muted-foreground);
 }
 .compare-table .compare-result .cell-value.is-negative,
@@ -1059,12 +1063,12 @@ section.desk-sheet > .sheet-heading {
   display: block;
 }
 .desk-spread.is-wide .desk-title {
-  font-size: clamp(1.5rem, 3vw, 2.25rem);
+  font-size: clamp(1.75rem, 3vw, 2.25rem);
 }
 .desk-spread.is-wide .intro-copy {
   max-width: 40rem;
   margin-top: 0.5rem;
-  font-size: 1rem;
+  font-size: 1.0625rem;
 }
 .desk-spread.is-wide .step-track {
   margin-bottom: 1.25rem;
@@ -1160,7 +1164,7 @@ section.desk-sheet > .sheet-heading {
   min-height: 2.75rem;
   padding: 0.5rem 0.9rem;
   background: transparent;
-  font-size: 1rem;
+  font-size: 1.0625rem;
   font-weight: 500;
   color: var(--muted-foreground);
   cursor: pointer;
@@ -1193,7 +1197,7 @@ section.desk-sheet > .sheet-heading {
   flex: none;
   padding: 0.1rem 0.45rem;
   border-radius: 0.25rem;
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   font-weight: 600;
 }
 .posting-tab-status[data-state='todo'] {
@@ -1221,7 +1225,7 @@ section.desk-sheet > .sheet-heading {
 .posting-last {
   margin-top: 1rem;
   text-align: end;
-  font-size: 0.875rem;
+  font-size: 0.9375rem;
   color: var(--muted-foreground);
 }
 
@@ -1239,7 +1243,7 @@ section.desk-sheet > .sheet-heading {
   width: 100%;
   margin-bottom: 0.75rem;
   /* 묶음 제목은 항목 이름(14px)보다 확실히 크게: 어디서 묶음이 바뀌는지 한눈에 */
-  font-size: 1.125rem;
+  font-size: 1.375rem;
   font-weight: 700;
   color: var(--foreground);
 }
@@ -1293,7 +1297,7 @@ section.desk-sheet > .sheet-heading {
   .posting-tabs [role='tab'] {
     flex-direction: column;
     gap: 0.125rem;
-    font-size: 0.875rem;
+    font-size: 0.9375rem;
   }
 }
 
@@ -1306,11 +1310,11 @@ section.desk-sheet > .sheet-heading {
 /* ── 근무지별 청년 지원 (support-view.tsx) ──
    색은 기본 글자색만 쓴다 (초록은 남는 돈, 주황은 추정·오류에만 — DESIGN.md) */
 .support-region {
-  font-size: 0.875rem;
+  font-size: 0.9375rem;
   color: var(--muted-foreground);
 }
 .support-heading {
-  font-size: 0.875rem;
+  font-size: 1.0625rem;
   font-weight: 600;
   color: var(--foreground);
 }
@@ -1330,7 +1334,7 @@ section.desk-sheet > .sheet-heading {
   border: 1px solid var(--border);
   border-radius: 0.5rem;
   padding: 0.75rem 1rem;
-  font-size: 0.875rem;
+  font-size: 0.9375rem;
   color: var(--body);
 }
 .support-title {
@@ -1345,7 +1349,7 @@ section.desk-sheet > .sheet-heading {
   border-radius: 0.25rem;
   background: var(--secondary);
   padding: 0.05rem 0.4rem;
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   font-weight: 600;
   color: var(--body);
 }
@@ -1371,7 +1375,7 @@ section.desk-sheet > .sheet-heading {
   display: flex;
   flex-wrap: wrap;
   gap: 0.25rem 0.75rem;
-  font-size: 0.75rem;
+  font-size: 0.9375rem;
   color: var(--muted-foreground);
 }
 .support-open {
@@ -1383,7 +1387,7 @@ section.desk-sheet > .sheet-heading {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.75rem;
+  font-size: 0.9375rem;
   color: var(--muted-foreground);
 }
 @media (max-width: 639px) {
@@ -1396,7 +1400,7 @@ section.desk-sheet > .sheet-heading {
 }
 .support-more,
 .support-empty {
-  font-size: 0.875rem;
+  font-size: 0.9375rem;
   color: var(--muted-foreground);
 }
 .support-more a {
@@ -1424,7 +1428,7 @@ section.desk-sheet > .sheet-heading {
   align-items: center;
   gap: 0.25rem;
   justify-self: start;
-  font-size: 0.875rem;
+  font-size: 0.9375rem;
 }
 .report-section {
   display: grid;
@@ -1449,7 +1453,7 @@ section.desk-sheet > .sheet-heading {
   gap: 0.3rem;
   border-radius: 999px;
   padding: 0.15rem 0.6rem;
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   font-weight: 600;
   color: var(--confirmed); /* '확인' 배지와 같은 색 (DESIGN.md 신뢰도 표시) */
   background: var(--card);
@@ -1457,7 +1461,7 @@ section.desk-sheet > .sheet-heading {
 .report-body {
   display: grid;
   gap: 0.6rem;
-  font-size: 1rem;
+  font-size: 1.0625rem;
   line-height: 1.7;
   color: var(--foreground);
   overflow-wrap: anywhere;
@@ -1473,7 +1477,7 @@ section.desk-sheet > .sheet-heading {
 .deposit-source {
   display: block;
   margin-top: 0.25rem;
-  font-size: 0.75rem;
+  font-size: 0.9375rem;
   color: var(--muted-foreground);
 }
 
@@ -1486,7 +1490,7 @@ section.desk-sheet > .sheet-heading {
   border-radius: 0.5rem;
   background: var(--muted);
   padding: 1rem;
-  font-size: 0.875rem;
+  font-size: 0.9375rem;
   color: var(--body);
 }
 .link-hint ol {
@@ -1503,7 +1507,7 @@ section.desk-sheet > .sheet-heading {
   border-radius: 0.5rem;
   background: var(--card);
   padding: 1rem;
-  font-size: 0.875rem;
+  font-size: 0.9375rem;
   color: var(--body);
 }
 .agent-progress-head {
@@ -1560,7 +1564,7 @@ section.desk-sheet > .sheet-heading {
   flex: none;
   border: 1px solid var(--border);
   border-radius: 999px;
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
 }
 .agent-step-mark svg {
   width: 0.875rem;
@@ -1582,7 +1586,7 @@ section.desk-sheet > .sheet-heading {
   padding: 0.5rem 0.75rem;
 }
 .agent-note {
-  font-size: 0.75rem;
+  font-size: 0.9375rem;
   color: var(--muted-foreground);
 }
 @keyframes agent-spin {
@@ -1638,7 +1642,7 @@ section.desk-sheet > .sheet-heading {
   border-radius: 0.5rem;
   background: var(--card);
   padding: 0.75rem;
-  font-size: 0.875rem;
+  font-size: 0.9375rem;
   line-height: 1.5;
   color: var(--body);
   text-align: start;
@@ -1667,7 +1671,7 @@ section.desk-sheet > .sheet-heading {
   gap: 0.5rem;
 }
 .source-details dt {
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   line-height: 1.5rem; /* 본문 첫 줄과 높이를 맞춘다 */
   color: var(--muted-foreground);
 }
@@ -1677,7 +1681,7 @@ section.desk-sheet > .sheet-heading {
   flex-wrap: wrap;
   gap: 0.5rem 1rem;
   margin-top: 0.85rem;
-  font-size: 0.75rem;
+  font-size: 0.9375rem;
   color: var(--muted-foreground);
 }
 .badge-legend > span {
@@ -1693,14 +1697,14 @@ section.desk-sheet > .sheet-heading {
 /* 계산 내역 묶음 (result-view.tsx Breakdown): 월급 / 매달 나가는 돈 (끝에 매달 남는 돈) */
 .breakdown-group {
   margin-top: 0.75rem;
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   font-weight: 700;
   color: var(--foreground); /* 아래 줄 이름(회색)과 구분되는 묶음 제목 */
 }
 /* 세금·4대보험 6줄은 접어 두고 합계만 한 줄로 */
 .breakdown-fold {
   border-block-end: 1px solid var(--border);
-  font-size: 0.875rem;
+  font-size: 0.9375rem;
 }
 .breakdown-fold > summary {
   display: flex;
@@ -1723,7 +1727,7 @@ section.desk-sheet > .sheet-heading {
 }
 .breakdown-fold-hint {
   margin-inline-start: 0.25rem;
-  font-size: 0.75rem;
+  font-size: 0.9375rem;
   font-weight: 400;
   text-decoration: underline;
   text-underline-offset: 0.2em;
@@ -1740,7 +1744,7 @@ section.desk-sheet > .sheet-heading {
   margin-top: 0.5rem;
   display: grid;
   gap: 0.25rem;
-  font-size: 0.75rem;
+  font-size: 0.9375rem;
 }
 .be-facts > div {
   display: grid;
@@ -1765,10 +1769,11 @@ section.desk-sheet > .sheet-heading {
 
 /* 결과 표의 답 줄 '매달 남는 돈': 이름도 크게 (옆의 큰 초록 금액이 무엇인지 바로 읽히게) */
 .result-table .compare-result th {
-  font-size: 1.125rem;
+  font-size: 1.25rem;
+  white-space: nowrap;
 }
 .result-compare .compare-list .compare-result dt {
-  font-size: 1rem;
+  font-size: 1.0625rem;
 }
 
 /* 연봉 비공개 공고 요약: 회색 카드 한 겹, 공고가 여럿이면 사이에 선 */
@@ -1785,7 +1790,7 @@ section.desk-sheet > .sheet-heading {
   align-items: center;
   justify-content: flex-end;
   gap: 0.5rem 0.75rem;
-  font-size: 0.875rem;
+  font-size: 0.9375rem;
   color: var(--foreground);
 }
 
@@ -1794,12 +1799,12 @@ section.desk-sheet > .sheet-heading {
   flex-wrap: wrap;
   align-items: baseline;
   gap: 0.25rem 0.5rem;
-  font-size: 1rem;
+  font-size: 1.0625rem;
   font-weight: 700;
   color: var(--foreground);
 }
 .plan-slot-label small {
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   font-weight: 400;
   color: var(--muted-foreground);
 }
@@ -1826,7 +1831,7 @@ section.desk-sheet > .sheet-heading {
 }
 .plan-amount {
   margin-top: 0.25rem;
-  font-size: 1.125rem;
+  font-size: 1.25rem;
   font-weight: 700;
   color: var(--foreground);
 }
@@ -1859,7 +1864,7 @@ section.desk-sheet > .sheet-heading {
 
 .plan-extra-source {
   margin-top: 0.5rem;
-  font-size: 0.75rem;
+  font-size: 0.9375rem;
   color: var(--muted-foreground);
 }
 .plan-extra-source a {
@@ -1886,11 +1891,11 @@ section.desk-sheet > .sheet-heading {
   border-radius: 0.5rem;
   background: var(--card);
   padding: 0.75rem 1rem;
-  font-size: 0.8125rem;
+  font-size: 0.9375rem;
   color: var(--muted-foreground);
 }
 .plan-conclusion strong {
-  font-size: 1.375rem;
+  font-size: 1.625rem;
   color: var(--foreground);
   font-variant-numeric: tabular-nums;
 }
@@ -1901,11 +1906,11 @@ section.desk-sheet > .sheet-heading {
   color: var(--destructive);
 }
 .plan-conclusion small {
-  font-size: 0.75rem;
+  font-size: 0.9375rem;
 }
 /* 할 일 카드 제목은 칸 제목('이사 전')보다 작게 */
 .plan-item .plan-item-head {
-  font-size: 0.9375rem;
+  font-size: 1.0625rem;
 }
 /* 폰: 결론 세 칸을 한 줄씩 (이름 왼쪽, 숫자 오른쪽). 2+1로 접히지 않게 한 열로 */
 @media (max-width: 39.99rem) {
@@ -1921,7 +1926,7 @@ section.desk-sheet > .sheet-heading {
     padding: 0.5rem 0.75rem;
   }
   .plan-conclusion strong {
-    font-size: 1.125rem;
+    font-size: 1.375rem;
   }
   .plan-conclusion small {
     flex-basis: 100%; /* 긴 설명(기준 연봉 등)은 아래 줄에 왼쪽부터 */
@@ -1943,13 +1948,13 @@ section.desk-sheet > .sheet-heading {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  font-size: 1.125rem;
+  font-size: 1.375rem;
   font-weight: 700;
   color: var(--foreground);
 }
 .plan-section-desc {
   margin-top: 0.25rem;
-  font-size: 0.875rem;
+  font-size: 0.9375rem;
   color: var(--muted-foreground);
 }
 .plan-section > .plan-items,
@@ -1970,7 +1975,7 @@ section.desk-sheet > .sheet-heading {
   gap: 0.25rem 0.5rem;
   border-bottom: 1px solid var(--border);
   padding: 0.375rem 0;
-  font-size: 0.875rem;
+  font-size: 1.0625rem;
   color: var(--body);
   overflow-wrap: anywhere;
 }
@@ -2001,14 +2006,14 @@ section.desk-sheet > .sheet-heading {
     column-gap: 1rem;
   }
   .plan-row.is-course {
-    grid-template-columns: 6.5rem minmax(0, 1fr) minmax(0, 15rem);
+    grid-template-columns: 7.5rem minmax(0, 1fr) minmax(0, 15rem);
   }
   .plan-row.is-saving {
     grid-template-columns: minmax(0, 1fr) 6rem minmax(0, 18rem);
   }
 }
 .plan-row-meta {
-  font-size: 0.75rem;
+  font-size: 0.9375rem;
   color: var(--muted-foreground);
 }
 .plan-fold > summary {
@@ -2016,7 +2021,7 @@ section.desk-sheet > .sheet-heading {
   display: flex;
   align-items: center;
   cursor: pointer;
-  font-size: 0.875rem;
+  font-size: 1.0625rem;
   color: var(--foreground);
 }
 /* 접힌 칸은 누를 수 있다는 표시 */
@@ -2035,7 +2040,7 @@ section.desk-sheet > .sheet-heading {
   border-radius: 0.5rem;
   background: color-mix(in srgb, var(--primary) 6%, var(--card));
   padding: 0.75rem 1rem;
-  font-size: 0.875rem;
+  font-size: 0.9375rem;
   color: var(--body);
 }
 /* 적금 참고: 매달 남는 돈에서 얼마씩 넣으면 1년 뒤 얼마가 되는지 */
@@ -2047,7 +2052,7 @@ section.desk-sheet > .sheet-heading {
   border-radius: 0.5rem;
   background: color-mix(in srgb, var(--primary) 6%, var(--card));
   padding: 0.75rem;
-  font-size: 0.875rem;
+  font-size: 0.9375rem;
   color: var(--body);
 }
 .savings-line {
@@ -2057,11 +2062,11 @@ section.desk-sheet > .sheet-heading {
   gap: 0.375rem 0.5rem;
 }
 .savings-total {
-  font-size: 1.125rem;
+  font-size: 1.375rem;
   color: var(--foreground);
 }
 .savings-note {
-  font-size: 0.75rem;
+  font-size: 0.9375rem;
   color: var(--muted-foreground);
 }
 /* 되묻기 (ask-view.tsx): 에이전트가 물은 원래 칸 위에 질문을 붙이고, 질문과 칸을 함께 강조한다 */
@@ -2083,7 +2088,7 @@ section.desk-sheet > .sheet-heading {
   border-radius: 0.5rem;
   background: color-mix(in srgb, var(--primary) 8%, var(--card));
   padding: 0.75rem;
-  font-size: 0.875rem;
+  font-size: 0.9375rem;
   color: var(--body);
 }
 .ask-order {
@@ -2091,7 +2096,7 @@ section.desk-sheet > .sheet-heading {
   border-radius: 0.25rem;
   background: color-mix(in srgb, var(--primary) 15%, var(--card));
   padding: 0 0.375rem;
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
 }
 .ask-bubble-title {
   display: flex;
