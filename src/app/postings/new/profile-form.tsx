@@ -172,13 +172,16 @@ function MoneyField({
   );
 }
 
-/** 묶음 제목 오른쪽 칩: 비어 있는 필수 칸 수, 또는 '선택'. 둘 다 아니면 없음 ('다 넣음'은 선택 칸이 0원이 돼 거짓이 될 수 있다) */
+/**
+ * 묶음 제목 오른쪽 칩: 계산에 쓰는데 비어 있는 칸 수, 또는 '선택'. 둘 다 아니면 없음.
+ * '필수'라고 하지 않는다 — 비워도 계산은 되고 그 경우만 '계산 못 함'이 된다. '다 넣음'도 쓰지 않는다 (선택 칸은 0원이 된다)
+ */
 function GroupChip({ count, optional = false }: { count: number; optional?: boolean }) {
   // 화면용 표시: 묶음 이름에 섞이지 않게 숨긴다 (개수는 위 상자가 읽어 준다)
   if (count > 0)
     return (
       <span aria-hidden className="group-chip is-need">
-        필수 {count}칸
+        채울 칸 {count}
       </span>
     );
   return optional ? (
@@ -498,26 +501,36 @@ export function ProfileFormView({
           ask={askFor('current_housing')}
           askOrder={askOrder('current_housing')}
         />
-        <div className="row-field profile-field">
+        {/* 가족 수: 선택지가 짧아 펼침 목록 대신 한 줄 버튼 (한 번에 보이고 한 번에 고른다). 진짜 라디오라 화살표로 옮긴다 */}
+        <div
+          className="row-field profile-field"
+          role="radiogroup"
+          aria-labelledby="family-label"
+          aria-describedby="family-hint"
+        >
           <div className="field-label-line">
-            <label htmlFor="family">가족 수 (본인 포함)</label>
+            <span id="family-label" className="readonly-label">
+              가족 수 (본인 포함)
+            </span>
             <span id="family-hint" className="field-help">
               세금 계산에 써요
             </span>
           </div>
-          <select
-            id="family"
-            value={form.family}
-            onChange={(event) => set({ family: Number(event.target.value) })}
-            className={CONTROL_CLASS}
-            aria-describedby="family-hint"
-          >
+          <div className="choice-row">
             {[1, 2, 3, 4, 5, 6].map((n) => (
-              <option key={n} value={n}>
+              <label key={n} className="choice">
+                <input
+                  type="radio"
+                  name="family"
+                  id={n === 1 ? 'family' : undefined}
+                  value={n}
+                  checked={form.family === n}
+                  onChange={() => set({ family: n })}
+                />
                 {n}명
-              </option>
+              </label>
             ))}
-          </select>
+          </div>
         </div>
         {askAge && <AgeField age={form.age ?? null} onChange={(age) => set({ age })} />}
       </fieldset>

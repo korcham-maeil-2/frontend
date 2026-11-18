@@ -1028,7 +1028,8 @@ export default function NewPosting() {
               {/* 빈칸이 다 채워지면 제목만 바뀐다 (화면 읽기 프로그램에 한 번 알림) */}
               <p role="status" className="review-todo-title">
                 {missingProfile.length
-                  ? '이 칸만 채우면 계산돼요'
+                  ? // 막지는 않는다: 비어 있으면 그 값이 필요한 경우만 '계산 못 함'이 된다
+                    '이 칸이 비어 있으면 일부는 계산하지 못해요'
                   : '필요한 칸은 다 채웠어요. 계산하면 돼요'}
               </p>
               <ul>

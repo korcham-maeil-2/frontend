@@ -1393,6 +1393,39 @@ section.desk-sheet > .sheet-heading {
   font-size: 0.9375rem;
   color: var(--muted-foreground);
 }
+/* 짧은 선택지 한 줄 버튼 (가족 수): 진짜 라디오는 숨기고 글자 칸이 버튼처럼. 고른 것은 코발트 면 */
+.choice-row {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.25rem;
+}
+.choice {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 2.75rem;
+  border: 1px solid var(--input);
+  border-radius: 0.375rem;
+  background: var(--card);
+  font-variant-numeric: tabular-nums;
+  color: var(--body);
+  cursor: pointer;
+}
+.choice input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.choice:has(input:checked) {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-weight: 600;
+}
+.choice:has(input:focus-visible) {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
 /* 통근 쪽 '지금 집 주거비'(보기만): 입력칸과 같은 높이에 값만 */
 .readonly-value {
   display: flex;
