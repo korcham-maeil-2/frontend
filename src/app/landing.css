@@ -555,11 +555,12 @@ main.site-shell:has(> .landing) {
   .compare-list .offer-badge {
     display: block;
     margin-block-start: 0.2rem;
-    font-size: 0.8125rem;
+    font-size: 0.9375rem;
     color: var(--muted-foreground);
   }
   .compare-list .offer-badge {
     display: inline-block;
+    font-size: 0.8125rem;
     margin-inline-start: 0;
   }
   .compare-list .compare-result {
