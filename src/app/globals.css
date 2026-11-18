@@ -1957,8 +1957,7 @@ section.desk-sheet > .sheet-heading {
     font-size: 1.125rem;
   }
   .plan-conclusion small {
-    flex-basis: 100%;
-    text-align: end;
+    flex-basis: 100%; /* 긴 설명(기준 연봉 등)은 아래 줄에 왼쪽부터 */
   }
 }
 /* 섹션: 2·3단계 입력 화면과 같은 규칙 (위 구분선 + 넉넉한 간격, 제목 1.125rem). 카드로 감싸지 않는다 */
