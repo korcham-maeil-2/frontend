@@ -36,7 +36,11 @@ export function livesInCompanyHousing(
   row: Row | undefined,
   moveHousing: number | null | undefined,
 ): boolean {
-  return row?.company_housing?.value === true && moveHousing === 0;
+  // 주거지원비가 있으면 이사 주거비가 '넣은 금액 − 지원비'(0원 아래로 안 내려감)라 0원이어도 넣은 금액을
+  // 알 수 없다 → 사택으로 보지 않는다 (틀려도 보증금이 보이는 쪽이 안전하다. 백엔드 housing_aid와 같은 조건)
+  const aid = row?.housing_allowance_monthly_krw?.value;
+  const hasAid = !!aid && row?.housing_allowance_months?.value !== 0;
+  return row?.company_housing?.value === true && !hasAid && moveHousing === 0;
 }
 
 /**

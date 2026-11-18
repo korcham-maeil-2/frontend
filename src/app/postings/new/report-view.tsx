@@ -44,12 +44,13 @@ const LABELED = /^([^:：]{1,40})[:：]\s+(.+)$/;
 function items(text: string): Item[] {
   const out: Item[] = [];
   let paragraph: string[] = [];
-  const push = (line: string) => {
-    const m = LABELED.exec(line);
+  // 이름표는 목록 줄에서만 뗀다 (예전 리포트의 문단 속 ': '를 이름표로 오해하지 않게)
+  const push = (line: string, labeled: boolean) => {
+    const m = labeled ? LABELED.exec(line) : null;
     out.push(m ? { label: m[1].trim(), text: m[2].trim() } : { label: null, text: line });
   };
   const flush = () => {
-    if (paragraph.length) push(paragraph.join(' '));
+    if (paragraph.length) push(paragraph.join(' '), false);
     paragraph = [];
   };
   for (const raw of text.replace(/\*\*/g, '').split('\n')) {
@@ -57,7 +58,7 @@ function items(text: string): Item[] {
     if (!line) flush();
     else if (LIST_ITEM.test(line)) {
       flush();
-      push(line.replace(LIST_ITEM, ''));
+      push(line.replace(LIST_ITEM, ''), true);
     } else paragraph.push(line);
   }
   flush();

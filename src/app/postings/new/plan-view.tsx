@@ -225,7 +225,7 @@ function SavingsSlot({
           </p>
           {/* 금액이 어떻게 나왔는지 한 줄 (남는 돈은 위 결론 칸에, 주의는 맨 아래 출처 줄에) */}
           <p className="savings-note">
-            원금 {formatWon(chosen.principal_krw)} + 세전 이자 약 {won(chosen.interest_krw)} (
+            원금 {formatWon(chosen.principal_krw)} + 세전 이자 {formatWon(chosen.interest_krw)} (
             {top.bank} 연 {rate(top.rate)})
           </p>
         </div>
@@ -439,6 +439,11 @@ function PostingPanel({
   // 사택·기숙사에 들어가면(이사할 집 주거비 0원) 백엔드가 보증금 할 일을 빼서 보낸다 (plan.py).
   // '처음 준비할 돈' 칸이 '모름'이 아니라 '없음'이라고 말하려면 이유를 알아야 해서 여기서도 본다
   const dorm = livesInCompanyHousing(row, scenarioOf(result, id, 'move')?.housing.value);
+  // 경우가 하나뿐인 이유를 말할 수 있을 때만 (다른 경우를 ③에서 껐다 — 예전 결과는 통근 플랜이 없을 수 있다)
+  const other = result.postings
+    .find((p) => p.posting_id === id)
+    ?.scenarios.find((s) => s.case !== chosen);
+  const oneCaseOff = cases.length === 1 && other?.applicable === false;
   const deposit = before.find((i) => i.kind === 'deposit');
   const showSavings =
     savings?.status === 'ok' &&
@@ -493,7 +498,7 @@ function PostingPanel({
         </p>
       )}
       {/* 경우가 하나뿐이면 왜인지 알린다: 해당 없는 경우는 ③에서 사용자가 끈 것뿐이다 (calc/remaining.py) */}
-      {cases.length === 1 && (
+      {oneCaseOff && (
         <p className="plan-one-case">
           {chosen === 'move'
             ? "'지금 집에서 다닐 수 있어요'를 꺼서 이사하는 경우만 보여요."
