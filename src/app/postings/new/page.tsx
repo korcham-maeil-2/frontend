@@ -1106,7 +1106,7 @@ export default function NewPosting() {
           )}
         </form>
       ) : reviewing ? (
-        <section className="desk-sheet sheet-enter" aria-label="공고 조건 확인">
+        <section className="desk-sheet sheet-enter review-sheet" aria-label="공고 조건 확인">
           {/* 처음 온 사람이 가장 먼저 볼 것: 지금 할 일 (공고마다 한 줄, 누르면 그 칸·탭으로) */}
           <div ref={reviewTodo} tabIndex={-1} className="review-todo">
             <p className="review-todo-title">

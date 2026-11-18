@@ -912,6 +912,32 @@ section.desk-sheet > .sheet-heading {
   }
 }
 
+/* 조건 확인(폰): 칸이 20개 넘어 다음 버튼이 멀다 → 주 버튼만 화면 아래에 붙인다.
+   버튼이 하는 일은 늘 같다(다음 단계). 뒤로 가기는 붙이지 않고, 입력 중엔 떼서 키보드와 겹치지 않게 */
+@media (max-width: 47.99rem) {
+  .review-sheet .sheet-actions {
+    display: contents; /* 주 버튼이 시트(긴 상자) 기준으로 붙어 있게 */
+  }
+  .review-sheet .sheet-actions > button:not(.main-action) {
+    margin-top: 1.25rem;
+    width: 100%;
+  }
+  .review-sheet .main-action {
+    position: sticky;
+    bottom: calc(0.75rem + env(safe-area-inset-bottom));
+    z-index: 5;
+    margin-top: 0.75rem;
+    width: 100%;
+    box-shadow: 0 0 0 0.5rem var(--card);
+  }
+  .review-sheet:has(:is(input, select, textarea):focus) .main-action {
+    position: static;
+  }
+  html:has(.review-sheet) {
+    scroll-padding-bottom: 5.5rem; /* Tab으로 내려갈 때 붙은 버튼이 칸을 가리지 않게 */
+  }
+}
+
 /* ── 내 생활비 단계 (profile-form.tsx) ── */
 /* 체크 상자 + 글: 줄 전체를 눌러도 되고, 터치 대상 44px */
 .profile-check {
