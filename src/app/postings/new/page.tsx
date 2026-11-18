@@ -936,7 +936,7 @@ export default function NewPosting() {
           <div className="sheet-actions flex-wrap">
             <div className="flex flex-wrap gap-2">
               {shown === 'plan' ? (
-                <Button variant="ghost" className="min-h-11" onClick={() => changeStep('result')}>
+                <Button variant="outline" className="min-h-11" onClick={() => changeStep('result')}>
                   <ArrowLeft aria-hidden /> 남는 돈 다시 보기
                 </Button>
               ) : (
@@ -948,7 +948,11 @@ export default function NewPosting() {
                   >
                     <Calculator aria-hidden /> 생활비 바꾸기
                   </Button>
-                  <Button variant="ghost" className="min-h-11" onClick={() => changeStep('review')}>
+                  <Button
+                    variant="outline"
+                    className="min-h-11"
+                    onClick={() => changeStep('review')}
+                  >
                     <Pencil aria-hidden /> 조건 다시 고치기
                   </Button>
                 </>
