@@ -515,7 +515,7 @@ export function ProfileFormView({
           매달 나가는 고정비
           <GroupChip count={needIn((id) => id.startsWith('fixed-'))} />
         </legend>
-        <p className="mb-3 text-sm text-muted-foreground">
+        <p className="group-desc">
           학자금·통신비·보험료처럼 어느 회사에 가든 똑같이 나가는 돈이에요.
         </p>
         <ul className="space-y-3">
@@ -671,7 +671,7 @@ export function ProfileFormView({
           <fieldset className="row-group">
             {/* 보이는 제목은 접기 줄(summary). 묶음 이름은 화면 읽기용으로 남긴다 */}
             <legend className="sr-only">비교 기준</legend>
-            <div className="mb-3 text-sm text-muted-foreground">
+            <div className="group-desc">
               <p>연봉 비공개 공고는 이 기준만큼 남으려면 얼마를 받아야 하는지 계산해요.</p>
               <p>비우면 다른 공고 중 매달 더 많이 남는 쪽이 기준이에요.</p>
             </div>

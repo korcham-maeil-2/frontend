@@ -1363,6 +1363,11 @@ section.desk-sheet > .sheet-heading {
 .optional-group > .row-group {
   margin-top: 0.5rem;
 }
+/* 묶음 설명(읽어야 하는 문장): 본문 크기·진한 색. 출처·예시만 작고 옅게 */
+.group-desc {
+  margin-bottom: 0.75rem;
+  color: var(--body);
+}
 .group-chip {
   border-radius: 0.25rem;
   padding: 0.15rem 0.5rem;
