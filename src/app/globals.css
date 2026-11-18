@@ -1072,12 +1072,40 @@ section.desk-sheet > .sheet-heading {
   border-bottom: 1px solid color-mix(in oklab, var(--primary) 18%, transparent);
 }
 @media (min-width: 48rem) {
+  /* 넓은 화면: ①──②──③ 번호끼리 선으로 잇고, 이름·요약은 번호 아래에 (칸 폭을 글자가 넓게 쓴다) */
+  .desk-spread.is-wide .step-track {
+    align-items: flex-start;
+    gap: 0;
+  }
   .desk-spread.is-wide .step-track li {
+    position: relative;
     flex: 1 1 0;
     min-width: 0;
   }
+  .desk-spread.is-wide .step-track li,
+  .desk-spread.is-wide .step-track li > button {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.375rem;
+  }
+  /* 마지막 단계는 글자 폭만: 빈 칸이 남지 않고 선이 끝까지 닿게 */
+  .desk-spread.is-wide .step-track li:last-child {
+    flex: 0 0 auto;
+  }
   .desk-spread.is-wide .step-track li + li::before {
     display: none;
+  }
+  /* 번호 오른쪽에서 다음 번호 앞까지 (번호 가운데 높이) */
+  .desk-spread.is-wide .step-track li:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    top: 0.75rem;
+    inset-inline: calc(1.5rem + 0.5rem) 0.5rem;
+    border-top: 1px solid var(--input);
+  }
+  /* 지나온 길은 진하게 */
+  .desk-spread.is-wide .step-track li:has(~ [aria-current])::after {
+    border-color: var(--primary);
   }
   .desk-spread.is-wide .step-summary {
     display: block;
@@ -1284,6 +1312,12 @@ section.desk-sheet > .sheet-heading {
   /* minmax(0, …): 한 줄로 자른 소득 글자가 칸을 화면보다 넓히지 않게 */
   grid-template-columns: minmax(0, 1fr);
   gap: 0.5rem;
+}
+/* 넓은 화면은 두 줄로 (카드 내용이 짧아 한 줄이면 오른쪽이 빈다) */
+@media (min-width: 1024px) {
+  .support-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 .support-item {
   border: 1px solid var(--border);
@@ -1864,6 +1898,127 @@ section.desk-sheet > .sheet-heading {
   font-size: 0.75rem;
   font-weight: 400;
   color: var(--muted-foreground);
+}
+/* 정착 플랜: 한 해 요약 띠, 한 줄 행, 접기, 남는 돈 단계의 미리보기 */
+.plan-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-top: 0.25rem;
+}
+.plan-conclusion {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: 0.5rem;
+}
+.plan-conclusion > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: var(--card);
+  padding: 0.75rem 1rem;
+  font-size: 0.8125rem;
+  color: var(--muted-foreground);
+}
+.plan-conclusion strong {
+  font-size: 1.375rem;
+  color: var(--foreground);
+  font-variant-numeric: tabular-nums;
+}
+.plan-conclusion strong.is-good {
+  color: var(--positive, var(--primary));
+}
+.plan-ref {
+  border-top: 1px solid var(--border);
+  padding-top: 1rem;
+}
+.plan-ref-title {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--muted-foreground);
+}
+.plan-ref > ul {
+  display: grid;
+  gap: 1.25rem;
+  margin-top: 0.5rem;
+}
+.plan-row {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.5rem;
+  border-bottom: 1px solid var(--border);
+  padding: 0.375rem 0;
+  font-size: 0.875rem;
+  color: var(--body);
+  overflow-wrap: anywhere;
+}
+.plan-row:last-child {
+  border-bottom: 0;
+}
+.plan-items:has(> .plan-row) {
+  gap: 0;
+}
+.plan-row-title {
+  font-weight: 600;
+  color: var(--foreground);
+}
+.plan-row .support-link {
+  display: inline; /* 제목이 줄바꿈돼도 링크 아이콘이 제목 끝에 붙어 있게 */
+}
+.plan-row .support-link svg {
+  display: inline;
+  vertical-align: -0.15em;
+  margin-inline-start: 0.25rem;
+}
+/* 넓은 화면: 날짜·금리를 세로로 훑을 수 있게 열을 맞춘다 (좁으면 지금처럼 줄바꿈) */
+@media (min-width: 40rem) {
+  .plan-row.is-course,
+  .plan-row.is-saving {
+    display: grid;
+    align-items: baseline;
+    column-gap: 1rem;
+  }
+  .plan-row.is-course {
+    grid-template-columns: 6.5rem minmax(0, 1fr) minmax(0, 15rem);
+  }
+  .plan-row.is-saving {
+    grid-template-columns: minmax(0, 1fr) 6rem minmax(0, 18rem);
+  }
+}
+.plan-row-meta {
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}
+.plan-fold > summary {
+  min-height: 2.75rem;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-size: 0.875rem;
+  color: var(--foreground);
+}
+/* 접힌 칸은 누를 수 있다는 표시 */
+.plan-fold > summary::before {
+  content: '▸';
+  margin-inline-end: 0.375rem;
+  color: var(--muted-foreground);
+}
+.plan-fold[open] > summary::before {
+  content: '▾';
+}
+.plan-preview {
+  margin-top: 1.5rem;
+  display: grid;
+  gap: 0.125rem;
+  border-radius: 0.5rem;
+  background: color-mix(in srgb, var(--primary) 6%, var(--card));
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  color: var(--body);
 }
 /* 적금 참고: 매달 남는 돈에서 얼마씩 넣으면 1년 뒤 얼마가 되는지 */
 .savings-calc {

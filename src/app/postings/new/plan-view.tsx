@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ExternalLink } from 'lucide-react';
+import { ArrowRight, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { api } from '@/lib/api/client';
@@ -40,7 +40,6 @@ export function isSettlePlan(value: unknown): value is SettlePlan {
 const SLOT_HINT: Partial<Record<PlanSlot['kind'], string>> = {
   before: '집을 구하기 전에',
   move_month: '이사하고 바로',
-  anytime: '기간 제한 없이',
 };
 
 function ItemTitle({ item }: { item: PlanItem }) {
@@ -55,6 +54,19 @@ function ItemTitle({ item }: { item: PlanItem }) {
 }
 
 function Item({ item }: { item: PlanItem }) {
+  // 지원 정책은 한 줄 (설명·조건은 아래 '근무지별 청년 지원'에), 할 일(보증금·전입신고)만 카드
+  if (item.kind === 'policy') {
+    return (
+      <li className="plan-row">
+        <ItemTitle item={item} />
+        {item.scope && (
+          <span className="support-category">{item.scope === 'national' ? '전국' : '지역'}</span>
+        )}
+        {/* 상시는 대부분이라 표시하지 않는다: 마감·시작일이 있는 것만 눈에 띄게 */}
+        {item.when && item.when !== '상시' && <span className="support-open">{item.when}</span>}
+      </li>
+    );
+  }
   return (
     <li className="plan-item">
       <p className="plan-item-head">
@@ -135,16 +147,15 @@ function SavingsSlot({
       <h4 className="plan-slot-label">
         첫 월급 받은 뒤<small>남는 돈을 모으고 싶다면 · 참고</small>
       </h4>
-      <p className="plan-extra-lead">
-        은행 적금 12개월 기본금리 높은 순이에요{disclosed && ` (${disclosed} 공시)`}. 가입을 권하는
-        게 아니에요. 우대금리 조건과 실제 금리는 가입 전에 은행에서 확인해 주세요.
+      <p className="plan-chips">
+        <span className="support-category">12개월 기본금리 순</span>
+        {disclosed && <span className="support-category">{disclosed} 공시</span>}
+        <span className="support-category">가입 권유 아님</span>
       </p>
       {deposit != null && remaining != null && (
         <div className="savings-calc">
-          {/* 한 줄로: 문장 사이에 금액 버튼 (좁으면 알아서 줄바꿈) */}
           <p className="savings-line">
-            {moving ? '이사하면' : '지금 집에서 통근하면'} 매달 남는 돈 약{' '}
-            {formatWon(Math.round(remaining / 10_000) * 10_000)} 중
+            매달
             <span className="inline-flex flex-wrap gap-1" role="group" aria-label="매달 넣을 금액">
               {options.map((d) => (
                 <Button
@@ -160,36 +171,37 @@ function SavingsSlot({
                 </Button>
               ))}
             </span>
-            씩 12개월 넣으면
+            <ArrowRight aria-hidden className="size-4 text-muted-foreground" />
+            12개월 뒤
             <strong className="savings-total">
               약 {formatWon(Math.round((deposit * 12 + interest) / 10_000) * 10_000)}
             </strong>
           </p>
           <p className="savings-note">
-            원금 {formatWon(deposit * 12)} + 세전 이자 약 {formatWon(interest)} · {top.bank} 연{' '}
-            {rate(top.rate)} 기본금리 기준
+            {moving ? '이사하면' : '통근하면'} 매달 남는 돈 약{' '}
+            {formatWon(Math.round(remaining / 10_000) * 10_000)} 기준 · 원금{' '}
+            {formatWon(deposit * 12)} + 세전 이자 약 {formatWon(interest)} · {top.bank} 연{' '}
+            {rate(top.rate)} · 실제 금리는 은행에서 확인
           </p>
         </div>
       )}
       <ul className="plan-items">
         {savings.products.map((p) => (
-          <li key={`${p.bank}-${p.name}`} className="plan-item">
-            <p className="plan-item-head">
-              <span className="plan-item-title">{p.name}</span>
-              <span className="support-category">{p.bank}</span>
-            </p>
-            <p className="plan-amount">
-              연 {rate(p.rate)}
-              {p.max_rate != null && p.max_rate > p.rate && (
-                <small className="plan-amount-note"> 우대 최고 연 {rate(p.max_rate)}</small>
-              )}
-            </p>
-            <p className="support-meta">
-              <span>{p.saving_type}</span>
-              {p.join_way && <span>가입: {p.join_way.replaceAll(',', '·')}</span>}
-              {/* 금감원 공시의 '최고 한도'(max_limit). 월 한도인지 총액인지는 상품마다 달라 공시 이름 그대로 */}
-              {p.limit_krw != null && <span>공시 최고 한도 {formatWon(p.limit_krw)}</span>}
-            </p>
+          <li key={`${p.bank}-${p.name}`} className="plan-row is-saving">
+            <span className="plan-row-title">
+              {p.name} <span className="support-category">{p.bank}</span>
+            </span>
+            <strong className="tabular-nums">연 {rate(p.rate)}</strong>
+            {/* 우대·가입 방법·공시 최고 한도(월 한도인지 총액인지는 상품마다 달라 공시 이름 그대로) */}
+            <span className="plan-row-meta">
+              {[
+                p.max_rate != null && p.max_rate > p.rate && `우대 최고 ${rate(p.max_rate)}`,
+                p.join_way?.replaceAll(',', '·'),
+                p.limit_krw != null && `공시 최고 한도 ${formatWon(p.limit_krw)}`,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+            </span>
           </li>
         ))}
       </ul>
@@ -206,8 +218,9 @@ function SavingsSlot({
 
 function CourseItem({ course, jobNcs }: { course: Course; jobNcs: string | null }) {
   return (
-    <li className="plan-item">
-      <p className="plan-item-head">
+    <li className="plan-row is-course">
+      <span className="support-open">{md(course.start)} 시작</span>
+      <span className="plan-row-title">
         {course.url ? (
           <a href={course.url} target="_blank" rel="noopener noreferrer" className="support-link">
             {course.title}
@@ -216,22 +229,18 @@ function CourseItem({ course, jobNcs }: { course: Course; jobNcs: string | null 
           </a>
         ) : (
           <span className="plan-item-title">{course.title}</span>
-        )}
+        )}{' '}
         {jobNcs && course.ncs?.startsWith(jobNcs) && (
           <span className="support-category">직무 관련</span>
-        )}
-        {course.weekend && <span className="support-category">주말반</span>}
-      </p>
-      <p className="support-meta">
-        <span className="support-open">
-          {md(course.start)} 시작{course.end && ` ~ ${md(course.end)}`}
-        </span>
-        {/* 컨소시엄은 '무료'만 보이면 누구나 들을 수 있다고 오해한다 → 대상(중소기업 재직자)도 함께 */}
-        <span>{course.kind_label}</span>
-        {course.fee_krw === 0 && <span>무료</span>}
-        {/* 강의는 장소가 중요해 좁은 화면에서도 기관을 보인다 (support-agency는 숨겨짐) */}
-        {course.institute && <span>{course.institute}</span>}
-      </p>
+        )}{' '}
+        {course.weekend && <span className="support-category">주말반</span>}{' '}
+        {course.fee_krw === 0 && <span className="support-category">무료</span>}
+      </span>
+      {/* 컨소시엄은 '무료'만 보이면 누구나 들을 수 있다고 오해한다 → 대상(중소기업 재직자)도 함께.
+          강의는 장소가 중요해 좁은 화면에서도 기관을 보인다 */}
+      <span className="plan-row-meta">
+        {[course.kind_label, course.institute].filter(Boolean).join(' · ')}
+      </span>
     </li>
   );
 }
@@ -248,19 +257,21 @@ function TrainingSlot({
   // 직무에 맞는 과정이 하나라도 있을 때만 '직무 관련 먼저'라고 알린다
   const matched = !!jobNcs && training.courses.some((c) => c.ncs?.startsWith(jobNcs));
   const where = training.region ? placeName(training.region) : '근무지';
-  const scope =
-    training.scope === 'sido'
-      ? `${where}에는 3개월 안에 시작하는 과정이 없어 근무지 인근(시도) 과정이에요.`
-      : `${where}에서 3개월 안에 시작하는 과정이에요.`;
   return (
     <li className="plan-slot is-extra">
       <h4 className="plan-slot-label">
         일하면서 배우기<small>근무지 근처 재직자 강의</small>
       </h4>
-      <p className="plan-extra-lead">
-        {scope} {matched ? '공고 직무와 관련된 과정과 주말반을' : '주말반을'} 먼저 보여 줘요. 수강
-        자격(재직 여부, 내일배움카드 등)과 장소는 과정 상세 페이지에서 확인해 주세요.
+      <p className="plan-chips">
+        <span className="support-category">
+          {training.scope === 'sido' ? `${where} 인근(시도) · 시군구엔 과정 없음` : where}
+        </span>
+        <span className="support-category">3개월 안 시작</span>
+        <span className="support-category">
+          {matched ? '직무 관련·주말반 먼저' : '주말반 먼저'}
+        </span>
       </p>
+      <p className="plan-extra-lead">수강 자격·장소는 과정 페이지에서 확인해 주세요.</p>
       <ul className="plan-items">
         {training.courses.map((course) => (
           <CourseItem
@@ -290,43 +301,123 @@ function PostingPanel({
   if (!posting.slots.length) {
     return <p className="support-empty">지금 넣을 할 일을 찾지 못했어요.</p>;
   }
+  const items = posting.slots.flatMap((slot) => slot.items);
+  const deposit = items.find((i) => i.kind === 'deposit');
+  const deadlines = items.filter((i) => i.kind === 'policy' && i.when && i.when !== '상시');
+  const showSavings = savings?.status === 'ok' && savings.products.length > 0;
+  const showTraining = training?.status === 'ok' && training.courses.length > 0;
   return (
-    <div className="space-y-3">
-      <p className="support-region">
-        {posting.company || posting.posting_id}
-        {posting.region && ` · ${posting.region}`}
-        {posting.moving ? ' · 회사 근처로 이사하는 경우' : ' · 지금 집에서 통근하는 경우'}
+    <div className="space-y-4">
+      <p className="plan-chips">
+        {posting.region && <span className="support-category">{posting.region}</span>}
+        <span className="support-category">
+          {posting.moving ? '회사 근처로 이사하는 경우' : '지금 집에서 통근하는 경우'}
+        </span>
       </p>
+      {/* 결론: 이 회사로 가면 숫자 셋 (처음 드는 돈, 매달 남는 돈, 놓치면 안 되는 마감) */}
+      <div className="plan-conclusion">
+        {deposit?.amount_krw != null && (
+          <div>
+            <span>처음 준비할 돈</span>
+            <strong>{formatWon(deposit.amount_krw)}</strong>
+            <small>원룸 보증금 시세 (추정)</small>
+          </div>
+        )}
+        <div>
+          <span>{posting.moving ? '이사하면' : '지금 집에서 통근하면'} 매달 남는 돈</span>
+          <strong className={remaining != null && remaining >= 0 ? 'is-good' : undefined}>
+            {remaining != null
+              ? `약 ${formatWon(Math.round(remaining / 10_000) * 10_000)}`
+              : '계산 못 함'}
+          </strong>
+          {remaining == null && <small>연봉이나 빈 값 때문에 계산하지 못했어요</small>}
+        </div>
+        <div>
+          <span>마감 있는 지원</span>
+          <strong>{deadlines.length ? `${deadlines.length}건` : '없음'}</strong>
+          <small>{deadlines[0]?.when ?? '지원은 모두 상시 신청이에요'}</small>
+        </div>
+      </div>
       <ol className="plan-timeline">
-        {posting.slots.map((slot) => (
-          <li key={`${slot.kind}-${slot.month ?? ''}`} className={`plan-slot is-${slot.kind}`}>
-            <h4 className="plan-slot-label">
-              {slot.label}
-              {SLOT_HINT[slot.kind] && <small>{SLOT_HINT[slot.kind]}</small>}
-            </h4>
+        {posting.slots.map((slot) => {
+          const list = (
             <ul className="plan-items">
               {slot.items.map((item) => (
                 <Item key={`${item.kind}-${item.policy_id ?? item.title}`} item={item} />
               ))}
             </ul>
-          </li>
-        ))}
-        {/* 남는 돈이 바뀌면(다시 계산) 고른 금액도 새로 정한다 */}
-        {savings && (
-          <SavingsSlot
-            key={remaining}
-            savings={savings}
-            remaining={remaining}
-            moving={posting.moving}
-          />
-        )}
-        <TrainingSlot training={training} jobNcs={posting.ncs ?? null} />
+          );
+          return (
+            <li key={`${slot.kind}-${slot.month ?? ''}`} className={`plan-slot is-${slot.kind}`}>
+              <h4 className="plan-slot-label">
+                {slot.label}
+                {SLOT_HINT[slot.kind] && <small>{SLOT_HINT[slot.kind]}</small>}
+              </h4>
+              {/* 언제든: 날짜가 없는 지원이라 접어 둔다 (날짜 있는 일만 펼쳐 보이게) */}
+              {slot.kind === 'anytime' ? (
+                <details className="plan-fold">
+                  <summary>지원 {slot.items.length}개 펼치기</summary>
+                  {list}
+                </details>
+              ) : (
+                list
+              )}
+            </li>
+          );
+        })}
       </ol>
       {posting.notes.map((note) => (
         <p key={note} className="text-sm text-muted-foreground">
           {note}
         </p>
       ))}
+      {/* 할 일이 아닌 참고 정보: 타임라인(순서) 밖에 둔다 */}
+      {(showSavings || showTraining) && (
+        <section className="plan-ref" aria-labelledby={`plan-ref-${posting.posting_id}`}>
+          <h4 id={`plan-ref-${posting.posting_id}`} className="plan-ref-title">
+            참고
+          </h4>
+          <ul>
+            {/* 남는 돈이 바뀌면(다시 계산) 고른 금액도 새로 정한다 */}
+            {showSavings && (
+              <SavingsSlot
+                key={remaining}
+                savings={savings}
+                remaining={remaining}
+                moving={posting.moving}
+              />
+            )}
+            <TrainingSlot training={training} jobNcs={posting.ncs ?? null} />
+          </ul>
+        </section>
+      )}
+    </div>
+  );
+}
+
+/** 남는 돈 단계 맨 아래: 다음 단계(정착 플랜)에 무엇이 있는지 공고마다 한 줄 (최대 3개) */
+export function PlanPreview({ plan }: { plan: SettlePlan }) {
+  const postings = plan.postings.filter((p) => p.slots.length > 0);
+  const lines = postings.slice(0, 3).map((posting) => {
+    // 회사마다 다른 것만: 보증금과 지원 개수
+    const items = posting.slots.flatMap((slot) => slot.items);
+    const deposit = items.find((i) => i.kind === 'deposit')?.amount_krw;
+    const line = [
+      posting.company || posting.posting_id,
+      deposit != null ? `보증금 ${formatWon(deposit)}` : '',
+      `지원 ${items.filter((i) => i.kind === 'policy').length}개`,
+    ]
+      .filter(Boolean)
+      .join(' · ');
+    return { id: posting.posting_id, line };
+  });
+  return (
+    <div className="plan-preview">
+      <p className="font-semibold text-foreground">다음: 1년 정착 플랜</p>
+      {lines.map(({ id, line }) => (
+        <p key={id}>{line}</p>
+      ))}
+      {postings.length > 3 && <p>외 {postings.length - 3}개</p>}
     </div>
   );
 }
@@ -383,6 +474,10 @@ export function PlanView({ plan, result }: { plan: SettlePlan; result: Calculati
       ?.scenarios.find((s) => s.case === (posting.moving ? 'move' : 'commute'))
       ?.monthly_remaining ?? null;
   if (!postings.length) return null;
+  // 처음 여는 탭: 매달 더 많이 남는 회사 (같으면 첫 공고)
+  const first = postings.reduce((a, b) =>
+    (remainingFor(b) ?? -Infinity) > (remainingFor(a) ?? -Infinity) ? b : a,
+  );
   const panel = (posting: PostingPlan) => (
     <PostingPanel
       posting={posting}
@@ -392,19 +487,11 @@ export function PlanView({ plan, result }: { plan: SettlePlan; result: Calculati
     />
   );
   return (
-    <section className="support-section space-y-4" aria-labelledby="plan-title">
-      <div>
-        <h3 id="plan-title" className="font-semibold text-foreground">
-          1년 정착 플랜
-        </h3>
-        <p className="text-sm text-muted-foreground">
-          이 회사를 고르면 언제 무엇을 하면 되는지 순서대로 모았어요.
-        </p>
-      </div>
+    <section className="space-y-4" aria-label="1년 정착 플랜">
       {postings.length === 1 ? (
         panel(postings[0])
       ) : (
-        <Tabs defaultValue={postings[0].posting_id} className="min-w-0">
+        <Tabs defaultValue={first.posting_id} className="min-w-0">
           <TabsList aria-label="볼 회사" className="posting-tabs max-w-full justify-start">
             {postings.map((posting) => (
               <TabsTrigger key={posting.posting_id} value={posting.posting_id}>

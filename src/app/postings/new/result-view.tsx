@@ -233,7 +233,8 @@ export function bestRemainingText(result: Result): string {
   );
   if (!candidates.length) return `공고 ${result.postings.length}개 계산`;
   const best = candidates.reduce((a, b) => (b.value > a.value ? b : a));
-  return `${best.company} 매달 ${won(best.value)}`;
+  // 단계 표시에서 좁으면 뒤가 잘린다: 숫자를 앞에 (회사 이름이 잘리게)
+  return `매달 ${won(best.value)} · ${best.company}`;
 }
 
 function remainingCell(value: number, extra: Omit<Shown, 'value'> = {}): Shown {

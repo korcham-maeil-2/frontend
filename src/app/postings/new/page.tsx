@@ -26,6 +26,7 @@ import {
   cellsOf,
   hasMaskedQuote,
   isImageRead,
+  placeName,
   statusBadge,
   type Row,
 } from './format';
@@ -55,7 +56,7 @@ import { PostingTabs, companyName } from './posting-tabs';
 import { ResultView, bestRemainingText, isCalculationResult } from './result-view';
 import { BadgeLegend } from './source-badge';
 import { SupportView, isLocalSupport } from './support-view';
-import { PlanView, isSettlePlan } from './plan-view';
+import { PlanPreview, PlanView, isSettlePlan } from './plan-view';
 import { askQuestionsOf, askTargetId, type AskQuestion } from './ask-view';
 import { ReportView, isReport, type Report } from './report-view';
 import { RowEditor, fieldsToCheck, focusField } from './row-editor';
@@ -68,7 +69,7 @@ import { RowEditor, fieldsToCheck, focusField } from './row-editor';
 //   4) POST /sessions/{id}/confirm      고친 비교표 + 생활비를 보내면 계산 결과(result)를 돌려받는다
 //      POST /sessions/{id}/recalculate  결과를 본 뒤 생활비·비교표를 고치면 계산만 다시 한다 (AI 호출 없음)
 
-type Step = 'input' | 'review' | 'living' | 'result';
+type Step = 'input' | 'review' | 'living' | 'result' | 'plan';
 type CalculationResult = components['schemas']['CalculationResult'];
 type LocalSupport = components['schemas']['LocalSupport'];
 type SettlePlan = components['schemas']['SettlePlan'];
@@ -104,6 +105,7 @@ const STEPS: { key: Step; label: string }[] = [
   { key: 'review', label: '조건 확인' },
   { key: 'living', label: '내 생활비' },
   { key: 'result', label: '남는 돈' },
+  { key: 'plan', label: '정착 플랜' },
 ];
 type SourceTab = 'text' | 'files';
 
@@ -341,6 +343,7 @@ export default function NewPosting() {
   /** 단계 바꾸기. 조건 확인으로 갈 때는 지금 고른 공고를 '본 것'으로 (새 표를 읽을 때는 따로 정한다) */
   function changeStep(next: Step, { markActiveSeen = true } = {}) {
     setError('');
+    setConfirmingRestart(false); // 다른 단계에 갔다 오면 '새로 시작' 확인은 닫힌 채로
     setCheckWarned(false);
     if (next === 'review' && markActiveSeen && activeId) markSeen(activeId);
     if (next === 'living') retryFailedRents(); // 불러오지 못했던 지역은 다시 묻는다
@@ -734,12 +737,19 @@ export default function NewPosting() {
   const names = (list: typeof inputs) => list.map((item) => item.name).join(', ');
 
   // 화면에 보이는 단계. 결과 단계인데 결과가 지금 입력과 맞지 않으면(고쳤거나 예전 초안) 생활비 단계를 보여 준다.
-  const shown: Step = step === 'result' && !freshResult ? 'living' : step;
+  // 정착 플랜은 결과의 다음 단계: 결과가 없으면 생활비, 플랜이 없으면 결과를 보여 준다.
+  const hasPlan = !!plan?.postings.some((p) => p.slots.length > 0);
+  const shown: Step =
+    (step === 'result' || step === 'plan') && !freshResult
+      ? 'living'
+      : step === 'plan' && !hasPlan
+        ? 'result'
+        : step;
 
   // 결과 화면을 열 때, 청년 지원이 오늘 기준이 아니면(며칠 전에 계산) 오늘 날짜로 다시 고른다.
   // 저장된 목록은 계산한 날 기준이라 '신청 중'이던 정책이 그새 끝났을 수 있다. 다시 고른 것은
   // 저장된 계산 결과를 바꾸지 않는다 (GET /sessions/{id}/local-support는 보기만 한다).
-  const showingResult = shown === 'result' && sessionId !== '';
+  const showingResult = shown === 'plan' && sessionId !== ''; // 청년 지원은 정착 플랜 단계에서 보여 준다
   // 오늘 기준으로 다시 고르지 못한 목록의 날짜. 지금 보이는 목록이 그 날짜면 '그날 기준'이라고 알린다
   // (다시 고르는 데 성공하거나 새로 비교하면 목록 날짜가 바뀌어 저절로 사라진다)
   const [staleFor, setStaleFor] = useState<string | null>(null);
@@ -797,6 +807,7 @@ export default function NewPosting() {
           ? `빈칸 ${missingProfile.length}개`
           : '다 넣음',
     result: freshResult ? bestRemainingText(freshResult) : '',
+    plan: '',
   };
   const demoNotice = demoMode && (
     <p className="demo-notice">
@@ -814,7 +825,11 @@ export default function NewPosting() {
             {STEPS.map(({ key, label }, i) => {
               const done = i < shownIndex;
               // 지난 단계, 또는 계산을 마친 뒤 생활비 단계에서 결과로 돌아가기
-              const reachable = done || (key === 'result' && freshResult !== null && shown !== key);
+              const reachable =
+                done ||
+                ((key === 'result' || (key === 'plan' && hasPlan)) &&
+                  freshResult !== null &&
+                  shown !== key);
               const content = (
                 <>
                   <span className="step-number">{done ? <Check aria-hidden /> : i + 1}</span>
@@ -843,7 +858,9 @@ export default function NewPosting() {
             })}
           </ol>
           <h1 ref={heading} tabIndex={-1} className="desk-title outline-none">
-            {shown === 'result' ? (
+            {shown === 'plan' ? (
+              '1년 정착 플랜'
+            ) : shown === 'result' ? (
               '매달 남는 돈'
             ) : shown === 'living' ? (
               '내 생활비'
@@ -857,13 +874,15 @@ export default function NewPosting() {
             )}
           </h1>
           <p className="intro-copy">
-            {shown === 'result'
-              ? '세금·4대보험을 빼고, 집·교통비·고정비까지 빼면 매달 이만큼 남아요.'
-              : shown === 'living'
-                ? '공고에는 없는 내 사정을 알려 주세요. 빈칸은 계산할 수 없다고 표시하고, 지어내지 않아요.'
-                : reviewing
-                  ? '공고에서 읽은 값이 맞는지 확인하세요. 틀린 값은 고치고, 빠진 값은 직접 입력할 수 있어요.'
-                  : '비교할 공고의 본문을 붙여 넣거나 공고 파일을 넣어 주세요. 여러 개를 함께 넣을 수 있어요.'}
+            {shown === 'plan'
+              ? '이 회사를 고르면 언제 무엇을 하면 되는지 모았어요.'
+              : shown === 'result'
+                ? '세금·4대보험을 빼고, 집·교통비·고정비까지 빼면 매달 이만큼 남아요.'
+                : shown === 'living'
+                  ? '공고에는 없는 내 사정을 알려 주세요. 빈칸은 계산할 수 없다고 표시하고, 지어내지 않아요.'
+                  : reviewing
+                    ? '공고에서 읽은 값이 맞는지 확인하세요. 틀린 값은 고치고, 빠진 값은 직접 입력할 수 있어요.'
+                    : '비교할 공고의 본문을 붙여 넣거나 공고 파일을 넣어 주세요. 여러 개를 함께 넣을 수 있어요.'}
           </p>
           {shown === 'input' && (
             <div className="desk-illustration" aria-hidden="true">
@@ -878,26 +897,69 @@ export default function NewPosting() {
         </div>
       </div>
 
-      {shown === 'result' && freshResult ? (
-        <section className="desk-sheet sheet-enter" aria-label="매달 남는 돈">
+      {(shown === 'result' || shown === 'plan') && freshResult ? (
+        <section
+          key={shown} // 단계가 바뀌면 들어오는 움직임을 다시
+          className="desk-sheet sheet-enter"
+          aria-label={shown === 'plan' ? '1년 정착 플랜' : '매달 남는 돈'}
+        >
           {demoNotice}
-          <h2 className="sheet-heading">공고 {rows.length}개 비교</h2>
-          <ReportView report={report} />
-          <ResultView result={freshResult} rows={rows} />
-          {support && (
-            <SupportView support={support} rows={rows} stale={support.checked_on === staleFor} />
+          {shown === 'result' ? (
+            <>
+              <h2 className="sheet-heading">공고 {rows.length}개 비교</h2>
+              <ReportView report={report} />
+              <ResultView result={freshResult} rows={rows} />
+              {hasPlan && plan && <PlanPreview plan={plan} />}
+            </>
+          ) : (
+            <>
+              {plan && <PlanView plan={plan} result={freshResult} />}
+              {support && (
+                <details className="result-details mt-6">
+                  <summary>
+                    근무지별 청년 지원 전체 보기 (
+                    {support.regions
+                      .map((r) => `${placeName(r.region)} ${r.matched}개`)
+                      .concat(`전국 ${support.national_matched}개`)
+                      .join(' · ')}
+                    )
+                  </summary>
+                  <SupportView
+                    support={support}
+                    rows={rows}
+                    stale={support.checked_on === staleFor}
+                  />
+                </details>
+              )}
+            </>
           )}
-          {plan && <PlanView plan={plan} result={freshResult} />}
           <div className="sheet-actions flex-wrap">
             <div className="flex flex-wrap gap-2">
-              <Button variant="outline" className="min-h-11" onClick={() => changeStep('living')}>
-                <Calculator aria-hidden /> 생활비 바꾸기
-              </Button>
-              <Button variant="ghost" className="min-h-11" onClick={() => changeStep('review')}>
-                <Pencil aria-hidden /> 조건 다시 고치기
-              </Button>
+              {shown === 'plan' ? (
+                <Button variant="ghost" className="min-h-11" onClick={() => changeStep('result')}>
+                  <ArrowLeft aria-hidden /> 남는 돈 다시 보기
+                </Button>
+              ) : (
+                <>
+                  <Button
+                    variant="outline"
+                    className="min-h-11"
+                    onClick={() => changeStep('living')}
+                  >
+                    <Calculator aria-hidden /> 생활비 바꾸기
+                  </Button>
+                  <Button variant="ghost" className="min-h-11" onClick={() => changeStep('review')}>
+                    <Pencil aria-hidden /> 조건 다시 고치기
+                  </Button>
+                </>
+              )}
             </div>
-            {confirmingRestart ? (
+            {/* 남는 돈 단계의 다음 행동은 하나: 정착 플랜 (새로 비교하기는 정착 플랜 단계에만) */}
+            {shown === 'result' && hasPlan ? (
+              <Button className="main-action" onClick={() => changeStep('plan')}>
+                1년 정착 플랜 보기 <ArrowRight aria-hidden />
+              </Button>
+            ) : confirmingRestart ? (
               <div
                 role="alertdialog"
                 aria-labelledby="restart-question"
@@ -922,7 +984,11 @@ export default function NewPosting() {
                 </div>
               </div>
             ) : (
-              <Button className="main-action" onClick={requestStartOver}>
+              <Button
+                variant={shown === 'plan' ? 'outline' : 'default'}
+                className={shown === 'plan' ? 'min-h-11' : 'main-action'}
+                onClick={requestStartOver}
+              >
                 새로 비교하기 <ArrowRight aria-hidden />
               </Button>
             )}

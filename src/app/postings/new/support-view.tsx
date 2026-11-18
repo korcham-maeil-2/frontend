@@ -74,12 +74,15 @@ function PolicyItem({ policy, thisYear }: { policy: Policy; thisYear: string }) 
         <span className={policy.apply_status === 'open' ? 'support-open' : undefined}>
           {applyText(policy, thisYear)}
         </span>
-        <span>{policy.age_range}</span>
+        <span>{policy.age_range === '나이 제한 없음' ? '나이 무관' : policy.age_range}</span>
+        {policy.income === '소득 무관' && <span>소득 무관</span>}
         {policy.agency && <span className="support-agency">{policy.agency}</span>}
       </p>
-      <p className="support-income" title={policy.income}>
-        소득: {policy.income}
-      </p>
+      {policy.income !== '소득 무관' && (
+        <p className="support-income" title={policy.income}>
+          소득: {policy.income}
+        </p>
+      )}
     </li>
   );
 }
@@ -174,8 +177,7 @@ export function SupportView({
           근무지별 청년 지원
         </h3>
         <p className="text-sm text-muted-foreground">
-          남는 돈 계산에는 넣지 않았어요. 조건과 일정은 바뀔 수 있으니, 신청 전에 각 신청 페이지에서
-          확인해 주세요.
+          남는 돈 계산에는 넣지 않았어요. 조건·일정은 신청 페이지에서 확인해 주세요.
         </p>
         {/* 다시 고르기는 화면이 뜬 뒤에 실패한다 → 줄을 늘 두고 글만 넣어야 화면 읽기가 읽어 준다 */}
         <p role="status" className="text-sm text-muted-foreground">
