@@ -787,8 +787,7 @@ export default function NewPosting() {
   };
   const demoNotice = demoMode && (
     <p className="demo-notice">
-      시연 모드예요. 실제 AI 대신 미리 준비한 답을 써서 &ldquo;예시 공고 넣기&rdquo;의 공고와 시연용
-      공고 파일만 읽을 수 있어요.
+      시연 모드라서 &ldquo;예시 공고 넣기&rdquo;의 공고와 시연용 공고 파일만 읽을 수 있어요.
     </p>
   );
 
@@ -851,14 +850,14 @@ export default function NewPosting() {
           </h1>
           <p className="intro-copy">
             {shown === 'plan'
-              ? '이 회사를 고르면 언제 무엇을 하면 되는지 모았어요.'
+              ? '이 회사에 가면 1년 동안 챙길 일을 순서대로 모았어요.'
               : shown === 'result'
-                ? '세금·4대보험을 빼고, 집·교통비·고정비까지 빼면 매달 이만큼 남아요.'
+                ? '세금과 4대보험, 집값·교통비·고정비를 빼고 매달 남는 돈이에요.'
                 : shown === 'living'
-                  ? '공고에는 없는 내 사정을 알려 주세요. 빈칸은 계산할 수 없다고 표시하고, 지어내지 않아요.'
+                  ? '공고에 없는 내 생활비를 넣어 주세요. 꼭 필요한 칸은 위에 따로 알려 드려요.'
                   : reviewing
                     ? '공고에서 가져온 조건이에요. 다시 볼 값은 아래에 모았어요.'
-                    : '비교할 공고의 본문을 붙여 넣거나 공고 파일을 넣어 주세요. 여러 개를 함께 넣을 수 있어요.'}
+                    : '공고 글을 붙여 넣거나 파일을 올려 주세요. 여러 곳을 한 번에 비교할 수 있어요.'}
           </p>
           {shown === 'input' && (
             <div className="desk-illustration" aria-hidden="true">
@@ -879,7 +878,6 @@ export default function NewPosting() {
           className="desk-sheet sheet-enter"
           aria-label={shown === 'plan' ? '1년 정착 플랜' : '매달 남는 돈'}
         >
-          {demoNotice}
           {shown === 'result' ? (
             <>
               <h2 className="sheet-heading">공고 {rows.length}개 비교</h2>
@@ -1019,29 +1017,11 @@ export default function NewPosting() {
             calculate();
           }}
         >
-          {demoNotice}
           <h2 className="sheet-heading">공고 {rows.length}개에 필요한 값</h2>
-          {/* 계산하는 동안은 입력을 잠근다 (계산이 끝나면 보낸 값으로 화면을 맞추므로, 그사이 고친 값이 사라진다) */}
-          <fieldset disabled={busy !== null} className="min-w-0">
-            <ProfileFormView
-              form={profile}
-              rows={rows}
-              onChange={setProfile}
-              activeId={activeId}
-              onSelectPosting={selectPosting}
-              missingFor={(row) => missingProfile.filter((item) => item.rowId === row.id)}
-              askAge={supportEnabled}
-              rents={rents}
-              failedRents={failedRents}
-              onRetryRents={retryFailedRents}
-              asking={asking?.questions}
-              askFixedIndex={asking?.fixedIndex}
-            />
-          </fieldset>
-          {/* 되묻기 중에는 질문이 칸 위에 있으니 '비어 있는 값' 목록은 숨긴다 */}
+          {/* 계산을 막는 빈칸을 맨 위에 (오류처럼 보이지 않게 '할 일' 상자로). 되묻기 중에는 질문이 칸 위에 있으니 숨긴다 */}
           {missingProfile.length > 0 && !asking && (
-            <div className="salary-notice mt-6">
-              <p className="font-semibold">비어 있는 값은 계산할 수 없다고 표시돼요</p>
+            <div className="review-todo">
+              <p className="review-todo-title">이 칸만 채우면 계산돼요</p>
               <ul>
                 {missingProfile.map((item) => (
                   <li key={item.fieldId}>
@@ -1059,6 +1039,23 @@ export default function NewPosting() {
               </ul>
             </div>
           )}
+          {/* 계산하는 동안은 입력을 잠근다 (계산이 끝나면 보낸 값으로 화면을 맞추므로, 그사이 고친 값이 사라진다) */}
+          <fieldset disabled={busy !== null} className="min-w-0">
+            <ProfileFormView
+              form={profile}
+              rows={rows}
+              onChange={setProfile}
+              activeId={activeId}
+              onSelectPosting={selectPosting}
+              missingFor={(row) => missingProfile.filter((item) => item.rowId === row.id)}
+              askAge={supportEnabled}
+              rents={rents}
+              failedRents={failedRents}
+              onRetryRents={retryFailedRents}
+              asking={asking?.questions}
+              askFixedIndex={asking?.fixedIndex}
+            />
+          </fieldset>
           {/* 계산 실패: 빨간 한 줄 대신 눈에 띄는 상자로. 할 일은 오류 문구에, 넣은 값은 그대로라는 것을 함께 */}
           <div role="alert">
             {error && (
@@ -1110,7 +1107,6 @@ export default function NewPosting() {
         </form>
       ) : reviewing ? (
         <section className="desk-sheet sheet-enter" aria-label="공고 조건 확인">
-          {demoNotice}
           {/* 처음 온 사람이 가장 먼저 볼 것: 지금 할 일 (공고마다 한 줄, 누르면 그 칸·탭으로) */}
           <div ref={reviewTodo} tabIndex={-1} className="review-todo">
             <p className="review-todo-title">
@@ -1163,9 +1159,8 @@ export default function NewPosting() {
             </ul>
           </div>
           {hasMaskedQuote(rows) && (
-            <p className="-mt-3 mb-5 text-sm text-muted-foreground">
-              공고 글의 [이메일]·[번지] 같은 표시는 AI에 보내기 전에 개인정보를 가린 자리예요.
-              비교에는 쓰지 않는 값이에요.
+            <p className="mb-5 text-sm text-muted-foreground">
+              [이메일]·[번지] 같은 표시는 개인정보를 가린 자리예요. 비교에는 쓰지 않아요.
             </p>
           )}
           {(visionInputs.length > 0 || ocrInputs.length > 0 || ignoredImages.length > 0) && (
@@ -1179,7 +1174,7 @@ export default function NewPosting() {
                 </p>
               )}
               {ocrInputs.length > 0 && (
-                <p>{names(ocrInputs)}: 스캔한 PDF라, 스캐너가 기계로 읽어 넣어 둔 글자를 썼어요.</p>
+                <p>{names(ocrInputs)}: 스캔한 PDF라서 파일 안에 들어 있던 글자를 그대로 썼어요.</p>
               )}
               {ignoredImages.length > 0 && (
                 <p>
@@ -1297,7 +1292,7 @@ export default function NewPosting() {
                     }}
                     rows={5}
                     placeholder="회사명, 근무지, 급여가 적힌 부분을 복사해 넣으세요. 링크는 열어 볼 수 없어요."
-                    className="min-h-36 resize-y rounded-md border border-input p-3 text-base leading-relaxed focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-ring"
+                    className="max-h-64 min-h-36 resize-y rounded-md border border-input p-3 text-base leading-relaxed focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-ring"
                   />
                   {isLinkOnly(text) && (
                     <LinkHint
@@ -1357,8 +1352,8 @@ export default function NewPosting() {
                 showTotal
               />
               <p className="text-sm leading-relaxed text-muted-foreground">
-                파일 원본은 서버에 저장하지 않고, 읽은 글만 비교표를 만드는 데 써요. 글자를 복사할
-                수 없는 이미지는 글자를 읽기 위해 AI(Claude)에 보내요.
+                파일은 서버에 저장하지 않아요. 글자를 복사할 수 없는 이미지만 글자를 읽으려고
+                AI(Claude)에 보내요.
               </p>
             </TabsContent>
           </Tabs>
