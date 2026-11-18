@@ -14,6 +14,11 @@ services:
       args:
         # 빌드할 때 화면 코드에 들어가는 백엔드 주소
         NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-https://maeil2-backend.sunghoyaaa.com}
+        # 화면 오류 추적(GlitchTip 프로젝트 maeil2-frontend)의 DSN. 서버의 frontend/.env에 둔다 (비우면 끔).
+        # 브라우저에 공개되는 값이다 (Sentry 형식 DSN은 보내기 전용)
+        NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
+        # 어느 배포의 오류인지 (배포 작업이 커밋 번호를 넘긴다)
+        NEXT_PUBLIC_SENTRY_RELEASE: ${NEXT_PUBLIC_SENTRY_RELEASE:-}
     image: maeil2-frontend
     container_name: maeil2-frontend
     restart: unless-stopped

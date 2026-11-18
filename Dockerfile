@@ -23,7 +23,12 @@ COPY . .
 # NEXT_PUBLIC_으로 시작하는 값은 빌드할 때 화면 코드에 박힌다 (실행 중에 바꿀 수 없음).
 # 백엔드 주소를 바꾸려면 다시 빌드해야 한다 (docker-compose.yml의 build.args).
 ARG NEXT_PUBLIC_API_BASE_URL=https://maeil2-backend.sunghoyaaa.com
+# 화면 오류 추적 (GlitchTip). 비우면 끈다 (src/instrumentation-client.ts)
+ARG NEXT_PUBLIC_SENTRY_DSN=
+ARG NEXT_PUBLIC_SENTRY_RELEASE=
 ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL \
+    NEXT_PUBLIC_SENTRY_DSN=$NEXT_PUBLIC_SENTRY_DSN \
+    NEXT_PUBLIC_SENTRY_RELEASE=$NEXT_PUBLIC_SENTRY_RELEASE \
     NEXT_TELEMETRY_DISABLED=1
 RUN pnpm build
 
