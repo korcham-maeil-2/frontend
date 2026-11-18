@@ -1492,6 +1492,15 @@ details[open] > summary .when-closed {
     width: auto;
     min-width: 0.75rem;
   }
+  /* 375px보다 좁은 휴대폰(320·360px)은 이 간격·선 최소 길이로는 한 줄에 안 들어가 화면이 옆으로 밀린다 */
+  @media (max-width: 23.4rem) {
+    .step-track {
+      --step-gap: 0.25rem;
+    }
+    .step-track li + li::before {
+      min-width: 0.25rem;
+    }
+  }
   .desk-spread.is-wide .desk-intro {
     padding: 1rem 1.25rem 1.25rem;
   }
