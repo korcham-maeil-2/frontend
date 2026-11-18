@@ -1283,12 +1283,6 @@ section.desk-sheet > .sheet-heading {
   color: var(--muted-foreground);
 }
 
-/* 내 생활비: 넓은 화면에서 숫자 칸이 이름에서 멀어지지 않게 폼 폭을 묶는다 (고정비 줄·단위 끝선은 그대로) */
-@media (min-width: 64rem) {
-  .profile-form {
-    max-width: 46rem;
-  }
-}
 /* 내 생활비: '모든 공고에 같은 값'과 '공고마다 다른 값'의 경계 (가장 큰 구분: 굵은 잉크 선) */
 .profile-split {
   margin-top: 3rem;
