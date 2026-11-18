@@ -55,6 +55,7 @@ import { ResultView, bestRemainingText, isCalculationResult } from './result-vie
 import { BadgeLegend } from './source-badge';
 import { SupportView, isLocalSupport } from './support-view';
 import { PlanView, isSettlePlan } from './plan-view';
+import { askQuestionsOf, askTargetId, type AskQuestion } from './ask-view';
 import { ReportView, isReport, type Report } from './report-view';
 import { RowEditor, fieldsToCheck, focusField } from './row-editor';
 
@@ -471,6 +472,7 @@ export default function NewPosting() {
       setResult(null);
       setSupport(null);
       setPlan(null);
+      setAsking(null);
       setReport(null);
       // 새 표: 첫 공고를 고르고 그것만 '본 것'으로 (예전 표에서 연 탭 기록은 버린다)
       setActivePosting(table[0].id);
@@ -567,7 +569,61 @@ export default function NewPosting() {
    *   - '이미 확인을 마침' → 같은 세션에 /recalculate
    *   - '세션이 없음' 등   → 같은 공고 글로 새 세션을 만들어 /confirm (공고를 다시 읽는다)
    */
-  async function calculate() {
+  function finishCalculation(
+    data: SessionResponse,
+    id: string,
+    sentRows: Row[],
+    sentProfile: UserProfile,
+  ) {
+    // 되묻기: 계산을 막는 빈 값이 있어 서버가 질문을 보냈다 → 대화 상자를 띄우고 답을 기다린다
+    const questions = data.status === 'awaiting_answer' ? askQuestionsOf(data.pending) : null;
+    if (questions) {
+      setSessionId(id);
+      setAsking({ id, questions });
+      return;
+    }
+    setAsking(null);
+    if (!isCalculationResult(data.result)) {
+      setError(RESULT_ERROR); // 모양이 다르면(예전 백엔드 등) 그리지 않는다
+      return;
+    }
+    const calculatedRows = data.table?.length ? data.table : sentRows;
+    setSessionId(id);
+    setRows(calculatedRows);
+    setCompleted(true);
+    setResult(data.result);
+    setRents((known) => ({ ...known, ...rentsFromResult(data.result?.rent_estimates) }));
+    // 청년 지원은 키가 없거나 예전 백엔드면 오지 않는다 → 없으면 그 영역만 안 그린다
+    setSupport(isLocalSupport(data.local_support) ? data.local_support : null);
+    // 정착 플랜: 예전 백엔드면 오지 않는다 → 없으면 그 영역만 안 그린다
+    setPlan(isSettlePlan(data.plan) ? data.plan : null);
+    // AI 리포트: 검증을 통과했을 때만 글이 온다 (report_check로 상태를 알린다)
+    setReport({ text: data.report ?? null, check: data.report_check ?? null });
+    setResultKey(inputKey(calculatedRows, sentProfile));
+    changeStep('result');
+  }
+
+  // 되묻기 대화 (계산 전에 서버가 빈 값을 물어볼 때)
+  const [asking, setAsking] = useState<{ id: string; questions: AskQuestion[] } | null>(null);
+  // 질문이 뜨면 첫 질문의 원래 칸으로 스크롤하고 커서를 넣는다 (바로 답할 수 있게).
+  // 계산 중에는 입력칸이 잠겨 있어(fieldset disabled) 커서가 안 들어가므로, 계산이 끝난 뒤 한 번만.
+  const focusedAsk = useRef<object | null>(null);
+  useEffect(() => {
+    if (!asking || busy !== null || focusedAsk.current === asking) return;
+    focusedAsk.current = asking;
+    const fixedIndex = profile.fixedExpenses.findIndex((x) => x.amount == null);
+    const field = document.getElementById(askTargetId(asking.questions[0], fixedIndex));
+    field?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    field?.focus({ preventScroll: true });
+    // 질문이 새로 왔을 때만 (답을 치는 동안 폼이 바뀌어도 커서를 옮기지 않는다)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [asking, busy]);
+
+  /**
+   * 계산하기. 되묻기 중이면 답(원래 칸에 넣은 값)을 포함한 지금 폼 값을 통째로 /confirm에 다시 보낸다
+   * (질문 중에 고친 다른 칸·비교표도 함께 반영된다). skipMissing: '모르겠어요, 이대로 계산'
+   */
+  async function calculate({ skipMissing = false } = {}) {
     setBusy('confirming');
     setError('');
     const sentRows = rows;
@@ -576,34 +632,13 @@ export default function NewPosting() {
     const confirm = (id: string) =>
       api.POST('/sessions/{session_id}/confirm', {
         params: { path: { session_id: id } },
-        body: { approved: true, table: sentRows, profile: sentProfile },
+        body: { approved: true, table: sentRows, profile: sentProfile, skip_missing: skipMissing },
       });
     const recalculate = (id: string) =>
       api.POST('/sessions/{session_id}/recalculate', {
         params: { path: { session_id: id } },
         body: { table: sentRows, profile: sentProfile },
       });
-
-    function finish(data: SessionResponse, id: string) {
-      if (!isCalculationResult(data.result)) {
-        setError(RESULT_ERROR); // 모양이 다르면(예전 백엔드 등) 그리지 않는다
-        return;
-      }
-      const calculatedRows = data.table?.length ? data.table : sentRows;
-      setSessionId(id);
-      setRows(calculatedRows);
-      setCompleted(true);
-      setResult(data.result);
-      setRents((known) => ({ ...known, ...rentsFromResult(data.result?.rent_estimates) }));
-      // 청년 지원은 키가 없거나 예전 백엔드면 오지 않는다 → 없으면 그 영역만 안 그린다
-      setSupport(isLocalSupport(data.local_support) ? data.local_support : null);
-      // 정착 플랜: 예전 백엔드면 오지 않는다 → 없으면 그 영역만 안 그린다
-      setPlan(isSettlePlan(data.plan) ? data.plan : null);
-      // AI 리포트: 검증을 통과했을 때만 글이 온다 (report_check로 상태를 알린다)
-      setReport({ text: data.report ?? null, check: data.report_check ?? null });
-      setResultKey(inputKey(calculatedRows, sentProfile));
-      changeStep('result');
-    }
 
     try {
       if (sessionId) {
@@ -612,7 +647,7 @@ export default function NewPosting() {
           response = await recalculate(sessionId);
         }
         if (response.data) {
-          finish(response.data, sessionId);
+          finishCalculation(response.data, sessionId, sentRows, sentProfile);
           return;
         }
         if (!SESSION_LOST.has(errorCode(response.error))) {
@@ -634,7 +669,7 @@ export default function NewPosting() {
         setError(confirmed.error?.message ?? NETWORK_ERROR);
         return;
       }
-      finish(confirmed.data, id);
+      finishCalculation(confirmed.data, id, sentRows, sentProfile);
     } catch {
       setError(NETWORK_ERROR);
     } finally {
@@ -665,6 +700,7 @@ export default function NewPosting() {
     setResult(null);
     setSupport(null);
     setPlan(null);
+    setAsking(null);
     setReport(null);
     setResultKey('');
     setActivePosting('');
@@ -902,9 +938,11 @@ export default function NewPosting() {
               rents={rents}
               failedRents={failedRents}
               onRetryRents={retryFailedRents}
+              asking={asking?.questions}
             />
           </fieldset>
-          {missingProfile.length > 0 && (
+          {/* 되묻기 중에는 질문이 칸 위에 있으니 '비어 있는 값' 목록은 숨긴다 */}
+          {missingProfile.length > 0 && !asking && (
             <div className="salary-notice mt-6">
               <p className="font-semibold">비어 있는 값은 계산할 수 없다고 표시돼요</p>
               <ul>
@@ -943,10 +981,29 @@ export default function NewPosting() {
             >
               <ArrowLeft aria-hidden /> 조건 확인으로
             </Button>
-            <Button type="submit" className="main-action" disabled={busy !== null}>
-              {busy === 'confirming' ? '계산하는 중…' : '매달 남는 돈 계산하기'}{' '}
-              <Calculator aria-hidden />
-            </Button>
+            {asking ? (
+              // 되묻기 중: 메인 버튼 자리에 두 버튼. Enter(폼 제출)는 '답하고 계산 이어 가기'
+              <div className="flex flex-wrap justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="min-h-11"
+                  disabled={busy !== null}
+                  onClick={() => calculate({ skipMissing: true })}
+                >
+                  모르겠어요, 이대로 계산
+                </Button>
+                <Button type="submit" className="main-action" disabled={busy !== null}>
+                  {busy === 'confirming' ? '계산하는 중…' : '답하고 계산 이어 가기'}{' '}
+                  <Calculator aria-hidden />
+                </Button>
+              </div>
+            ) : (
+              <Button type="submit" className="main-action" disabled={busy !== null}>
+                {busy === 'confirming' ? '계산하는 중…' : '매달 남는 돈 계산하기'}{' '}
+                <Calculator aria-hidden />
+              </Button>
+            )}
           </div>
           {/* AI 리포트는 쓰고 검증하는 데 시간이 걸린다 (시연 모드는 리포트를 쓰지 않는다).
               화면 읽기 프로그램 알림은 카드 안에서 단계가 바뀔 때만 (agent-progress.tsx) */}

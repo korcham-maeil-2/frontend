@@ -1865,3 +1865,32 @@ section.desk-sheet > .sheet-heading {
   font-weight: 400;
   color: var(--muted-foreground);
 }
+/* 되묻기 (ask-view.tsx): 에이전트가 물은 원래 칸 위에 질문을 붙이고, 질문과 칸을 함께 강조한다 */
+.ask-wrap,
+.fixed-expense.is-asked {
+  border-radius: 0.5rem;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 45%, transparent);
+}
+.ask-wrap {
+  padding: 0.5rem 0.75rem 0;
+}
+.fixed-expense.is-asked {
+  padding: 0.5rem;
+}
+.fixed-ask {
+  list-style: none;
+}
+.ask-bubble {
+  border-radius: 0.5rem;
+  background: color-mix(in srgb, var(--primary) 8%, var(--card));
+  padding: 0.75rem;
+  font-size: 0.875rem;
+  color: var(--body);
+}
+.ask-bubble-title {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-weight: 700;
+  color: var(--foreground);
+}

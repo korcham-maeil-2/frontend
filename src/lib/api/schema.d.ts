@@ -107,6 +107,29 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/sessions/{session_id}/answers': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Answer Questions
+     * @description 되묻기에 답한다 (이슈 #13) = check_missing에서 멈춘 그래프를 답과 함께 다시 깨운다.
+     *
+     *     답한 값은 '사용자 입력'으로 사용자 정보에 들어가고, 계산이 이어진다 (모르면 null).
+     *     되묻기를 기다리는 세션이 아니면 409.
+     */
+    post: operations['answer_questions_sessions__session_id__answers_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/sessions/{session_id}/recalculate': {
     parameters: {
       query?: never;
@@ -243,6 +266,19 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
   schemas: {
+    /**
+     * Answers
+     * @description POST /sessions/{id}/answers 요청. 모르는 값은 null로 보내면 비워 둔 채 계산한다.
+     */
+    Answers: {
+      /**
+       * Answers
+       * @description 질문 key → 월 금액(원). 모르면 null (예: {'current_housing': 300000})
+       */
+      answers?: {
+        [key: string]: number | null;
+      };
+    };
     /**
      * Baseline
      * @description 비교 기준: 이만큼은 남아야 한다.
@@ -513,6 +549,12 @@ export interface components {
       table?: components['schemas']['ComparisonRow'][] | null;
       /** @description 사용자 정보 (지금 집 주거비, 공고별 통근·이사 비용, 고정비, 지금 연봉 등). 보내면 월 잔여액·손익분기 연봉을 계산한다. 안 보내면 세후 월급까지만 계산 */
       profile?: components['schemas']['UserProfile'] | null;
+      /**
+       * Skip Missing
+       * @description 되묻기 중 '모르겠어요, 이대로 계산': 빈 값을 묻지 않고 계산한다 ('계산 못 함'으로 보임). 되묻기에 답할 때는 false로 지금 폼 값을 통째로 보낸다
+       * @default false
+       */
+      skip_missing: boolean;
     };
     /**
      * Cost
@@ -613,6 +655,7 @@ export interface components {
       | 'SESSION_NOT_FOUND'
       | 'SESSION_NOT_AWAITING_CONFIRMATION'
       | 'SESSION_NOT_COMPLETED'
+      | 'SESSION_NOT_AWAITING_ANSWER'
       | 'REGION_NOT_FOUND'
       | 'NORMALIZE_FAILED'
       | 'FILE_MISSING'
@@ -916,7 +959,7 @@ export interface components {
     PendingQuestion: {
       /**
        * Type
-       * @description 멈춘 이유. 지금은 confirm_table 하나
+       * @description 멈춘 이유: confirm_table(비교표 확인) 또는 ask_missing(빈 값 되묻기, payload.questions에 질문 목록)
        */
       type: string;
       /** Payload */
@@ -1392,7 +1435,7 @@ export interface components {
        * Status
        * @enum {string}
        */
-      status: 'awaiting_confirmation' | 'completed' | 'running';
+      status: 'awaiting_confirmation' | 'awaiting_answer' | 'completed' | 'running';
       /** @description 사용자 확인을 기다리는 내용 (status가 awaiting_confirmation일 때) */
       pending?: components['schemas']['PendingQuestion'] | null;
       /**
@@ -1851,6 +1894,68 @@ export interface operations {
     requestBody: {
       content: {
         'application/json': components['schemas']['ConfirmRequest'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SessionResponse'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Unprocessable Content */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Internal Server Error */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  answer_questions_sessions__session_id__answers_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        session_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['Answers'];
       };
     };
     responses: {
