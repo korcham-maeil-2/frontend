@@ -159,6 +159,17 @@
   html {
     @apply font-sans;
   }
+  /* 누르는 것은 모두 손 모양 커서. Tailwind 기본값은 button을 화살표로 두어서, 클래스마다 따로 넣은 곳만
+     손 모양이 되던 것을 한 곳에서 맞춘다 (버튼·탭·접기 줄·라디오·체크 상자와 그 이름표) */
+  button:not(:disabled),
+  [role='button']:not([aria-disabled='true']),
+  [role='tab']:not([aria-disabled='true']),
+  summary,
+  select:not(:disabled),
+  input:is([type='checkbox'], [type='radio'], [type='file']):not(:disabled),
+  label:has(input:is([type='checkbox'], [type='radio']):not(:disabled)) {
+    cursor: pointer;
+  }
   h1,
   h2,
   h3 {
