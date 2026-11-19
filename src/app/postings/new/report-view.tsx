@@ -72,8 +72,6 @@ function withMoney(text: string) {
   return text.split(MONEY).map((part, i) => (i % 2 ? <strong key={i}>{part}</strong> : part));
 }
 
-const PREVIEW_ITEMS = 3; // 처음에는 세 칸만 보여 주고 '더 보기' (휴대폰에서 숫자 표가 밀리지 않게)
-
 export function ReportView({ report }: { report: Report | null }) {
   const [open, setOpen] = useState(false);
   const check = report?.check;
@@ -90,44 +88,46 @@ export function ReportView({ report }: { report: Report | null }) {
   }
 
   const all = items(report.text);
-  const shown = open ? all : all.slice(0, PREVIEW_ITEMS);
-  const hidden = all.length - PREVIEW_ITEMS;
 
+  // 결론은 위 '한 줄 결론'(verdict.tsx)이 말한다 → AI 설명은 한 줄로 접어 두고, 누르면 펼친다
   return (
-    <section className="report-section" aria-labelledby="report-title">
-      <div className="report-head">
-        <h3 id="report-title" className="font-semibold text-foreground">
-          한눈에 보기
-        </h3>
-        <p className="report-badge">
+    <section
+      className={open ? 'report-section is-open' : 'report-section'}
+      aria-labelledby="report-title"
+    >
+      <button
+        type="button"
+        className="report-head"
+        aria-expanded={open}
+        aria-controls="report-body"
+        onClick={() => setOpen((v) => !v)}
+      >
+        <span id="report-title" className="font-semibold text-foreground">
+          AI가 쓴 자세한 설명
+        </span>
+        <span className="report-badge">
           <ShieldCheck aria-hidden className="size-4 shrink-0" />
           금액 검증 통과
-        </p>
-      </div>
-      <ul className="report-body" id="report-body">
-        {shown.map((item, i) => (
-          <li key={i}>
-            {item.label && <p className="report-item-label">{item.label}</p>}
-            <p>{withMoney(item.text)}</p>
-          </li>
-        ))}
-      </ul>
-      {hidden > 0 && (
-        <button
-          type="button"
-          className="question-link report-more"
-          aria-expanded={open}
-          aria-controls="report-body"
-          onClick={() => setOpen((v) => !v)}
-        >
-          {open ? '설명 접기' : `설명 더 보기 (${hidden}개)`}
-          <ChevronDown aria-hidden className={`size-4 ${open ? 'rotate-180' : ''}`} />
-        </button>
+        </span>
+        <ChevronDown aria-hidden className={`report-chevron size-5 ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <>
+          <ul className="report-body" id="report-body">
+            {all.map((item, i) => (
+              <li key={i}>
+                {item.label && <p className="report-item-label">{item.label}</p>}
+                <p>{withMoney(item.text)}</p>
+              </li>
+            ))}
+          </ul>
+          <p className="text-sm text-muted-foreground">
+            AI가 계산 결과를 보고 쓴 설명이에요. 금액은 AI가 쓴 게 아니라 계산 결과를 그대로
+            옮겼어요
+            {check.attempts > 1 ? ` (검토에서 고칠 곳이 나와 ${check.attempts}번째에 통과)` : ''}.
+          </p>
+        </>
       )}
-      <p className="text-sm text-muted-foreground">
-        AI가 계산 결과를 보고 쓴 설명이에요. 금액은 AI가 쓴 게 아니라 계산 결과를 그대로 옮겼어요
-        {check.attempts > 1 ? ` (검토에서 고칠 곳이 나와 ${check.attempts}번째에 통과)` : ''}.
-      </p>
     </section>
   );
 }
