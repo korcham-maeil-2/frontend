@@ -907,12 +907,7 @@ export function ResultView({
   return (
     <div className="space-y-6">
       {/* 보기 방식 고르기: 탭이 아니라 표 하나의 보기 방식을 바꾸는 버튼 묶음 */}
-      <div
-        role="group"
-        aria-label="비교할 경우"
-        className="source-tabs mode-switch"
-        data-tour="result-modes"
-      >
+      <div role="group" aria-label="비교할 경우" className="source-tabs mode-switch">
         {MODES.map((m) => (
           <button
             key={m.value}

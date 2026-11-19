@@ -79,9 +79,13 @@ function compare(result: Result, rows: Row[]) {
     const chosen = pickCase(posting, be, 'best');
     const scenario = posting.scenarios.find((s) => s.case === chosen && s.applicable);
     if (scenario?.monthly_remaining == null) {
+      // 빈 값이 이유면 무엇을 넣으면 되는지 (표의 '매달 남는 돈' 칸과 같은 이름)
+      const missing = posting.scenarios.find((s) => s.case === chosen)?.missing ?? [];
       const why =
         posting.net_income.value != null
-          ? '계산에 필요한 값이 없어 비교에서 뺐어요.'
+          ? missing.length
+            ? `${missing.join(', ')} 칸이 비어 계산하지 못했어요. 생활비에서 넣으면 같이 비교해요.`
+            : '계산에 필요한 값이 없어 비교에서 뺐어요.'
           : be
             ? "연봉이 공고에 없어 비교에서 뺐어요. 아래 '면접에서 확인할 연봉'을 보세요."
             : '연봉이 없어 비교에서 뺐어요. 조건 확인에서 연봉을 넣으면 같이 비교해요.';
@@ -323,18 +327,21 @@ export function Verdict({
   support: LocalSupport | null;
 }) {
   const { done, left } = compare(result, rows);
-  if (!done.length) return null;
   const single = done.length === 1;
   const bars = single ? casesOf(done[0]) : done;
-  const line = lineOf(bars, single);
+  // 계산된 공고가 없어도 카드는 둔다: 왜 못 했는지(아래 줄)가 답이다
+  const line = bars.length ? lineOf(bars, single) : null;
   return (
     <section className="verdict" aria-label="한 줄 결론">
-      <div>
+      {/* 사용법 안내 말풍선은 결론 문장을 가리킨다 (카드 전체는 휴대폰 화면보다 길 수 있다) */}
+      <div data-tour="verdict">
         {single && <p className="verdict-name">{done[0].name}</p>}
-        <p className="verdict-title">{line.title}</p>
-        {line.why && <p className="verdict-why">{line.why}</p>}
+        <p className="verdict-title">
+          {line ? line.title : '아직 매달 남는 돈을 계산하지 못했어요.'}
+        </p>
+        {line?.why && <p className="verdict-why">{line.why}</p>}
       </div>
-      <Bars bars={bars} single={single} />
+      {bars.length > 0 && <Bars bars={bars} single={single} />}
       {left.map((l, i) => (
         // 회사 이름이 같은 공고가 있을 수 있어 순서로
         <p key={i} className="verdict-left">
