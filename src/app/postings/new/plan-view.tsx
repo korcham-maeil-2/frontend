@@ -13,7 +13,15 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { api } from '@/lib/api/client';
 import type { components } from '@/lib/api/schema';
-import { formatWon, hasSalary, placeName, salaryText, statusBadge, type Row } from './format';
+import {
+  formatWon,
+  hasSalary,
+  placeName,
+  postingNames,
+  salaryText,
+  statusBadge,
+  type Row,
+} from './format';
 import { livesInCompanyHousing } from './profile';
 import { SourceBadge } from './source-badge';
 import {
@@ -485,8 +493,8 @@ function PostingPanel({
   /** 청년 지원을 못 불러와 지원 일정이 빠졌는지 */
   supportFailed: boolean;
   onEditLiving: () => void;
-  /** 되묻기 칸 (모든 회사가 같이 쓴다): 결론 카드 바로 아래에 둔다 */
-  askBack: ReactNode;
+  /** 되묻기 칸: 결론 카드 바로 아래. 지금 보는 경우(통근·이사)에 보이는 정책 번호를 받아 그 수만 센다 */
+  askBack: (ids: Set<string>) => ReactNode;
 }) {
   const cases = (['commute', 'move'] as const).filter((c) => plans[c]);
   const [picked, setPicked] = useState<Case>(() => defaultCase(result, plans));
@@ -683,7 +691,11 @@ function PostingPanel({
           </small>
         </div>
       </div>
-      {askBack}
+      {askBack(
+        new Set(
+          posting.slots.flatMap((s) => s.items.flatMap((i) => (i.policy_id ? [i.policy_id] : []))),
+        ),
+      )}
       {/* 1년 순서: 급한 것부터 시간순. 칸마다 한 줄 요약(칩), 지금·집 구하기 전만 펼쳐 둔다 */}
       <section className="plan-section">
         <h3 className="plan-section-title">1년 순서</h3>
@@ -930,6 +942,8 @@ export function PlanView({
     scenarioOf(result, p.posting_id, defaultCase(result, plansOf(plan, p)))?.monthly_remaining ??
     -Infinity;
   const first = postings.reduce((a, b) => (best(b) > best(a) ? b : a));
+  // 같은 회사 공고는 '카카오 (공고 2)' (조건 확인·결과 화면과 같은 이름)
+  const names = postingNames(postings.map((p) => p.company));
   const panel = (posting: PostingPlan) => {
     const plans = plansOf(plan, posting);
     const row = rows.find((r) => r.id === posting.posting_id);
@@ -960,7 +974,14 @@ export function PlanView({
           training={training[trainingKey(posting) ?? '']}
           supportFailed={supportFailed}
           onEditLiving={onEditLiving}
-          askBack={<AskBack status={status} terms={own} answers={answers} onAnswer={setAnswers} />}
+          askBack={(shown) => (
+            <AskBack
+              status={status}
+              terms={Object.fromEntries(Object.entries(own).filter(([id]) => shown.has(id)))}
+              answers={answers}
+              onAnswer={setAnswers}
+            />
+          )}
         />
       </TermsProvider>
     );
@@ -974,7 +995,7 @@ export function PlanView({
           <TabsList aria-label="볼 회사" className="posting-tabs">
             {postings.map((posting, i) => (
               <TabsTrigger key={posting.posting_id} value={posting.posting_id}>
-                <span className="posting-tab-name">{posting.company || `공고 ${i + 1}`}</span>
+                <span className="posting-tab-name">{names[i]}</span>
               </TabsTrigger>
             ))}
           </TabsList>
