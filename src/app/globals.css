@@ -1678,7 +1678,6 @@ details[open] > summary .when-closed {
 }
 .report-head {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
   min-height: 2.75rem; /* 누르는 줄 (접힌 AI 설명) */
@@ -1694,7 +1693,15 @@ details[open] > summary .when-closed {
 .report-section.is-open {
   padding-bottom: 1rem;
 }
+.report-head-text {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.5rem;
+}
 .report-chevron {
+  flex: none;
   margin-inline-start: auto;
   color: var(--muted-foreground);
   transition: transform 0.15s;
@@ -1732,6 +1739,7 @@ details[open] > summary .when-closed {
 
 /* 결과 맨 위 한 줄 결론 + 막대 + 찾아본 자료 (verdict.tsx). 초록은 남는 돈에만 (DESIGN.md) */
 .verdict {
+  margin-bottom: 1rem; /* 아래 AI 설명 상자와 붙지 않게 */
   display: grid;
   gap: 0.75rem;
   border: 1px solid var(--border);

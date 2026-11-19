@@ -555,6 +555,8 @@ function useOverflowX() {
     if (!el) return;
     const observer = new ResizeObserver(() => setOverflows(el.scrollWidth > el.clientWidth + 1));
     observer.observe(el);
+    // 표 내용이 바뀌어(비교 방식 바꾸기 등) 표만 넓어지거나 좁아져도 다시 잰다
+    if (el.firstElementChild) observer.observe(el.firstElementChild);
     return () => observer.disconnect();
   }, []);
   return [ref, overflows] as const;

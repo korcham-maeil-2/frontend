@@ -102,12 +102,15 @@ export function ReportView({ report }: { report: Report | null }) {
         aria-controls="report-body"
         onClick={() => setOpen((v) => !v)}
       >
-        <span id="report-title" className="font-semibold text-foreground">
-          AI가 쓴 자세한 설명
-        </span>
-        <span className="report-badge">
-          <ShieldCheck aria-hidden className="size-4 shrink-0" />
-          금액 검증 통과
+        {/* 제목·배지는 좁으면 줄을 바꾸고, 화살표는 늘 오른쪽 끝에 (혼자 다음 줄로 떨어지지 않게) */}
+        <span className="report-head-text">
+          <span id="report-title" className="font-semibold text-foreground">
+            AI가 쓴 자세한 설명
+          </span>
+          <span className="report-badge">
+            <ShieldCheck aria-hidden className="size-4 shrink-0" />
+            금액 검증 통과
+          </span>
         </span>
         <ChevronDown aria-hidden className={`report-chevron size-5 ${open ? 'rotate-180' : ''}`} />
       </button>
