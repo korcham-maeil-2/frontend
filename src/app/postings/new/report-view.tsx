@@ -105,7 +105,7 @@ export function ReportView({ report }: { report: Report | null }) {
         {/* 제목·배지는 좁으면 줄을 바꾸고, 화살표는 늘 오른쪽 끝에 (혼자 다음 줄로 떨어지지 않게) */}
         <span className="report-head-text">
           <span id="report-title" className="font-semibold text-foreground">
-            AI가 쓴 자세한 설명
+            왜 이런 결과인지 풀어 보기
           </span>
           <span className="report-badge">
             <ShieldCheck aria-hidden className="size-4 shrink-0" />
