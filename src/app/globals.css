@@ -2828,11 +2828,12 @@ body:has(.tour-chip) {
 .plan-node > summary {
   cursor: pointer;
 }
-.plan-node > summary::after {
+/* 접힘 표시는 이름 앞에 (더 보기 줄과 같은 자리, 칩이 길어도 혼자 다음 줄로 떨어지지 않게) */
+.plan-node > summary::before {
   content: '▸';
   color: var(--muted-foreground);
 }
-.plan-node[open] > summary::after {
+.plan-node[open] > summary::before {
   content: '▾';
 }
 .plan-node > summary .plan-slot-label,
