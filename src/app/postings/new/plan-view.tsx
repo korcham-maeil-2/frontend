@@ -740,13 +740,20 @@ function PostingPanel({
             afterJoin.length > 0 && (
               <Node key="after" n={0} label="입사한 뒤" chips={[]} fold={false}>
                 {/* 공고에서 읽은 날: 한 줄에 하나 (때 + 무엇이 바뀌는지). 짧아서 늘 보인다 */}
-                <ul className="plan-items">
+                <ul className="plan-items plan-after">
                   {afterJoin.flatMap((slot) =>
                     slot.items.map((item) => (
                       <li key={`${slot.label}-${item.title}`} className="plan-row">
                         <span className="support-open">{slot.label}</span>
                         <span>
                           <span className="plan-row-title">{item.title}</span> {item.detail}
+                          {/* 그날 앞뒤 매달 남는 돈 (백엔드 계산값, 둘 다 있을 때만) */}
+                          {item.remaining_before != null && item.remaining_after != null && (
+                            <span className="plan-row-money">
+                              남는 돈 약 {won(item.remaining_before)} →{' '}
+                              <strong>약 {won(item.remaining_after)}</strong>
+                            </span>
+                          )}
                         </span>
                       </li>
                     )),

@@ -2835,6 +2835,17 @@ body:has(.tour-chip) {
 .plan-more .plan-fold > summary::before {
   margin-inline-end: 0;
 }
+/* 입사한 뒤: '입사 3개월 뒤'·'입사 24개월 뒤' 길이가 달라도 글이 같은 줄에서 시작하게 */
+.plan-after .support-open {
+  min-width: 6.5rem;
+}
+.plan-row-money {
+  display: block;
+  color: var(--body);
+}
+.plan-row-money strong {
+  color: var(--foreground);
+}
 .plan-fold-body {
   padding: 0.5rem 0 1rem;
 }

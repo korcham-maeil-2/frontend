@@ -1089,6 +1089,16 @@ export interface components {
       /** Policy Id */
       policy_id: string | null;
       /**
+       * Remaining Before
+       * @description 이 날 전 매달 남는 돈 (원, 공고에서 읽은 날만). 계산값이 있을 때만
+       */
+      remaining_before: number | null;
+      /**
+       * Remaining After
+       * @description 이 날 뒤 매달 남는 돈 (원)
+       */
+      remaining_after: number | null;
+      /**
        * Scope
        * @description 정책이면 지역 정책(local)인지 전국 정책(national)인지
        */
@@ -1214,6 +1224,11 @@ export interface components {
       scenarios: components['schemas']['Scenario'][];
       /** Notes */
       notes: string[];
+      /**
+       * Probation Net
+       * @description 수습 동안 세후 월급 (수습 급여가 100% 미만일 때만). 정착 플랜이 쓴다
+       */
+      probation_net: number | null;
     };
     /**
      * Question
