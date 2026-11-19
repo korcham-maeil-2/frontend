@@ -133,7 +133,7 @@ export function isCalculationResult(value: unknown): value is Result {
 }
 
 /** 계산한 금액: 만 원 단위로 떨어지면 그대로, 아니면 '약 287만원'처럼 만 원 단위로 반올림한다. */
-function won(value: number): string {
+export function won(value: number): string {
   const abs = Math.abs(value);
   const rounded = Math.round(abs / 10_000) * 10_000;
   if (rounded === 0) return abs === 0 ? '0원' : '약 0원';
@@ -207,7 +207,11 @@ function netMissingNote(posting: PostingResult, row: Row | undefined): string | 
  *   - 연봉 비공개 공고: 더 적게 받아도 되는 경우 (같으면 더 많이 남는 쪽)
  *   - 연봉 공개 공고: 더 많이 남는 경우
  */
-function pickCase(posting: PostingResult, breakEven: BreakEven | undefined, mode: Mode): Case {
+export function pickCase(
+  posting: PostingResult,
+  breakEven: BreakEven | undefined,
+  mode: Mode,
+): Case {
   if (mode !== 'best') return mode;
   const found = breakEven?.cases.filter((c) => c.annual_salary_krw != null) ?? [];
   if (found.length) {
