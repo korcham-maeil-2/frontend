@@ -58,6 +58,7 @@ import { SupportView, isLocalSupport } from './support-view';
 import { PlanPreview, PlanView, isSettlePlan } from './plan-view';
 import { askQuestionsOf, type AskQuestion } from './ask-view';
 import { ReportView, isReport, type Report } from './report-view';
+import { Verdict } from './verdict';
 import { RowEditor, fieldsToCheck, focusField, salaryLeftBlank } from './row-editor';
 import { STEPS, type Step } from './steps';
 import { Tour, stopAfterStep, tabOf, tutorialProfile } from './tour';
@@ -898,6 +899,7 @@ export default function NewPosting() {
             <>
               {/* 보이는 소제목은 위 제목과 같은 말이라 뺐다. 화면 읽기의 제목 단계(h1 → h2 → h3)는 남긴다 */}
               <h2 className="sr-only">공고 {rows.length}개 비교</h2>
+              <Verdict result={freshResult} rows={rows} support={support} />
               <ReportView report={report} />
               <ResultView
                 result={freshResult}
@@ -1151,7 +1153,7 @@ export default function NewPosting() {
             <ul>
               {rows.map((row, i) => {
                 const ids = toCheck.get(row.id) ?? [];
-                const name = companyName(row, i);
+                const name = companyName(rows, i);
                 const single = rows.length === 1;
                 if (ids.length)
                   return (
