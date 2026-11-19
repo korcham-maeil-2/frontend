@@ -59,7 +59,7 @@ import { askQuestionsOf, type AskQuestion } from './ask-view';
 import { ReportView, isReport, type Report } from './report-view';
 import { RowEditor, fieldsToCheck, focusField, salaryLeftBlank } from './row-editor';
 import { STEPS, type Step } from './steps';
-import { Tour, stopAfterStep, tutorialProfile } from './tour';
+import { Tour, stopAfterStep, tabOf, tutorialProfile } from './tour';
 
 // 공고 넣기 → (백엔드가 Claude로 비교표를 만듦) → 조건 확인·수정 → 내 생활비 → 매달 남는 돈
 //   1) POST /sessions                 공고 글을 보내면 비교표(table)를 돌려받는다
@@ -1440,7 +1440,11 @@ export default function NewPosting() {
           shown={shown}
           // 읽는 중·계산하는 중에는 진행 안내를, 오류가 나면 오류 문구를 가리지 않게 숨긴다
           paused={busy !== null || error !== ''}
-          onNext={() => setTour(tour + 1)}
+          onNext={() => {
+            setTour(tour + 1);
+            const tab = tabOf(tour + 1); // 파일 첨부 말풍선이면 그 탭을 직접 열어 보여 준다
+            if (tab) setSourceTab(tab);
+          }}
           onEnd={() => setTour(null)}
         />
       )}
