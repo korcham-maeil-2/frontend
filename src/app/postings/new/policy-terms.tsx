@@ -18,7 +18,12 @@ type Kind = PolicyTerms['conditions'][number]['kind'];
 /** 되묻기 질문: AI가 읽은 조건 종류 중 사용자가 바로 답할 수 있는 것 (문장은 코드가 정한다) */
 const QUESTIONS = [
   { kind: 'no_house', question: '지금 내 집(주택)이 없나요?', yes: '무주택', no: '집 있음' },
-  { kind: 'householder', question: '이사하면 세대주가 되나요?', yes: '세대주', no: '세대주 아님' },
+  {
+    kind: 'householder',
+    question: '세대주인가요? (이사하면 새 집 기준)',
+    yes: '세대주',
+    no: '세대주 아님',
+  },
 ] as const satisfies readonly { kind: Kind; question: string; yes: string; no: string }[];
 
 type AskedKind = (typeof QUESTIONS)[number]['kind'];
@@ -74,9 +79,13 @@ export const useChecked = () => useStored<Record<string, boolean>>('wolgeup.plan
  */
 export function ageRange(quote: string): [number, number] | null {
   const s = quote.replace(/\s+/g, '').replace(/만(?=\d)/g, ''); // '만 19세'의 만만 (미만은 둔다)
+  // 신청자가 아닌 사람의 나이('자녀가 만 6세 이하')는 읽지 않는다
+  if (/자녀|부모|배우자|가구원|아동/.test(s)) return null;
+  // '19~34세', '19세 이상 ~ 34세 이하', '18세 이상 39세 미만', '18세 이상부터 39세 이하까지'
   const both =
-    s.match(/(\d{1,3})세?[~∼～-](\d{1,3})세/) ?? s.match(/(\d{1,3})세이상(\d{1,3})세이하/);
-  if (both) return [Number(both[1]), Number(both[2])];
+    s.match(/(\d{1,3})세?(?:이상|부터)*[~∼～-](\d{1,3})세(이하|미만)?/) ??
+    s.match(/(\d{1,3})세(?:이상|부터)+(\d{1,3})세(이하|미만)?/);
+  if (both) return [Number(both[1]), Number(both[2]) - (both[3] === '미만' ? 1 : 0)];
   const one = s.match(/(\d{1,3})세(미만|이하|이상)/);
   if (!one) return null;
   const n = Number(one[1]);
@@ -243,7 +252,9 @@ export function PolicyDetail({ id }: { id: string | null | undefined }) {
   const mismatch = verdicts.includes('off');
   // 확인한 조건: 코드가 '맞아요'라고 본 것 + 사용자가 직접 체크한 것
   // 체크는 '정책번호:원문'으로 기억한다 (다시 읽어 조건 순서가 바뀌어도 엉뚱한 줄에 붙지 않게)
-  const keyOf = (i: number) => `${id}:${squash(found.conditions[i].quote)}`;
+  // 같은 원문을 인용한 조건이 둘일 수 있어 조건 글도 붙인다
+  const keyOf = (i: number) =>
+    `${id}:${squash(found.conditions[i].quote)}|${squash(found.conditions[i].text)}`;
   const done = verdicts.filter((v, i) => v === 'ok' || (!v && checked[keyOf(i)])).length;
   const listId = `policy-conditions-${id}`;
   return (
@@ -277,7 +288,7 @@ export function PolicyDetail({ id }: { id: string | null | undefined }) {
               const v = verdicts[i];
               const key = keyOf(i);
               return (
-                <li key={`${c.kind}-${c.quote}`}>
+                <li key={keyOf(i)}>
                   {/* 코드가 판단 못 한 조건은 직접 확인하고 체크한다 (이 탭에만 저장).
                       되묻기로 물을 조건은 위 질문에 답하면 표시가 붙으니 체크 칸을 두지 않는다 */}
                   {v ? (
