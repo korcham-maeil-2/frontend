@@ -224,8 +224,31 @@ export default function NewPosting() {
   const [tour, setTour] = useState<number | null>(null);
   // 예시 공고 글 (백엔드 GET /examples). 못 받았으면 예시 버튼을 숨긴다
   const [examples, setExamples] = useState<string[]>([]);
+  // 서버 상태 확인이 두 번 연달아 실패했는지 (백엔드가 꺼졌거나 연결이 끊김). 공고 넣기 위에 안내한다
+  const [serverDown, setServerDown] = useState(false);
+  const [checkingServer, setCheckingServer] = useState(false);
   const heading = useRef<HTMLHeadingElement>(null);
   const firstTextarea = useRef<HTMLTextAreaElement>(null);
+
+  /** 서버 상태를 묻는다. 답이 오면 '연결하지 못했어요' 안내를 내린다 */
+  function askHealth() {
+    return getHealth().then((health) => {
+      setServerDown(false);
+      setDemoMode(health?.normalize_mode === 'fixture');
+      setSupportEnabled(health?.local_support === true);
+    });
+  }
+
+  /** '다시 연결해 보기': 상태와 예시 공고를 다시 묻는다 (예시 버튼도 그때 나타난다) */
+  function recheckServer() {
+    setCheckingServer(true);
+    getExamples()
+      .then(setExamples)
+      .catch(() => {});
+    askHealth()
+      .catch(() => setServerDown(true))
+      .finally(() => setCheckingServer(false));
+  }
 
   // 처음 열 때: 이 탭에 저장해 둔 작성 내용을 되살리고, 백엔드가 시연 모드인지 묻는다.
   useEffect(() => {
@@ -264,14 +287,9 @@ export default function NewPosting() {
     setRestored(true);
     // 서버가 막 깨어나는 중이면 첫 요청이 실패할 수 있어 3초 뒤 한 번 더 묻는다
     // (나이 칸·시연 표시·예시 버튼이 빠지지 않게)
-    const askTwice = (ask: () => Promise<void>) =>
-      ask().catch(() => setTimeout(() => ask().catch(() => {}), 3000));
-    askTwice(() =>
-      getHealth().then((health) => {
-        setDemoMode(health?.normalize_mode === 'fixture');
-        setSupportEnabled(health?.local_support === true);
-      }),
-    );
+    const askTwice = (ask: () => Promise<void>, onFail = () => {}) =>
+      ask().catch(() => setTimeout(() => ask().catch(onFail), 3000));
+    askTwice(askHealth, () => setServerDown(true));
     askTwice(() => getExamples().then(setExamples));
   }, []);
 
@@ -799,6 +817,24 @@ export default function NewPosting() {
   const demoNotice = demoMode && (
     <p className="demo-notice">시연 모드라서 예시 공고와 시연용 공고 파일만 읽을 수 있어요.</p>
   );
+  // 서버에 닿지 않으면 공고를 읽을 수 없다는 것을 먼저 알린다 (보낸 뒤에야 오류를 보지 않게)
+  const serverNotice = serverDown && (
+    <div role="status" className="server-notice">
+      <p>
+        <strong>서버에 연결하지 못했어요.</strong> 지금은 공고를 읽을 수 없어요. 써 둔 글은 이 창에
+        남아 있어요.
+      </p>
+      <Button
+        type="button"
+        variant="outline"
+        className="min-h-11"
+        disabled={checkingServer}
+        onClick={recheckServer}
+      >
+        {checkingServer ? '확인하는 중…' : '다시 연결해 보기'}
+      </Button>
+    </div>
+  );
 
   return (
     // 공고 넣기는 왼쪽 안내 + 오른쪽 입력 두 칸, 그다음 단계부터는 화면 한 장을 넓게 쓴다
@@ -1291,6 +1327,7 @@ export default function NewPosting() {
             readPostings();
           }}
         >
+          {serverNotice}
           {demoNotice}
           <h2 className="sheet-heading mb-4">넣는 방법</h2>
           <Tabs value={sourceTab} onValueChange={(tab) => setSourceTab(tab as SourceTab)}>

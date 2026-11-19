@@ -566,6 +566,75 @@ details[open] > summary .when-closed {
   font-size: 0.9375rem;
   color: var(--body);
 }
+/* 404·오류 화면 (src/components/layout/notice-page.tsx): 안내 패널 하나 */
+.notice-page {
+  margin-block: clamp(2.5rem, 8vw, 5rem);
+  max-width: 40rem;
+  border-radius: 1rem;
+  background: var(--muted);
+  padding: clamp(1.75rem, 5vw, 3rem);
+}
+.notice-label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--muted-foreground);
+}
+.notice-title {
+  margin-top: 0.5rem;
+  font-size: clamp(1.75rem, 4vw, 2.4rem);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--foreground);
+  word-break: keep-all;
+}
+.notice-body {
+  margin-top: 1rem;
+  display: grid;
+  gap: 0.35rem;
+  color: var(--body);
+  word-break: keep-all;
+}
+.notice-actions {
+  margin-top: 1.75rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+/* global-error는 버튼 부품을 쓸 수 없어(레이아웃 밖) 같은 모양을 CSS로 둔다 */
+.notice-button {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  border-radius: 0.5rem;
+  border: 1px solid transparent;
+  background: var(--primary);
+  padding-inline: 1rem;
+  font-weight: 500;
+  color: var(--primary-foreground);
+}
+.notice-button.is-outline {
+  border-color: var(--border);
+  background: var(--background);
+  color: var(--foreground);
+}
+/* 서버에 연결하지 못할 때 공고 넣기 위에 (오류 색: 지금 할 수 없는 일이라서) */
+.server-notice {
+  margin-bottom: 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  border: 1px solid color-mix(in oklch, var(--destructive), transparent 70%);
+  border-radius: 0.5rem;
+  background: color-mix(in oklch, var(--destructive), transparent 94%);
+  padding: 0.6rem 0.9rem;
+  font-size: 0.9375rem;
+  color: var(--body);
+}
+.server-notice strong {
+  color: var(--destructive);
+}
 .demo-notice {
   margin-bottom: 1rem;
   border-radius: 0.5rem;
