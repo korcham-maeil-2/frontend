@@ -45,6 +45,7 @@ import {
   missingInputs,
   rentsFromResult,
   toUserProfile,
+  validAge,
   type ProfileForm,
   type Rents,
   type UserProfile,
@@ -910,11 +911,13 @@ export default function NewPosting() {
               <h2 className="sr-only">공고 {rows.length}개의 정착 플랜</h2>
               {plan && (
                 <PlanView
+                  sessionId={sessionId}
                   plan={plan}
                   result={freshResult}
                   rows={rows}
                   supportFailed={!support}
                   onEditLiving={() => changeStep('living')}
+                  age={validAge(profile.age)}
                 />
               )}
               {support && (

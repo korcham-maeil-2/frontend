@@ -1,14 +1,38 @@
 'use client';
 
-import { Fragment, useEffect, useState, type ReactNode } from 'react';
+import {
+  Fragment,
+  cloneElement,
+  useEffect,
+  useState,
+  type ReactElement,
+  type ReactNode,
+} from 'react';
 import { ArrowRight, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { api } from '@/lib/api/client';
 import type { components } from '@/lib/api/schema';
-import { formatWon, placeName, statusBadge, type Row } from './format';
+import {
+  formatWon,
+  hasSalary,
+  placeName,
+  postingNames,
+  salaryText,
+  statusBadge,
+  type Row,
+} from './format';
 import { livesInCompanyHousing } from './profile';
 import { SourceBadge } from './source-badge';
+import {
+  AskBack,
+  PolicyDetail,
+  TermsProvider,
+  useAnswers,
+  useChecked,
+  usePolicyTerms,
+  useReadTerms,
+} from './policy-terms';
 
 // 결과 화면의 '1년 정착 플랜' (백엔드 plan.py의 SettlePlan, 이슈 #18).
 //   공고마다: 이사 전 → 이사한 달 → 달마다(신청 마감·시작) → 언제든
@@ -64,6 +88,8 @@ function Item({ item }: { item: PlanItem }) {
         <span>
           <ItemTitle item={item} /> <LocalChip item={item} />
         </span>
+        {/* AI가 원문에서 읽은 지원 내용·주의·신청 조건 (policy-terms.tsx). 못 읽으면 이름만 */}
+        <PolicyDetail id={item.policy_id} />
       </li>
     );
   }
@@ -73,7 +99,8 @@ function Item({ item }: { item: PlanItem }) {
         <ItemTitle item={item} />
         <LocalChip item={item} />
       </p>
-      {item.amount_krw != null && (
+      {/* 공고에서 읽은 날(milestone)은 설명 문장에 금액이 있어 따로 크게 쓰지 않는다 */}
+      {item.amount_krw != null && item.kind !== 'milestone' && (
         <p className="plan-amount">
           <span className="tabular-nums">{formatWon(item.amount_krw)}</span>
           {item.status === 'estimated' && (
@@ -117,39 +144,6 @@ function month(yyyymm: string | null | undefined): string | null {
     : null;
 }
 
-/**
- * 구역 머리: 제목 왼쪽 + 회색 칩(최대 2개) 오른쪽, 아래에 읽어야 하는 설명 한두 문장 (17px 본문색).
- * 사실을 ' · '로 이어 붙이지 않는다 — 문장은 문장으로, 짧은 사실은 칩으로 (DESIGN.md).
- */
-function SectionHead({
-  title,
-  chips = [],
-  children,
-}: {
-  title: string;
-  chips?: (string | false | null | undefined)[];
-  children?: ReactNode;
-}) {
-  const shown = chips.filter((c): c is string => !!c);
-  return (
-    <>
-      <h3 className="plan-section-title">
-        {title}
-        {shown.length > 0 && (
-          <span className="plan-section-chips">
-            {shown.map((chip) => (
-              <span key={chip} className="support-category">
-                {chip}
-              </span>
-            ))}
-          </span>
-        )}
-      </h3>
-      {children && <p className="plan-section-desc">{children}</p>}
-    </>
-  );
-}
-
 /** 줄 끝 참고 사실들: ' · '로 잇지 않고 한 줄에 하나씩 */
 function MetaLines({ lines }: { lines: (string | false | null | undefined)[] }) {
   return (
@@ -189,10 +183,7 @@ function SavingsSlot({
   const top = savings.products[0]; // 계산 기준: 기본금리 1위 (한도는 월·총액이 상품마다 달라 비교하지 않는다)
   const chosen = options.find((e) => e.monthly_krw === deposit);
   return (
-    <section className="plan-section">
-      <SectionHead title="남는 돈 모으기" chips={['참고', disclosed && `${disclosed} 공시`]}>
-        은행 적금을 12개월 기본금리가 높은 순으로 모았어요.
-      </SectionHead>
+    <>
       {remaining == null && (
         <p className="plan-section-desc">
           매달 남는 돈을 계산하면 여기서 모으는 금액을 볼 수 있어요.
@@ -254,9 +245,10 @@ function SavingsSlot({
           {savings.source}
           <span className="sr-only"> (새 창)</span>
         </a>
-        . 가입을 권하는 게 아니에요. 실제 금리는 은행에서 확인해 주세요.
+        {disclosed && ` (${disclosed} 공시, 12개월 기본금리 높은 순)`}. 가입을 권하는 게 아니에요.
+        실제 금리는 은행에서 확인해 주세요.
       </p>
-    </section>
+    </>
   );
 }
 
@@ -288,6 +280,9 @@ function CourseItem({ course, jobNcs }: { course: Course; jobNcs: string | null 
 }
 
 /** 일하면서 배우기: 근무지 근처 재직자 오프라인 강의 (고용24). 자격은 상세 페이지에서 확인. */
+/** 일하면서 배우기: 먼저 보여 줄 강의 수 (나머지는 '강의 n개 더 보기') */
+const TRAINING_SHOWN = 3;
+
 function TrainingSlot({
   training,
   jobNcs,
@@ -300,15 +295,15 @@ function TrainingSlot({
   const matched = !!jobNcs && training.courses.some((c) => c.ncs?.startsWith(jobNcs));
   const where = training.region ? placeName(training.region) : '근무지';
   return (
-    <section className="plan-section">
-      <SectionHead title="일하면서 배우기">
+    <>
+      <p className="plan-section-desc">
         {training.scope === 'sido'
-          ? `${where}에는 과정이 없어 시도 전체에서 3개월 안에 시작하는 재직자 강의를 모았어요.`
-          : `${where} 재직자 강의 중 3개월 안에 시작하는 것을 모았어요.`}{' '}
-        {matched ? '직무 관련과 주말반을' : '주말반을'} 먼저 보여 드려요.
-      </SectionHead>
+          ? `${where}에는 과정이 없어 시도 전체에서 모았어요. `
+          : `${where} 재직자 강의예요. `}
+        3개월 안에 시작하고, {matched ? '직무 관련과 주말반이' : '주말반이'} 먼저예요.
+      </p>
       <ul className="plan-items">
-        {training.courses.map((course) => (
+        {training.courses.slice(0, TRAINING_SHOWN).map((course) => (
           <CourseItem
             key={`${course.title}-${course.start}-${course.institute}`}
             course={course}
@@ -316,8 +311,23 @@ function TrainingSlot({
           />
         ))}
       </ul>
+      {/* 강의는 세 개만 먼저, 나머지는 한 번 더 펼쳐 본다 (칩의 개수는 전체) */}
+      {training.courses.length > TRAINING_SHOWN && (
+        <details className="plan-more-courses">
+          <summary>강의 {training.courses.length - TRAINING_SHOWN}개 더 보기</summary>
+          <ul className="plan-items">
+            {training.courses.slice(TRAINING_SHOWN).map((course) => (
+              <CourseItem
+                key={`${course.title}-${course.start}-${course.institute}`}
+                course={course}
+                jobNcs={jobNcs}
+              />
+            ))}
+          </ul>
+        </details>
+      )}
       <p className="plan-extra-source">출처: {training.source}</p>
-    </section>
+    </>
   );
 }
 
@@ -333,6 +343,13 @@ const won = (v: number) =>
   (v < 0 ? '−' : '') + formatWon(Math.round(Math.abs(v) / 10_000) * 10_000);
 /** 받아야 할 최소 연봉: 4단계 카드와 같은 말 ('… 이상', 최저임금으로 올린 답은 '이상' 없이) */
 const minSalaryText = (m: MinSalary) => `${formatWon(m.salary)}${m.floor ? '' : ' 이상'}`;
+
+/** 소득 조건 아래 참고 한 줄: '연봉 3,400만원 (세전)', 월급이면 1년치도 */
+function salaryLine(row: Row): string | null {
+  if (!hasSalary(row)) return null;
+  const monthly = row.salary_type?.value === 'monthly' ? row.monthly_salary_krw?.value : null;
+  return `${salaryText(row)} (세전${monthly ? `, 1년이면 ${formatWon(monthly * 12)}` : ''})`;
+}
 
 /** 공고의 플랜들: 이사 플랜(postings)과 통근 플랜(alternates). 예전 백엔드면 하나뿐 */
 function plansOf(plan: SettlePlan, posting: PostingPlan): Partial<Record<Case, PostingPlan>> {
@@ -399,6 +416,83 @@ function StepItems({ items }: { items: PlanItem[] }) {
   );
 }
 
+/**
+ * 1년 순서의 한 칸: 번호 + 이름 + 칩(한 줄 요약). fold면 눌러서 펼친다 (open: 처음부터 펼쳐 둠).
+ * 접혀 있어도 칩에 금액·개수·AI가 읽은 수가 보여 무엇이 들어 있는지 안다.
+ */
+function Node({
+  n,
+  label,
+  chips,
+  open = false,
+  fold = true,
+  children,
+}: {
+  n: number;
+  label: string;
+  chips: (string | false | null | undefined)[];
+  open?: boolean;
+  fold?: boolean;
+  children: ReactNode;
+}) {
+  const head = (
+    <>
+      <span className="plan-slot-label">{label}</span>
+      <Chips chips={chips} />
+    </>
+  );
+  return (
+    <li>
+      <span aria-hidden className="plan-step-number">
+        {n}
+      </span>
+      {fold ? (
+        <details open={open} className="plan-node">
+          <summary>{head}</summary>
+          {children}
+        </details>
+      ) : (
+        <>
+          <p className="plan-node-head">{head}</p>
+          {children}
+        </>
+      )}
+    </li>
+  );
+}
+
+function Chips({ chips }: { chips: (string | false | null | undefined)[] }) {
+  return chips
+    .filter((c): c is string => !!c)
+    .map((c) => (
+      <span key={c} className="support-category">
+        {c}
+      </span>
+    ));
+}
+
+/** 더 보기의 한 줄: 접어 두고 칩으로 무엇이 있는지만 */
+function Fold({
+  title,
+  chips,
+  children,
+}: {
+  title: string;
+  chips: (string | false | null | undefined)[];
+  children: ReactNode;
+}) {
+  return (
+    // 더 보기는 한 번에 하나만 펼친다 (같은 name: 하나를 열면 나머지가 닫혀 화면이 길어지지 않는다)
+    <details className="plan-fold" name="plan-more">
+      <summary>
+        {title}
+        <Chips chips={chips} />
+      </summary>
+      <div className="plan-fold-body">{children}</div>
+    </details>
+  );
+}
+
 function PostingPanel({
   plans,
   result,
@@ -407,6 +501,7 @@ function PostingPanel({
   training,
   supportFailed,
   onEditLiving,
+  askBack,
 }: {
   plans: Partial<Record<Case, PostingPlan>>;
   result: CalculationResult;
@@ -417,6 +512,8 @@ function PostingPanel({
   /** 청년 지원을 못 불러와 지원 일정이 빠졌는지 */
   supportFailed: boolean;
   onEditLiving: () => void;
+  /** 되묻기 칸: 결론 카드 바로 아래. 지금 보는 경우(통근·이사)에 보이는 정책 번호를 받아 그 수만 센다 */
+  askBack: (ids: Set<string>) => ReactNode;
 }) {
   const cases = (['commute', 'move'] as const).filter((c) => plans[c]);
   const [picked, setPicked] = useState<Case>(() => defaultCase(result, plans));
@@ -436,6 +533,8 @@ function PostingPanel({
   const moveMonth = itemsOf('move_month');
   const start = itemsOf('start');
   const anytime = itemsOf('anytime');
+  // 공고에서 읽은 날 (입사 N개월 뒤: 수습 끝·주거지원비 끝). 백엔드가 순서대로 보낸다
+  const afterJoin = posting.slots.filter((s) => s.kind === 'job');
   // 사택·기숙사에 들어가면(이사할 집 주거비 0원) 백엔드가 보증금 할 일을 빼서 보낸다 (plan.py).
   // '처음 준비할 돈' 칸이 '모름'이 아니라 '없음'이라고 말하려면 이유를 알아야 해서 여기서도 본다
   const dorm = livesInCompanyHousing(row, scenarioOf(result, id, 'move')?.housing.value);
@@ -466,12 +565,19 @@ function PostingPanel({
     const m = minSalaryOf(result, id, c);
     return r != null ? `약 ${won(r)}` : m ? minSalaryText(m) : '';
   };
-  const steps = [
-    // 단계 이름에 '14일'을 되풀이하지 않는다 (전입신고 설명 문장에 한 번)
-    { label: '집을 구하기 전에', items: before },
-    { label: '이사한 다음', items: moveMonth.filter((i) => i.kind === 'move_in') },
-    { label: '전입신고를 마친 다음', items: moveMonth.filter((i) => i.kind === 'policy') },
-  ].filter((s) => s.items.length);
+  // AI가 조건을 읽은 정책 수 (접힌 칸에도 AI가 한 일이 보이게 칩으로)
+  const read = useReadTerms();
+  const aiChip = (items: PlanItem[]) => {
+    const n = items.filter((i) => i.policy_id && read[i.policy_id]).length;
+    return n > 0 && `조건 확인 ${n}개`;
+  };
+  const beforePolicies = before.filter((i) => i.kind === 'policy').length;
+  const settle = moving ? [...moveMonth, ...start] : start; // 이사하고 입사하면 할 일
+  const notes = posting.notes.map((note) => (
+    <p key={note} className="text-sm text-muted-foreground">
+      {note}
+    </p>
+  ));
   return (
     <div className="space-y-4">
       {/* 통근·이사 바꿔 보기 (둘 다 될 때). 4단계의 '비교할 경우'와 같은 모양 */}
@@ -604,75 +710,137 @@ function PostingPanel({
           </small>
         </div>
       </div>
-      {/* 급한 것부터: 날짜 있는 지원 → (이사) 순서 → 입사하면 → 언제든. 입사일을 몰라 순서와 날짜를 나눈다 */}
-      {deadlines.length > 0 && (
-        <section className="plan-section">
-          {/* 날짜가 줄 앞에 있어 '날짜순'은 따로 쓰지 않는다 */}
-          <SectionHead title="마감이 있는 지원">
-            {moving && '지역 지원은 전입한 주소를 기준으로 봐요.'}
-          </SectionHead>
-          <Rows items={deadlines} />
-        </section>
+      {askBack(
+        new Set(
+          posting.slots.flatMap((s) => s.items.flatMap((i) => (i.policy_id ? [i.policy_id] : []))),
+        ),
       )}
-      {moving && steps.length > 0 && (
-        <section className="plan-section">
-          {/* 할 일이 한 칸뿐이면(사택·기숙사 등) 순서(번호·세로 선) 없이 '이사하면 할 일' 한 칸으로 */}
-          {steps.length === 1 ? (
-            <SectionHead title="이사하면 할 일">
-              {dorm &&
-                '사택·기숙사에 들어가는 것으로 보고 보증금과 집 구하기 지원은 뺐어요. 주소를 옮기는 일은 같아요.'}
-            </SectionHead>
-          ) : (
-            <SectionHead title="이사 순서">
-              입사일이 정해지지 않아도 이 순서대로 하면 돼요.
-            </SectionHead>
+      {/* 1년 순서: 급한 것부터 시간순. 칸마다 한 줄 요약(칩), 지금·집 구하기 전만 펼쳐 둔다 */}
+      <section className="plan-section">
+        <h3 className="plan-section-title">1년 순서</h3>
+        <ol className="plan-steps">
+          {[
+            deadlines.length > 0 && (
+              <Node
+                key="now"
+                n={0}
+                label="지금"
+                chips={[`마감 ${deadlines.length}건`, deadlines[0]?.when, aiChip(deadlines)]}
+                open
+              >
+                {moving && (
+                  <p className="plan-section-desc">지역 지원은 전입한 주소를 기준으로 봐요.</p>
+                )}
+                <Rows items={deadlines} />
+              </Node>
+            ),
+            moving && before.length > 0 && (
+              <Node
+                key="before"
+                n={0}
+                label="집 구하기 전"
+                chips={[
+                  deposit?.amount_krw != null && `보증금 ${formatWon(deposit.amount_krw)}`,
+                  beforePolicies > 0 && `지원 ${beforePolicies}개`,
+                  aiChip(before),
+                ]}
+                open
+              >
+                <StepItems items={before} />
+              </Node>
+            ),
+            settle.length > 0 && (
+              <Node
+                key="settle"
+                n={0}
+                label={moving ? '이사하고 입사하면' : '입사하면'}
+                // 위에 펼쳐 둔 칸이 없으면(통근 등) 이 칸을 펼쳐 둔다 (빈 순서처럼 보이지 않게)
+                open={deadlines.length === 0 && !(moving && before.length > 0)}
+                chips={[
+                  moveMonth.some((i) => i.kind === 'move_in') && '전입신고',
+                  start.length > 0 && `첫 취업 지원 ${start.length}개`,
+                  aiChip(settle),
+                ]}
+              >
+                {dorm && (
+                  <p className="plan-section-desc">
+                    사택·기숙사에 들어가는 것으로 보고 보증금과 집 구하기 지원은 뺐어요.
+                  </p>
+                )}
+                {moving && <StepItems items={moveMonth} />}
+                {start.length > 0 && (
+                  <>
+                    <p className="plan-step-sub">첫 취업 때 많이 챙기는 지원</p>
+                    <Rows items={start} twoColumns />
+                  </>
+                )}
+              </Node>
+            ),
+            afterJoin.length > 0 && (
+              <Node key="after" n={0} label="입사한 뒤" chips={[]} fold={false}>
+                {/* 공고에서 읽은 날: 한 줄에 하나 (때 + 무엇이 바뀌는지). 짧아서 늘 보인다 */}
+                <ul className="plan-items plan-after">
+                  {afterJoin.flatMap((slot) =>
+                    slot.items.map((item) => (
+                      <li key={`${slot.label}-${item.title}`} className="plan-row">
+                        <span className="support-open">{slot.label}</span>
+                        <span>
+                          <span className="plan-row-title">{item.title}</span> {item.detail}
+                          {/* 그날 앞뒤 매달 남는 돈 (백엔드 계산값, 둘 다 있을 때만) */}
+                          {item.remaining_before != null && item.remaining_after != null && (
+                            <span className="plan-row-money">
+                              남는 돈 약 {won(item.remaining_before)} →{' '}
+                              <strong>약 {won(item.remaining_after)}</strong>
+                            </span>
+                          )}
+                        </span>
+                      </li>
+                    )),
+                  )}
+                </ul>
+              </Node>
+            ),
+          ]
+            // 보이는 칸에만 차례로 번호를 단다
+            .filter((node): node is ReactElement<{ n: number }> => !!node)
+            .map((node, i) => cloneElement(node, { n: i + 1 }))}
+        </ol>
+      </section>
+      {/* 플랜 안내('언제든 지원이 n개 더', 통근이면 '사는 지역 지원은 뺐어요'): 언제든 칸이 있으면 그 안에 */}
+      {anytime.length === 0 && notes}
+      {/* 더 보기: 할 일이 아닌 참고는 접어 두고, 칩으로 무엇이 있는지만 */}
+      {(anytime.length > 0 || showSavings || showTraining) && (
+        <section className="plan-section plan-more">
+          <h3 className="plan-more-title">더 보기</h3>
+          {anytime.length > 0 && (
+            <Fold
+              title="언제든 신청할 수 있는 지원"
+              chips={[`${anytime.length}개`, aiChip(anytime)]}
+            >
+              <Rows items={anytime} />
+              {notes}
+            </Fold>
           )}
-          {steps.length === 1 ? (
-            <StepItems items={steps[0].items} />
-          ) : (
-            // 번호 + 세로 선은 순서가 있는 이곳에만 (날짜 목록은 날짜를 앞에, 번호 없음)
-            <ol className="plan-steps">
-              {steps.map((s, i) => (
-                <li key={s.label}>
-                  <span aria-hidden className="plan-step-number">
-                    {i + 1}
-                  </span>
-                  <h4 className="plan-slot-label">{s.label}</h4>
-                  <StepItems items={s.items} />
-                </li>
-              ))}
-            </ol>
+          {showSavings && (
+            <Fold
+              title="남는 돈 모으기"
+              chips={[savings.products[0] && `적금 최고 연 ${rate(savings.products[0].rate)}`]}
+            >
+              {/* 경우·남는 돈이 바뀌면 고른 금액도 새로 */}
+              <SavingsSlot
+                key={`${chosen}-${remaining ?? minSalary?.monthly}`}
+                savings={savings}
+                remaining={remaining ?? minSalary?.monthly ?? null}
+              />
+            </Fold>
+          )}
+          {showTraining && (
+            <Fold title="일하면서 배우기" chips={[`근처 재직자 강의 ${training.courses.length}개`]}>
+              <TrainingSlot training={training} jobNcs={posting.ncs ?? null} />
+            </Fold>
           )}
         </section>
       )}
-      {start.length > 0 && (
-        <section className="plan-section">
-          <SectionHead title="입사하면 챙겨 볼 것">
-            첫 취업 때 많이 챙기는 전국 지원이에요.
-          </SectionHead>
-          <Rows items={start} twoColumns />
-        </section>
-      )}
-      {anytime.length > 0 && (
-        <details className="plan-fold plan-section">
-          <summary>언제든 신청할 수 있는 지원 {anytime.length}개</summary>
-          <Rows items={anytime} />
-        </details>
-      )}
-      {posting.notes.map((note) => (
-        <p key={note} className="text-sm text-muted-foreground">
-          {note}
-        </p>
-      ))}
-      {/* 참고: 할 일이 아니라 순서 밖 섹션으로. 경우·남는 돈이 바뀌면 고른 금액도 새로 */}
-      {showSavings && (
-        <SavingsSlot
-          key={`${chosen}-${remaining ?? minSalary?.monthly}`}
-          savings={savings}
-          remaining={remaining ?? minSalary?.monthly ?? null}
-        />
-      )}
-      {showTraining && <TrainingSlot training={training} jobNcs={posting.ncs ?? null} />}
     </div>
   );
 }
@@ -761,12 +929,16 @@ function usePlanExtras(keys: string[]) {
 }
 
 export function PlanView({
+  sessionId,
   plan,
   result,
   rows,
   supportFailed,
   onEditLiving,
+  age,
 }: {
+  /** 정책 조건을 받아 올 세션 (서버가 이 세션 플랜에서 읽을 정책을 고른다) */
+  sessionId: string;
   plan: SettlePlan;
   result: CalculationResult;
   /** 조건 확인 표 (사택·기숙사 여부를 본다) */
@@ -774,26 +946,65 @@ export function PlanView({
   /** 청년 지원을 못 불러왔는지 (세션의 local_support가 없음) */
   supportFailed: boolean;
   onEditLiving: () => void;
+  /** 3단계 만 나이 (선택): 나이 조건 옆 표시에만 */
+  age: number | null;
 }) {
   const postings = plan.postings;
   const { savings, training } = usePlanExtras(extrasKeys(postings));
+  const { status, terms } = usePolicyTerms(sessionId, plan);
+  // 되묻기 답: 이 브라우저에서만 쓴다 (서버·AI에 보내지 않는다)
+  const [answers, setAnswers] = useAnswers();
+  const [checked, setChecked] = useChecked();
   if (!postings.length) return null;
   // 처음 여는 탭: 처음 보여 줄 경우에 매달 더 많이 남는 회사 (같으면 첫 공고)
   const best = (p: PostingPlan) =>
     scenarioOf(result, p.posting_id, defaultCase(result, plansOf(plan, p)))?.monthly_remaining ??
     -Infinity;
   const first = postings.reduce((a, b) => (best(b) > best(a) ? b : a));
-  const panel = (posting: PostingPlan) => (
-    <PostingPanel
-      plans={plansOf(plan, posting)}
-      result={result}
-      row={rows.find((r) => r.id === posting.posting_id)}
-      savings={savings}
-      training={training[trainingKey(posting) ?? '']}
-      supportFailed={supportFailed}
-      onEditLiving={onEditLiving}
-    />
-  );
+  // 같은 회사 공고는 '카카오 (공고 2)' (조건 확인·결과 화면과 같은 이름)
+  const names = postingNames(postings.map((p) => p.company));
+  const panel = (posting: PostingPlan) => {
+    const plans = plansOf(plan, posting);
+    const row = rows.find((r) => r.id === posting.posting_id);
+    // 이 회사 플랜에 보이는 정책의 조건만 (되묻기 개수·질문도 회사마다)
+    const ids = new Set(
+      Object.values(plans).flatMap((p) =>
+        p.slots.flatMap((s) => s.items.flatMap((i) => (i.policy_id ? [i.policy_id] : []))),
+      ),
+    );
+    const own = Object.fromEntries(Object.entries(terms).filter(([id]) => ids.has(id)));
+    return (
+      <TermsProvider
+        value={{
+          status,
+          terms: own,
+          answers,
+          age,
+          salary: row && salaryLine(row),
+          checked,
+          onCheck: (key, value) => setChecked({ ...checked, [key]: value }),
+        }}
+      >
+        <PostingPanel
+          plans={plans}
+          result={result}
+          row={row}
+          savings={savings}
+          training={training[trainingKey(posting) ?? '']}
+          supportFailed={supportFailed}
+          onEditLiving={onEditLiving}
+          askBack={(shown) => (
+            <AskBack
+              status={status}
+              terms={Object.fromEntries(Object.entries(own).filter(([id]) => shown.has(id)))}
+              answers={answers}
+              onAnswer={setAnswers}
+            />
+          )}
+        />
+      </TermsProvider>
+    );
+  };
   return (
     <section className="space-y-4" aria-label="1년 정착 플랜">
       {postings.length === 1 ? (
@@ -803,7 +1014,7 @@ export function PlanView({
           <TabsList aria-label="볼 회사" className="posting-tabs">
             {postings.map((posting, i) => (
               <TabsTrigger key={posting.posting_id} value={posting.posting_id}>
-                <span className="posting-tab-name">{posting.company || `공고 ${i + 1}`}</span>
+                <span className="posting-tab-name">{names[i]}</span>
               </TabsTrigger>
             ))}
           </TabsList>
