@@ -12,6 +12,7 @@ import {
   placeName,
   salaryText,
   statusBadge,
+  postingNames,
   type Badge,
   type Row,
   type Status,
@@ -440,7 +441,7 @@ function rowClass(key: RowKey) {
 function baselinePosting(be: BreakEven, columns: Column[]) {
   if (be.baseline.kind !== 'posting') return undefined;
   const i = columns.findIndex((c) => c.posting.posting_id === be.baseline.posting_id);
-  return i >= 0 ? companyOf(columns[i], i) : undefined;
+  return i >= 0 ? companyOf(columns, i) : undefined;
 }
 
 /** 이 공고를 그 경우로 다닐 때 ('여기 근처로 이사해서') */
@@ -485,8 +486,8 @@ function answerSentence(be: BreakEven, columns: Column[], own: Case, floor: bool
     : `${fact} ${here} ${same} 이만큼은 받아야 해요.`;
 }
 
-function companyOf(column: Column, index: number) {
-  return column.posting.company || `공고 ${index + 1}`;
+function companyOf(columns: Column[], index: number) {
+  return postingNames(columns.map((c) => c.posting.company))[index];
 }
 
 /** 세금·4대보험 공제 항목 (payslip 키, 이름) */
@@ -586,7 +587,7 @@ function CalcSteps({ columns, style }: { columns: Column[]; style: CSSProperties
               </th>
               {columns.map((column, i) => (
                 <th key={column.posting.posting_id} scope="col">
-                  {companyOf(column, i)}
+                  {companyOf(columns, i)}
                 </th>
               ))}
             </tr>
@@ -697,7 +698,7 @@ function SalaryAnswer({ result, columns }: { result: Result; columns: Column[] }
               <SalaryAnswerBody
                 be={be}
                 // 표 머리와 같은 이름 (회사 이름이 없으면 '공고 N')
-                company={i >= 0 ? companyOf(columns[i], i) : be.company || '연봉 비공개 공고'}
+                company={i >= 0 ? companyOf(columns, i) : be.company || '연봉 비공개 공고'}
                 column={columns[i]}
                 columns={columns}
               />
@@ -809,7 +810,7 @@ function rentFailures(columns: Column[], estimates: RentEstimate[]) {
     if (!move || move.housing.value != null) return;
     // 같은 지역 공고는 한 안내로 묶는다
     const entry = byRegion.get(rent.lawd_cd) ?? { place: placeName(rent.region), companies: [] };
-    entry.companies.push(companyOf(column, i));
+    entry.companies.push(companyOf(columns, i));
     byRegion.set(rent.lawd_cd, entry);
   });
   return [...byRegion.entries()].map(([key, entry]) => ({ key, ...entry }));
@@ -830,7 +831,7 @@ function DepositSummary({ columns, estimates }: { columns: Column[]; estimates: 
     // 사택·기숙사에 들어가면 원룸 보증금이 들지 않는다
     if (livesInCompanyHousing(column.row, move.housing.value)) return;
     const entry = byRegion.get(code) ?? { rent, companies: [] };
-    entry.companies.push(companyOf(column, i));
+    entry.companies.push(companyOf(columns, i));
     byRegion.set(code, entry);
   });
   if (!byRegion.size) return null;
@@ -934,7 +935,7 @@ export function ResultView({
                 </th>
                 {columns.map((column, i) => (
                   <th key={column.posting.posting_id} scope="col" className={computed(column)}>
-                    {companyOf(column, i)}
+                    {companyOf(columns, i)}
                     <small>{column.scenario ? column.scenario.label : '해당 없음'}</small>
                   </th>
                 ))}
@@ -960,7 +961,7 @@ export function ResultView({
           <TabsList aria-label="볼 공고" className="posting-tabs compare-switch">
             {columns.map((column, i) => (
               <TabsTrigger key={column.posting.posting_id} value={column.posting.posting_id}>
-                <span className="posting-tab-name">{companyOf(column, i)}</span>
+                <span className="posting-tab-name">{companyOf(columns, i)}</span>
               </TabsTrigger>
             ))}
           </TabsList>
@@ -979,7 +980,7 @@ export function ResultView({
                         <CellContent cell={column.cells[key]} label={label} />
                         {key === 'remaining' && other && (
                           <small className="cell-note">
-                            {companyOf(other, 1 - i)}: {other.cells.remaining.value}
+                            {companyOf(columns, 1 - i)}: {other.cells.remaining.value}
                           </small>
                         )}
                       </dd>

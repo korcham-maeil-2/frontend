@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react';
 import type { components } from '@/lib/api/schema';
-import type { Row } from './format';
+import { postingNames, type Row } from './format';
 import { pickCase, won } from './result-view';
 
 // 결과 화면 맨 위: 한 줄 결론 + 왜 그런지 한 줄 + 돈이 어디로 가는지 막대 + 찾아본 공공데이터.
@@ -77,11 +77,10 @@ function entry(posting: PostingResult, name: string, scenario: Scenario, row?: R
 function compare(result: Result, rows: Row[]) {
   const done: Compared[] = [];
   const left: { name: string; why: string }[] = [];
-  // 같은 회사 공고가 둘이면 '카카오 (공고 2)'처럼 구분한다 (결론 문장이 '카카오보다 카카오가'가 되지 않게)
-  const names = result.postings.map((p, i) => p.company || `공고 ${i + 1}`);
+  // 같은 회사 공고가 둘이면 '카카오 (공고 2)' (탭·표와 같은 이름, 결론 문장이 '카카오보다 카카오가'가 되지 않게)
+  const names = postingNames(result.postings.map((p) => p.company));
   result.postings.forEach((posting, i) => {
-    const name =
-      names.filter((n) => n === names[i]).length > 1 ? `${names[i]} (공고 ${i + 1})` : names[i];
+    const name = names[i];
     const be = result.break_even.find((b) => b.posting_id === posting.posting_id);
     const chosen = pickCase(posting, be, 'best');
     const scenario = posting.scenarios.find((s) => s.case === chosen && s.applicable);

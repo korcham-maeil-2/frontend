@@ -1150,7 +1150,7 @@ export default function NewPosting() {
             <ul>
               {rows.map((row, i) => {
                 const ids = toCheck.get(row.id) ?? [];
-                const name = companyName(row, i);
+                const name = companyName(rows, i);
                 const single = rows.length === 1;
                 if (ids.length)
                   return (

@@ -3,7 +3,7 @@
 import { useEffect, useRef, type KeyboardEvent, type ReactNode } from 'react';
 import { ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import type { Row } from './format';
+import { postingNames, type Row } from './format';
 
 // 회사 탭: 조건 확인·내 생활비에서 공고(회사)를 하나씩 골라 본다.
 //   - '방식 고르기'(본문/파일, 더 남는 쪽/통근/이사)는 회색 둥근 스위치(.source-tabs),
@@ -18,8 +18,8 @@ export type TabStatus = { remaining: number; seen: boolean; todoLabel?: string }
 const tabId = (row: Row) => `posting-tab-${row.id}`;
 const panelId = (row: Row) => `posting-panel-${row.id}`;
 
-export function companyName(row: Row, index: number) {
-  return row.company?.value?.trim() || `공고 ${index + 1}`;
+export function companyName(rows: Row[], index: number) {
+  return postingNames(rows.map((row) => row.company?.value))[index];
 }
 
 function tabState({ remaining, seen }: TabStatus): 'todo' | 'done' | 'unseen' {
@@ -109,7 +109,7 @@ export function PostingTabs({
               tabIndex={selected ? 0 : -1}
               onClick={() => onSelect(row.id)}
             >
-              <span className="posting-tab-name">{companyName(row, i)}</span>
+              <span className="posting-tab-name">{companyName(rows, i)}</span>
               <span className="posting-tab-status" data-state={state}>
                 {state === 'todo'
                   ? (s.todoLabel ?? `${s.remaining}개 남음`)
@@ -136,7 +136,7 @@ export function PostingTabs({
               className="min-h-11"
               onClick={() => select(index + 1)}
             >
-              다음 공고: {companyName(next, index + 1)} <ArrowRight aria-hidden />
+              다음 공고: {companyName(rows, index + 1)} <ArrowRight aria-hidden />
             </Button>
           </div>
         ) : (

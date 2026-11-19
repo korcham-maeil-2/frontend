@@ -102,6 +102,17 @@ export function formatWon(value: number): string {
   return `${parts.join(' ')}원`;
 }
 
+/**
+ * 화면에 쓸 공고 이름들: 회사 이름, 없으면 '공고 N'. 같은 이름이 둘 이상이면 '카카오 (공고 2)'처럼
+ * 순서를 붙여 구분한다 (같은 회사의 두 직무를 비교할 때 탭·표·결론 문장이 헷갈리지 않게).
+ */
+export function postingNames(companies: (string | null | undefined)[]): string[] {
+  const names = companies.map((c, i) => c?.trim() || `공고 ${i + 1}`);
+  return names.map((n, i) =>
+    names.filter((m) => m === n).length > 1 ? `${n} (공고 ${i + 1})` : n,
+  );
+}
+
 /** 급여 금액이 있는지 (급여 종류에 맞는 칸 기준) */
 export function hasSalary(row: Row): boolean {
   const amount =
