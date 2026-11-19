@@ -1390,6 +1390,13 @@ export default function NewPosting() {
                 }}
                 showTotal
               />
+              {/* 이미지는 글자를 읽으려고 가리기 전에 AI로 간다 (대회 규정: 실제 개인정보를 외부 AI에 보내지 않기).
+                  공고 캡처는 공개된 글이라 괜찮고, 이름이 찍힌 메일 캡처만 문제라 이미지를 올렸을 때만 알린다 */}
+              {attachments.files.some(({ mime }) => mime.startsWith('image/')) && (
+                <p className="text-sm text-body">
+                  이름·연락처가 보이는 메일 캡처라면 그 부분은 가리고 올려 주세요.
+                </p>
+              )}
               <p className="text-sm leading-relaxed text-muted-foreground">
                 파일은 서버에 저장하지 않아요. 글자를 복사할 수 없는 이미지만 글자를 읽으려고
                 AI(Claude)에 보내요.
