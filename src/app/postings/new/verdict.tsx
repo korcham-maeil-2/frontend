@@ -24,6 +24,9 @@ type Compared = {
   remaining: number;
   /** 공고 연봉 (월급이면 12배). 모르면 null → '연봉은 낮지만'을 쓰지 않는다 */
   annual: number | null;
+  /** 회사 주거지원비가 끝난 뒤 (입사 몇 개월 뒤, 그때 매달 남는 돈). 해당 없으면 null */
+  afterAid: { months: number; remaining: number } | null;
+  row?: Row;
 };
 
 const CASE_IF: Record<Case, string> = {
@@ -62,6 +65,17 @@ function annualOf(row: Row | undefined): number | null {
   return row.annual_salary_krw?.value ?? null;
 }
 
+/**
+ * 주거지원비가 끝난 뒤: 이사 주거비에서 지원비를 실제로 뺐고 기간을 알 때만 (새 집 주거비가 0원이면
+ * 뺀 만큼을 몰라 말하지 않는다 — 정착 플랜 '입사한 뒤' 칸과 같은 규칙, plan.py)
+ */
+function afterAidOf(scenario: Scenario, row?: Row): Compared['afterAid'] {
+  const amount = row?.housing_allowance_monthly_krw?.value;
+  const months = row?.housing_allowance_months?.value;
+  if (scenario.case !== 'move' || !amount || !months || !scenario.housing.value) return null;
+  return { months, remaining: scenario.monthly_remaining! - amount };
+}
+
 function entry(posting: PostingResult, name: string, scenario: Scenario, row?: Row): Compared {
   return {
     key: `${posting.posting_id}-${scenario.case}`,
@@ -70,6 +84,8 @@ function entry(posting: PostingResult, name: string, scenario: Scenario, row?: R
     scenario,
     remaining: scenario.monthly_remaining!,
     annual: annualOf(row),
+    afterAid: afterAidOf(scenario, row),
+    row,
   };
 }
 
@@ -114,7 +130,7 @@ function compare(result: Result, rows: Row[]) {
 function casesOf(only: Compared): Compared[] {
   return only.posting.scenarios
     .filter((s) => s.applicable && s.monthly_remaining != null)
-    .map((s) => entry(only.posting, only.name, s))
+    .map((s) => entry(only.posting, only.name, s, only.row))
     .sort((a, b) => b.remaining - a.remaining);
 }
 
@@ -193,7 +209,29 @@ function Gap({ gap, short }: { gap: number; short: boolean }) {
 }
 
 /** 한 줄 결론 + 이유. bars는 많이 남는 순 */
-function lineOf(bars: Compared[], single: boolean): { title: ReactNode; why?: string } {
+/**
+ * 시간 단서: 이기는 쪽의 주거지원비가 끝나면 순위가 바뀔 때 한 줄
+ * ('단, 입사 24개월 뒤 주거지원비가 끝나면 ○○가 매달 약 24만원 더 남아요.'). 결론과 플랜이 다른 말을 하지 않게
+ */
+function laterLine(win: Compared, rival: Compared, single: boolean): string | undefined {
+  if (!win.afterAid) return undefined;
+  const rivalLater = rival.afterAid?.remaining ?? rival.remaining;
+  const gap = rivalLater - win.afterAid.remaining;
+  if (gap < 10_000) return undefined;
+  const who = single
+    ? `${rival.scenario.case === 'commute' ? '지금 집에서 다니는 쪽' : '이사하는 쪽'}이`
+    : subject(rival.name);
+  return `단, 입사 ${win.afterAid.months}개월 뒤 주거지원비가 끝나면 ${who} 매달 ${won(gap)} 더 남아요.`;
+}
+
+type Line = { title: ReactNode; why?: string; later?: string };
+
+function lineOf(bars: Compared[], single: boolean): Line {
+  const line = headlineOf(bars, single);
+  return bars[1] ? { ...line, later: laterLine(bars[0], bars[1], single) } : line;
+}
+
+function headlineOf(bars: Compared[], single: boolean): Line {
   const [win, rival] = bars;
   if (!rival) {
     const short = win.remaining < 0;
@@ -347,6 +385,7 @@ export function Verdict({
           {line ? line.title : '아직 매달 남는 돈을 계산하지 못했어요.'}
         </p>
         {line?.why && <p className="verdict-why">{line.why}</p>}
+        {line?.later && <p className="verdict-later">{line.later}</p>}
       </div>
       {bars.length > 0 && <Bars bars={bars} single={single} />}
       {left.map((l, i) => (

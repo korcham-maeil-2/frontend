@@ -1768,6 +1768,12 @@ details[open] > summary .when-closed {
 .verdict-title strong.is-short {
   color: var(--destructive);
 }
+/* 시간 단서 ('단, 입사 24개월 뒤 …'): 결론이 바뀌는 때라 본문보다 진하게 */
+.verdict-later {
+  margin-top: 0.25rem;
+  font-weight: 600;
+  color: var(--foreground);
+}
 /* 왜 그런지 한 줄: 읽어야 하는 답 문장이라 17px 본문색 */
 .verdict-why {
   margin-top: 0.25rem;
