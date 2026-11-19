@@ -199,6 +199,31 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/sessions/{session_id}/policy-terms': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Policy Terms
+     * @description 정착 플랜에 보이는 정책마다 지원 내용·주의·신청 조건 (원문 인용 포함).
+     *
+     *     정책 원문(공개 자료)만 Claude가 읽는다. 사용자 정보는 보내지 않는다 (대회 규정 제7조).
+     *     읽을 정책은 이 세션의 플랜에서 서버가 고른다 — 화면이 보낸 번호를 받지 않아, 아무 정책이나
+     *     읽게 해서 비용을 쓰게 할 수 없다. 처음 보는 정책만 읽고 저장해 모든 사용자가 같이 쓴다.
+     *     플랜이 없거나 정책을 읽지 않는 서버(키 없음 등)면 status='off' (화면은 정책 이름만 보여 준다).
+     */
+    get: operations['get_policy_terms_sessions__session_id__policy_terms_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/sessions/{session_id}': {
     parameters: {
       query?: never;
@@ -276,28 +301,6 @@ export interface paths {
     get: operations['get_training_plan_training__lawd_cd__get'];
     put?: never;
     post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/plan/policy-terms': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /**
-     * Get Policy Terms
-     * @description 정책마다 무엇을 주는지·주의할 점·신청 조건 (원문 인용 포함). 처음 보는 정책만 Claude가
-     *     읽고 저장해 둔다. 정책을 읽지 않는 서버(키 없음 등)면 status='off'
-     *     (화면은 원문 요약을 보여 준다).
-     */
-    post: operations['get_policy_terms_plan_policy_terms_post'];
     delete?: never;
     options?: never;
     head?: never;
@@ -1689,16 +1692,6 @@ export interface components {
        */
       url: string | null;
     };
-    /**
-     * TermsRequest
-     * @description 플랜에 보이는 정책 번호와 그 근무지 지역 (공개 정보만, 사용자 정보는 받지 않는다).
-     */
-    TermsRequest: {
-      /** Lawd Cds */
-      lawd_cds: string[];
-      /** Ids */
-      ids: string[];
-    };
     /** TermsResult */
     TermsResult: {
       /**
@@ -2291,6 +2284,55 @@ export interface operations {
       };
     };
   };
+  get_policy_terms_sessions__session_id__policy_terms_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        session_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TermsResult'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Unprocessable Content */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Internal Server Error */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
   get_session_sessions__session_id__get: {
     parameters: {
       query?: never;
@@ -2457,48 +2499,6 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ErrorResponse'];
-        };
-      };
-      /** @description Unprocessable Content */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ErrorResponse'];
-        };
-      };
-      /** @description Internal Server Error */
-      500: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ErrorResponse'];
-        };
-      };
-    };
-  };
-  get_policy_terms_plan_policy_terms_post: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['TermsRequest'];
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['TermsResult'];
         };
       };
       /** @description Unprocessable Content */

@@ -9,7 +9,7 @@ import type { components } from '@/lib/api/schema';
 import { formatWon, placeName, statusBadge, type Row } from './format';
 import { livesInCompanyHousing } from './profile';
 import { SourceBadge } from './source-badge';
-import { AskBack, PolicyDetail, TermsProvider, usePolicyTerms, type Answers } from './policy-terms';
+import { AskBack, PolicyDetail, TermsProvider, useAnswers, usePolicyTerms } from './policy-terms';
 
 // 결과 화면의 '1년 정착 플랜' (백엔드 plan.py의 SettlePlan, 이슈 #18).
 //   공고마다: 이사 전 → 이사한 달 → 달마다(신청 마감·시작) → 언제든
@@ -661,20 +661,20 @@ function PostingPanel({
       )}
       {afterJoin.length > 0 && (
         <section className="plan-section">
-          <SectionHead title="입사한 뒤 바뀌는 것">
-            공고에 적힌 조건으로, 매달 받는 돈이 바뀌는 때예요.
-          </SectionHead>
-          <ol className="plan-steps">
-            {afterJoin.map((slot, i) => (
-              <li key={slot.label}>
-                <span aria-hidden className="plan-step-number">
-                  {i + 1}
-                </span>
-                <h4 className="plan-slot-label">{slot.label}</h4>
-                <Rows items={slot.items} />
-              </li>
-            ))}
-          </ol>
+          <SectionHead title="입사한 뒤 바뀌는 것" />
+          {/* 공고에서 읽은 날: 한 줄에 하나 (때 + 무엇이 바뀌는지) */}
+          <ul className="plan-items">
+            {afterJoin.flatMap((slot) =>
+              slot.items.map((item) => (
+                <li key={`${slot.label}-${item.title}`} className="plan-row">
+                  <span className="support-open">{slot.label}</span>
+                  <span>
+                    <span className="plan-row-title">{item.title}</span> {item.detail}
+                  </span>
+                </li>
+              )),
+            )}
+          </ul>
         </section>
       )}
       {anytime.length > 0 && (
@@ -785,12 +785,15 @@ function usePlanExtras(keys: string[]) {
 }
 
 export function PlanView({
+  sessionId,
   plan,
   result,
   rows,
   supportFailed,
   onEditLiving,
 }: {
+  /** 정책 조건을 받아 올 세션 (서버가 이 세션 플랜에서 읽을 정책을 고른다) */
+  sessionId: string;
   plan: SettlePlan;
   result: CalculationResult;
   /** 조건 확인 표 (사택·기숙사 여부를 본다) */
@@ -801,9 +804,9 @@ export function PlanView({
 }) {
   const postings = plan.postings;
   const { savings, training } = usePlanExtras(extrasKeys(postings));
-  const { status, terms } = usePolicyTerms(plan);
-  // 되묻기 답: 이 화면에서만 쓴다 (서버·AI에 보내지 않는다)
-  const [answers, setAnswers] = useState<Answers>({});
+  const { status, terms } = usePolicyTerms(sessionId, plan);
+  // 되묻기 답: 이 브라우저에서만 쓴다 (서버·AI에 보내지 않는다)
+  const [answers, setAnswers] = useAnswers();
   if (!postings.length) return null;
   // 처음 여는 탭: 처음 보여 줄 경우에 매달 더 많이 남는 회사 (같으면 첫 공고)
   const best = (p: PostingPlan) =>
@@ -824,7 +827,7 @@ export function PlanView({
   return (
     <TermsProvider value={{ status, terms, answers }}>
       <section className="space-y-4" aria-label="1년 정착 플랜">
-        {status === 'ok' && <AskBack terms={terms} answers={answers} onAnswer={setAnswers} />}
+        <AskBack status={status} terms={terms} answers={answers} onAnswer={setAnswers} />
         {postings.length === 1 ? (
           panel(postings[0])
         ) : (
