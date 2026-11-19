@@ -2790,6 +2790,18 @@ body:has(.tour-chip) {
   font-weight: 600;
   color: var(--foreground);
 }
+.ask-back-hint {
+  display: block;
+  font-size: var(--text-sm);
+  font-weight: 400;
+  color: var(--body);
+}
+.plan-more-courses > summary {
+  cursor: pointer;
+  padding: 0.5rem 0;
+  font-size: var(--text-sm);
+  color: var(--primary);
+}
 .ask-back-choices {
   display: inline-flex;
   gap: 0.5rem;

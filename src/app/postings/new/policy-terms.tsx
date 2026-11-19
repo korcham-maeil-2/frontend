@@ -20,11 +20,19 @@ const QUESTIONS = [
   { kind: 'no_house', question: '지금 내 집(주택)이 없나요?', yes: '무주택', no: '집 있음' },
   {
     kind: 'householder',
-    question: '세대주인가요? (이사하면 새 집 기준)',
+    question: '지원을 신청할 때 세대주인가요?',
+    // 통근·이사 어느 경우에도 맞게 (답은 경우마다가 아니라 한 번만 저장한다)
+    hint: '혼자 살며 전입신고를 하면 세대주예요. 부모님 집에 살면 보통 아니에요.',
     yes: '세대주',
     no: '세대주 아님',
   },
-] as const satisfies readonly { kind: Kind; question: string; yes: string; no: string }[];
+] as const satisfies readonly {
+  kind: Kind;
+  question: string;
+  hint?: string;
+  yes: string;
+  no: string;
+}[];
 
 type AskedKind = (typeof QUESTIONS)[number]['kind'];
 /** 조건을 채우는지: true 맞아요, false 안 맞아요, 없으면 모름 */
@@ -198,7 +206,10 @@ export function AskBack({
       <ul className="ask-back-list">
         {questions.map((q) => (
           <li key={q.kind}>
-            <span className="ask-back-question">{q.question}</span>
+            <span className="ask-back-question">
+              {q.question}
+              {'hint' in q && <span className="ask-back-hint">{q.hint}</span>}
+            </span>
             <span role="group" aria-label={q.question} className="ask-back-choices">
               {[true, false].map((value) => (
                 <button
@@ -274,7 +285,8 @@ export function PolicyDetail({ id }: { id: string | null | undefined }) {
             <ChevronDown aria-hidden className={open ? 'rotate-180' : undefined} />
           </button>
         )}
-        {mismatch && <span className="policy-mark is-off">안 맞을 수 있어요</span>}
+        {/* 펼치면 조건마다 표시가 있으니 요약 줄에는 접혔을 때만 */}
+        {mismatch && !open && <span className="policy-mark is-off">안 맞을 수 있어요</span>}
       </p>
       {found.caution && (
         <p className="policy-caution">

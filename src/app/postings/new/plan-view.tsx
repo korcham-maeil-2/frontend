@@ -280,6 +280,9 @@ function CourseItem({ course, jobNcs }: { course: Course; jobNcs: string | null 
 }
 
 /** 일하면서 배우기: 근무지 근처 재직자 오프라인 강의 (고용24). 자격은 상세 페이지에서 확인. */
+/** 일하면서 배우기: 먼저 보여 줄 강의 수 (나머지는 '강의 n개 더 보기') */
+const TRAINING_SHOWN = 3;
+
 function TrainingSlot({
   training,
   jobNcs,
@@ -300,7 +303,7 @@ function TrainingSlot({
         3개월 안에 시작하고, {matched ? '직무 관련과 주말반이' : '주말반이'} 먼저예요.
       </p>
       <ul className="plan-items">
-        {training.courses.map((course) => (
+        {training.courses.slice(0, TRAINING_SHOWN).map((course) => (
           <CourseItem
             key={`${course.title}-${course.start}-${course.institute}`}
             course={course}
@@ -308,6 +311,21 @@ function TrainingSlot({
           />
         ))}
       </ul>
+      {/* 강의는 세 개만 먼저, 나머지는 한 번 더 펼쳐 본다 (칩의 개수는 전체) */}
+      {training.courses.length > TRAINING_SHOWN && (
+        <details className="plan-more-courses">
+          <summary>강의 {training.courses.length - TRAINING_SHOWN}개 더 보기</summary>
+          <ul className="plan-items">
+            {training.courses.slice(TRAINING_SHOWN).map((course) => (
+              <CourseItem
+                key={`${course.title}-${course.start}-${course.institute}`}
+                course={course}
+                jobNcs={jobNcs}
+              />
+            ))}
+          </ul>
+        </details>
+      )}
       <p className="plan-extra-source">출처: {training.source}</p>
     </>
   );
@@ -464,7 +482,8 @@ function Fold({
   children: ReactNode;
 }) {
   return (
-    <details className="plan-fold">
+    // 더 보기는 한 번에 하나만 펼친다 (같은 name: 하나를 열면 나머지가 닫혀 화면이 길어지지 않는다)
+    <details className="plan-fold" name="plan-more">
       <summary>
         {title}
         <Chips chips={chips} />
