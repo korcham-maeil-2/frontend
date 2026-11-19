@@ -100,7 +100,7 @@ export function AskBack({
   if (status === 'loading') {
     return (
       <p className="ask-back ask-back-title" role="status">
-        <Sparkles aria-hidden /> AI가 지원 정책의 신청 조건을 읽는 중…
+        <Sparkles aria-hidden /> 월급지도가 지원 정책의 신청 조건을 읽는 중…
       </p>
     );
   }
@@ -111,7 +111,7 @@ export function AskBack({
   const done = questions.every((q) => answers[q.kind] !== undefined);
   const title = (
     <span className="ask-back-title">
-      <Sparkles aria-hidden /> AI가 지원 {read}개의 신청 조건을 읽었어요
+      <Sparkles aria-hidden /> 월급지도가 지원 {read}개의 신청 조건을 읽었어요
     </span>
   );
   if (!questions.length || (done && !editing)) {
@@ -161,6 +161,11 @@ export function AskBack({
       </ul>
     </section>
   );
+}
+
+/** AI가 읽은 정책 조건 전체 (정책 번호 → 조건). 접힌 칸의 '조건 확인 n개' 칩에 쓴다 */
+export function useReadTerms() {
+  return useContext(TermsContext).terms;
 }
 
 /** 조건 하나 옆 표시: 답한 조건만 (모르면 아무것도 붙이지 않는다) */
@@ -221,7 +226,10 @@ export function PolicyDetail({ id }: { id: string | null | undefined }) {
               </li>
             ))}
           </ul>
-          <p className="policy-note">AI가 원문에서 읽었어요. 신청 전 공고문을 꼭 확인해 주세요.</p>
+          {/* 대회 규정 제7조(서비스 안 AI 표시 권장): 제목·칩은 '월급지도', AI로 읽었다는 사실은 여기에 */}
+          <p className="policy-note">
+            AI로 원문에서 읽은 조건이에요. 신청 전 공고문을 꼭 확인해 주세요.
+          </p>
         </div>
       )}
     </div>

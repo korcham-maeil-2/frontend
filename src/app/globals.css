@@ -2340,14 +2340,6 @@ details[open] > summary .when-closed {
   font-weight: 700;
   color: var(--foreground);
 }
-/* 구역 칩(최대 2개)은 제목 줄 오른쪽 끝 (SectionHead) */
-.plan-section-chips {
-  margin-inline-start: auto;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 0.25rem;
-}
 /* 구역 설명은 읽어야 하는 문장: 본문 크기·본문색 (DESIGN.md 글씨 단계 ①) */
 .plan-section-desc {
   margin-top: 0.25rem;
@@ -2800,4 +2792,49 @@ body:has(.tour-chip) {
 .policy-toggle:focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
+}
+
+/* 1년 순서 (plan-view.tsx Node): 번호 + 이름 + 칩 한 줄. 접힌 칸도 칩으로 무엇이 있는지 보인다 */
+.plan-node > summary,
+.plan-node-head {
+  min-height: 1.75rem; /* 번호 동그라미와 줄을 맞춘다 */
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.5rem;
+}
+.plan-node > summary {
+  cursor: pointer;
+}
+.plan-node > summary::after {
+  content: '▸';
+  color: var(--muted-foreground);
+}
+.plan-node[open] > summary::after {
+  content: '▾';
+}
+.plan-node > summary .plan-slot-label,
+.plan-node-head .plan-slot-label {
+  min-height: 0;
+}
+.plan-node > summary:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+/* 더 보기: 접은 줄 여러 개 (참고 정보) */
+.plan-more-title {
+  font-size: var(--text-base);
+  font-weight: 700;
+  color: var(--foreground);
+}
+.plan-more .plan-fold > summary {
+  flex-wrap: wrap;
+  gap: 0.25rem 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+.plan-more .plan-fold > summary::before {
+  margin-inline-end: 0;
+}
+.plan-fold-body {
+  padding: 0.5rem 0 1rem;
 }
