@@ -45,6 +45,7 @@ import {
   missingInputs,
   rentsFromResult,
   toUserProfile,
+  validAge,
   type ProfileForm,
   type Rents,
   type UserProfile,
@@ -916,6 +917,7 @@ export default function NewPosting() {
                   rows={rows}
                   supportFailed={!support}
                   onEditLiving={() => changeStep('living')}
+                  age={validAge(profile.age)}
                 />
               )}
               {support && (

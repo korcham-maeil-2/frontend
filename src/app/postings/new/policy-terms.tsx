@@ -25,33 +25,79 @@ type AskedKind = (typeof QUESTIONS)[number]['kind'];
 /** 조건을 채우는지: true 맞아요, false 안 맞아요, 없으면 모름 */
 export type Answers = Partial<Record<AskedKind, boolean>>;
 type Status = 'loading' | 'ok' | 'off';
-type TermsState = { status: Status; terms: Record<string, PolicyTerms>; answers: Answers };
+type TermsState = {
+  status: Status;
+  terms: Record<string, PolicyTerms>;
+  answers: Answers;
+  /** 3단계에서 넣은 만 나이 (선택). 나이 조건 옆 표시에만 쓴다 */
+  age?: number | null;
+  /** 이 공고 급여 한 줄 (소득 조건 아래 참고로). 소득을 판단하지는 않는다 */
+  salary?: string | null;
+  /** 사용자가 직접 확인했다고 체크한 조건 ('정책번호:원문') */
+  checked?: Record<string, boolean>;
+  onCheck?: (key: string, value: boolean) => void;
+};
 
 const TermsContext = createContext<TermsState>({ status: 'off', terms: {}, answers: {} });
 export const TermsProvider = TermsContext.Provider;
 
 const asked = (kind: Kind): kind is AskedKind => QUESTIONS.some((q) => q.kind === kind);
 const squash = (text: string) => text.replace(/\s+/g, '');
-const ANSWERS_KEY = 'wolgeup.plan-answers';
 
-/** 되묻기 답: 플랜을 떠났다 와도 남게 이 탭에만 저장한다 (서버로 보내지 않는다) */
-export function useAnswers() {
-  const [answers, setAnswers] = useState<Answers>(() => {
+/** 플랜을 떠났다 와도 남게 이 탭에만 저장한다 (서버로 보내지 않는다) */
+function useStored<T extends object>(key: string) {
+  const [value, setValue] = useState<T>(() => {
     try {
-      return JSON.parse(sessionStorage.getItem(ANSWERS_KEY) ?? '{}') as Answers;
+      return JSON.parse(sessionStorage.getItem(key) ?? '{}') as T;
     } catch {
-      return {};
+      return {} as T;
     }
   });
-  const save = (next: Answers) => {
-    setAnswers(next);
+  const save = (next: T) => {
+    setValue(next);
     try {
-      sessionStorage.setItem(ANSWERS_KEY, JSON.stringify(next));
+      sessionStorage.setItem(key, JSON.stringify(next));
     } catch {
       // 저장소를 못 쓰면 이 화면에서만 기억한다
     }
   };
-  return [answers, save] as const;
+  return [value, save] as const;
+}
+/** 되묻기 답 */
+export const useAnswers = () => useStored<Answers>('wolgeup.plan-answers');
+/** 직접 확인했다고 체크한 조건 */
+export const useChecked = () => useStored<Record<string, boolean>>('wolgeup.plan-checked');
+
+/**
+ * 나이 조건 원문에서 'N~M세'·'N세 이상 M세 이하'·'N세 이하·미만·이상'만 읽는다.
+ * 그 밖('2009년생부터' 등)은 읽지 않아 표시도 하지 않는다 (틀린 '맞아요'를 막는다).
+ */
+export function ageRange(quote: string): [number, number] | null {
+  const s = quote.replace(/\s+/g, '').replace(/만(?=\d)/g, ''); // '만 19세'의 만만 (미만은 둔다)
+  const both =
+    s.match(/(\d{1,3})세?[~∼～-](\d{1,3})세/) ?? s.match(/(\d{1,3})세이상(\d{1,3})세이하/);
+  if (both) return [Number(both[1]), Number(both[2])];
+  const one = s.match(/(\d{1,3})세(미만|이하|이상)/);
+  if (!one) return null;
+  const n = Number(one[1]);
+  return one[2] === '이상' ? [n, Infinity] : [0, one[2] === '미만' ? n - 1 : n];
+}
+
+type Verdict = 'ok' | 'off' | 'check' | undefined;
+type Condition = PolicyTerms['conditions'][number];
+
+/** 조건 하나를 코드로 판단: 되묻기 답, 나이(원문 범위). 모르면 undefined (아무 표시 없음) */
+function verdict(c: Condition, answers: Answers, age: number | null): Verdict {
+  if (asked(c.kind)) {
+    const answer = answers[c.kind];
+    return answer === undefined ? undefined : answer ? 'ok' : 'off';
+  }
+  if (c.kind !== 'age' || age == null) return undefined;
+  const range = ageRange(c.quote);
+  if (!range) return undefined;
+  if (age < range[0] || age > range[1]) return 'off';
+  // 상한 나이면 만 나이 기준일에 따라 넘을 수 있다
+  return age === range[1] ? 'check' : 'ok';
 }
 
 /** 이 세션 플랜의 정책 조건을 받아 온다. 플랜이 바뀌면(다시 계산) 다시 받는다 */
@@ -168,28 +214,37 @@ export function useReadTerms() {
   return useContext(TermsContext).terms;
 }
 
-/** 조건 하나 옆 표시: 답한 조건만 (모르면 아무것도 붙이지 않는다) */
-function Mark({ kind, answers }: { kind: Kind; answers: Answers }) {
-  const answer = asked(kind) ? answers[kind] : undefined;
-  if (answer === undefined) return null;
-  return answer ? (
-    <span className="policy-mark is-ok">
-      <CircleCheck aria-hidden /> 맞아요
-    </span>
-  ) : (
+/** 조건 하나 옆 표시 (코드가 판단한 조건만) */
+function Mark({ verdict }: { verdict: Exclude<Verdict, undefined> }) {
+  if (verdict === 'ok')
+    return (
+      <span className="policy-mark is-ok">
+        <CircleCheck aria-hidden /> 맞아요
+      </span>
+    );
+  return verdict === 'off' ? (
     <span className="policy-mark is-off">
       <CircleAlert aria-hidden /> 안 맞을 수 있어요
+    </span>
+  ) : (
+    <span className="policy-mark is-check">
+      <CircleAlert aria-hidden /> 나이 기준일 확인
     </span>
   );
 }
 
 /** 정책 줄 아래 한 줄: 지원 내용 + 금액 + '조건 n개'(누르면 펼침). 주의가 있으면 빨간 한 줄 더 */
 export function PolicyDetail({ id }: { id: string | null | undefined }) {
-  const { terms, answers } = useContext(TermsContext);
+  const { terms, answers, age = null, salary, checked = {}, onCheck } = useContext(TermsContext);
   const [open, setOpen] = useState(false);
   const found = id ? terms[id] : undefined;
   if (!found) return null;
-  const mismatch = found.conditions.some((c) => asked(c.kind) && answers[c.kind] === false);
+  const verdicts = found.conditions.map((c) => verdict(c, answers, age));
+  const mismatch = verdicts.includes('off');
+  // 확인한 조건: 코드가 '맞아요'라고 본 것 + 사용자가 직접 체크한 것
+  // 체크는 '정책번호:원문'으로 기억한다 (다시 읽어 조건 순서가 바뀌어도 엉뚱한 줄에 붙지 않게)
+  const keyOf = (i: number) => `${id}:${squash(found.conditions[i].quote)}`;
+  const done = verdicts.filter((v, i) => v === 'ok' || (!v && checked[keyOf(i)])).length;
   const listId = `policy-conditions-${id}`;
   return (
     <div className="policy-terms">
@@ -204,7 +259,7 @@ export function PolicyDetail({ id }: { id: string | null | undefined }) {
             aria-controls={listId}
             onClick={() => setOpen(!open)}
           >
-            조건 {found.conditions.length}개
+            조건 {found.conditions.length}개{done > 0 && ` 중 ${done}개 확인`}
             <ChevronDown aria-hidden className={open ? 'rotate-180' : undefined} />
           </button>
         )}
@@ -218,14 +273,38 @@ export function PolicyDetail({ id }: { id: string | null | undefined }) {
       {open && (
         <div id={listId} className="policy-conditions">
           <ul>
-            {found.conditions.map((c) => (
-              <li key={`${c.kind}-${c.quote}`}>
-                {c.text} <Mark kind={c.kind} answers={answers} />
-                {/* 원문이 조건 문장과 다를 때만 근거로 보여 준다 */}
-                {squash(c.quote) !== squash(c.text) && <q className="policy-quote">{c.quote}</q>}
-              </li>
-            ))}
+            {found.conditions.map((c, i) => {
+              const v = verdicts[i];
+              const key = keyOf(i);
+              return (
+                <li key={`${c.kind}-${c.quote}`}>
+                  {/* 코드가 판단 못 한 조건은 직접 확인하고 체크한다 (이 탭에만 저장).
+                      되묻기로 물을 조건은 위 질문에 답하면 표시가 붙으니 체크 칸을 두지 않는다 */}
+                  {v ? (
+                    <>
+                      {c.text} <Mark verdict={v} />
+                    </>
+                  ) : asked(c.kind) ? (
+                    c.text
+                  ) : (
+                    <label className="policy-check">
+                      <input
+                        type="checkbox"
+                        checked={!!checked[key]}
+                        onChange={(e) => onCheck?.(key, e.target.checked)}
+                      />
+                      {c.text}
+                    </label>
+                  )}
+                  {/* 원문이 조건 문장과 다를 때만 근거로 보여 준다 */}
+                  {squash(c.quote) !== squash(c.text) && <q className="policy-quote">{c.quote}</q>}
+                </li>
+              );
+            })}
           </ul>
+          {salary && found.conditions.some((c) => c.kind === 'income') && (
+            <p className="policy-salary">참고: 이 공고 {salary}</p>
+          )}
           {/* 대회 규정 제7조(서비스 안 AI 표시 권장): 제목·칩은 '월급지도', AI로 읽었다는 사실은 여기에 */}
           <p className="policy-note">
             AI로 원문에서 읽은 조건이에요. 신청 전 공고문을 꼭 확인해 주세요.

@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { api } from '@/lib/api/client';
 import type { components } from '@/lib/api/schema';
-import { formatWon, placeName, statusBadge, type Row } from './format';
+import { formatWon, hasSalary, placeName, salaryText, statusBadge, type Row } from './format';
 import { livesInCompanyHousing } from './profile';
 import { SourceBadge } from './source-badge';
 import {
@@ -21,6 +21,7 @@ import {
   PolicyDetail,
   TermsProvider,
   useAnswers,
+  useChecked,
   usePolicyTerms,
   useReadTerms,
 } from './policy-terms';
@@ -316,6 +317,13 @@ const won = (v: number) =>
   (v < 0 ? '−' : '') + formatWon(Math.round(Math.abs(v) / 10_000) * 10_000);
 /** 받아야 할 최소 연봉: 4단계 카드와 같은 말 ('… 이상', 최저임금으로 올린 답은 '이상' 없이) */
 const minSalaryText = (m: MinSalary) => `${formatWon(m.salary)}${m.floor ? '' : ' 이상'}`;
+
+/** 소득 조건 아래 참고 한 줄: '연봉 3,400만원 (세전)', 월급이면 1년치도 */
+function salaryLine(row: Row): string | null {
+  if (!hasSalary(row)) return null;
+  const monthly = row.salary_type?.value === 'monthly' ? row.monthly_salary_krw?.value : null;
+  return `${salaryText(row)} (세전${monthly ? `, 1년이면 ${formatWon(monthly * 12)}` : ''})`;
+}
 
 /** 공고의 플랜들: 이사 플랜(postings)과 통근 플랜(alternates). 예전 백엔드면 하나뿐 */
 function plansOf(plan: SettlePlan, posting: PostingPlan): Partial<Record<Case, PostingPlan>> {
@@ -896,6 +904,7 @@ export function PlanView({
   rows,
   supportFailed,
   onEditLiving,
+  age,
 }: {
   /** 정책 조건을 받아 올 세션 (서버가 이 세션 플랜에서 읽을 정책을 고른다) */
   sessionId: string;
@@ -906,57 +915,81 @@ export function PlanView({
   /** 청년 지원을 못 불러왔는지 (세션의 local_support가 없음) */
   supportFailed: boolean;
   onEditLiving: () => void;
+  /** 3단계 만 나이 (선택): 나이 조건 옆 표시에만 */
+  age: number | null;
 }) {
   const postings = plan.postings;
   const { savings, training } = usePlanExtras(extrasKeys(postings));
   const { status, terms } = usePolicyTerms(sessionId, plan);
   // 되묻기 답: 이 브라우저에서만 쓴다 (서버·AI에 보내지 않는다)
   const [answers, setAnswers] = useAnswers();
+  const [checked, setChecked] = useChecked();
   if (!postings.length) return null;
   // 처음 여는 탭: 처음 보여 줄 경우에 매달 더 많이 남는 회사 (같으면 첫 공고)
   const best = (p: PostingPlan) =>
     scenarioOf(result, p.posting_id, defaultCase(result, plansOf(plan, p)))?.monthly_remaining ??
     -Infinity;
   const first = postings.reduce((a, b) => (best(b) > best(a) ? b : a));
-  const panel = (posting: PostingPlan) => (
-    <PostingPanel
-      plans={plansOf(plan, posting)}
-      result={result}
-      row={rows.find((r) => r.id === posting.posting_id)}
-      savings={savings}
-      training={training[trainingKey(posting) ?? '']}
-      supportFailed={supportFailed}
-      onEditLiving={onEditLiving}
-      askBack={<AskBack status={status} terms={terms} answers={answers} onAnswer={setAnswers} />}
-    />
-  );
+  const panel = (posting: PostingPlan) => {
+    const plans = plansOf(plan, posting);
+    const row = rows.find((r) => r.id === posting.posting_id);
+    // 이 회사 플랜에 보이는 정책의 조건만 (되묻기 개수·질문도 회사마다)
+    const ids = new Set(
+      Object.values(plans).flatMap((p) =>
+        p.slots.flatMap((s) => s.items.flatMap((i) => (i.policy_id ? [i.policy_id] : []))),
+      ),
+    );
+    const own = Object.fromEntries(Object.entries(terms).filter(([id]) => ids.has(id)));
+    return (
+      <TermsProvider
+        value={{
+          status,
+          terms: own,
+          answers,
+          age,
+          salary: row && salaryLine(row),
+          checked,
+          onCheck: (key, value) => setChecked({ ...checked, [key]: value }),
+        }}
+      >
+        <PostingPanel
+          plans={plans}
+          result={result}
+          row={row}
+          savings={savings}
+          training={training[trainingKey(posting) ?? '']}
+          supportFailed={supportFailed}
+          onEditLiving={onEditLiving}
+          askBack={<AskBack status={status} terms={own} answers={answers} onAnswer={setAnswers} />}
+        />
+      </TermsProvider>
+    );
+  };
   return (
-    <TermsProvider value={{ status, terms, answers }}>
-      <section className="space-y-4" aria-label="1년 정착 플랜">
-        {postings.length === 1 ? (
-          panel(postings[0])
-        ) : (
-          <Tabs defaultValue={first.posting_id} className="min-w-0">
-            <TabsList aria-label="볼 회사" className="posting-tabs">
-              {postings.map((posting, i) => (
-                <TabsTrigger key={posting.posting_id} value={posting.posting_id}>
-                  <span className="posting-tab-name">{posting.company || `공고 ${i + 1}`}</span>
-                </TabsTrigger>
-              ))}
-            </TabsList>
-            {postings.map((posting) => (
-              <TabsContent key={posting.posting_id} value={posting.posting_id} className="pt-3">
-                {panel(posting)}
-              </TabsContent>
+    <section className="space-y-4" aria-label="1년 정착 플랜">
+      {postings.length === 1 ? (
+        panel(postings[0])
+      ) : (
+        <Tabs defaultValue={first.posting_id} className="min-w-0">
+          <TabsList aria-label="볼 회사" className="posting-tabs">
+            {postings.map((posting, i) => (
+              <TabsTrigger key={posting.posting_id} value={posting.posting_id}>
+                <span className="posting-tab-name">{posting.company || `공고 ${i + 1}`}</span>
+              </TabsTrigger>
             ))}
-          </Tabs>
-        )}
-        {plan.notes.map((note) => (
-          <p key={note} className="text-sm text-muted-foreground">
-            {note}
-          </p>
-        ))}
-      </section>
-    </TermsProvider>
+          </TabsList>
+          {postings.map((posting) => (
+            <TabsContent key={posting.posting_id} value={posting.posting_id} className="pt-3">
+              {panel(posting)}
+            </TabsContent>
+          ))}
+        </Tabs>
+      )}
+      {plan.notes.map((note) => (
+        <p key={note} className="text-sm text-muted-foreground">
+          {note}
+        </p>
+      ))}
+    </section>
   );
 }
