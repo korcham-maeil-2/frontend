@@ -35,11 +35,15 @@ const CASE_THAN: Record<Case, string> = {
   move: '이사할 때보다',
 };
 
-/** 받침에 맞는 조사 ('빛가람그리드(주)' → '가'). 한글이 없으면 '이(가)' 꼴 */
+/** 숫자를 읽었을 때 받침이 있는 것 (영·일·삼·육·칠·팔) */
+const DIGIT_FINAL = '013678';
+
+/** 받침에 맞는 조사. 끝 괄호·기호는 건너뛴다 ('빛가람그리드(주)' → '가', '공고 1' → '이'). 영문 끝은 '이(가)' */
 function josa(name: string, withFinal: string, without: string): string {
-  const last = [...name].reverse().find((ch) => ch >= '가' && ch <= '힣');
-  if (!last) return `${withFinal}(${without})`;
-  return (last.charCodeAt(0) - 0xac00) % 28 ? withFinal : without;
+  const last = name.replace(/[^0-9A-Za-z가-힣]+$/, '').slice(-1);
+  if (last >= '가' && last <= '힣') return (last.charCodeAt(0) - 0xac00) % 28 ? withFinal : without;
+  if (/\d/.test(last)) return DIGIT_FINAL.includes(last) ? withFinal : without;
+  return `${withFinal}(${without})`;
 }
 const subject = (name: string) => name + josa(name, '이', '가');
 const topic = (name: string) => name + josa(name, '은', '는');
@@ -73,8 +77,11 @@ function entry(posting: PostingResult, name: string, scenario: Scenario, row?: R
 function compare(result: Result, rows: Row[]) {
   const done: Compared[] = [];
   const left: { name: string; why: string }[] = [];
+  // 같은 회사 공고가 둘이면 '카카오 (공고 2)'처럼 구분한다 (결론 문장이 '카카오보다 카카오가'가 되지 않게)
+  const names = result.postings.map((p, i) => p.company || `공고 ${i + 1}`);
   result.postings.forEach((posting, i) => {
-    const name = posting.company || `공고 ${i + 1}`;
+    const name =
+      names.filter((n) => n === names[i]).length > 1 ? `${names[i]} (공고 ${i + 1})` : names[i];
     const be = result.break_even.find((b) => b.posting_id === posting.posting_id);
     const chosen = pickCase(posting, be, 'best');
     const scenario = posting.scenarios.find((s) => s.case === chosen && s.applicable);
@@ -203,7 +210,8 @@ function lineOf(bars: Compared[], single: boolean): { title: ReactNode; why?: st
   }
   const gap = win.remaining - rival.remaining;
   const short = win.remaining < 0;
-  if (gap < sameBelow(bars)) {
+  // 한쪽만 모자라면 차이가 작아도 '거의 같아요'라고 하지 않는다
+  if (gap < sameBelow(bars) && win.remaining < 0 === rival.remaining < 0) {
     const what = short ? '모자라는 돈' : '남는 돈';
     return {
       title: single
