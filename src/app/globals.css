@@ -568,8 +568,9 @@ details[open] > summary .when-closed {
 }
 /* 404·오류 화면 (src/components/layout/notice-page.tsx): 안내 패널 하나 */
 .notice-page {
-  margin-block: clamp(2.5rem, 8vw, 5rem);
+  margin: clamp(2.5rem, 8vw, 5rem) auto;
   max-width: 40rem;
+  text-align: center;
   border-radius: 1rem;
   background: var(--muted);
   padding: clamp(1.75rem, 5vw, 3rem);
@@ -593,11 +594,13 @@ details[open] > summary .when-closed {
   gap: 0.35rem;
   color: var(--body);
   word-break: keep-all;
+  text-wrap: balance; /* 가운데 정렬이라 마지막 줄에 한두 낱말만 남지 않게 */
 }
 .notice-actions {
   margin-top: 1.75rem;
   display: flex;
   flex-wrap: wrap;
+  justify-content: center;
   gap: 0.5rem;
 }
 /* global-error는 버튼 부품을 쓸 수 없어(레이아웃 밖) 같은 모양을 CSS로 둔다 */
