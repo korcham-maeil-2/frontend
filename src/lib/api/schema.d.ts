@@ -282,6 +282,28 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/plan/policy-terms': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Get Policy Terms
+     * @description 정책마다 무엇을 주는지·주의할 점·신청 조건 (원문 인용 포함). 처음 보는 정책만 Claude가
+     *     읽고 저장해 둔다. 정책을 읽지 않는 서버(키 없음 등)면 status='off'
+     *     (화면은 원문 요약을 보여 준다).
+     */
+    post: operations['get_policy_terms_plan_policy_terms_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -549,6 +571,35 @@ export interface components {
        * @description questions의 문장만 (예전 모양, questions를 쓰세요)
        */
       questions_to_ask?: string[];
+    };
+    /** Condition */
+    Condition: {
+      /**
+       * Kind
+       * @description 조건 종류 (되묻기 질문을 고를 때만 쓴다. 정책을 빼지 않는다)
+       * @enum {string}
+       */
+      kind:
+        | 'age'
+        | 'income'
+        | 'no_house'
+        | 'householder'
+        | 'moved_in'
+        | 'residence'
+        | 'employed'
+        | 'unmarried'
+        | 'student'
+        | 'other';
+      /**
+       * Text
+       * @description 조건을 짧게 (해요체 아님, 40자 안)
+       */
+      text: string;
+      /**
+       * Quote
+       * @description 원문 그대로의 구절 (코드가 원문과 대조함)
+       */
+      quote: string;
     };
     /**
      * ConfirmRequest
@@ -996,10 +1047,10 @@ export interface components {
     PlanItem: {
       /**
        * Kind
-       * @description deposit=보증금 마련, move_in=전입신고, policy=지원 신청
+       * @description deposit=보증금 마련, move_in=전입신고, policy=지원 신청, milestone=공고에서 읽은 날 (수습 끝·주거지원비 끝)
        * @enum {string}
        */
-      kind: 'deposit' | 'move_in' | 'policy';
+      kind: 'deposit' | 'move_in' | 'policy' | 'milestone';
       /** Title */
       title: string;
       /**
@@ -1046,10 +1097,10 @@ export interface components {
        * Kind
        * @enum {string}
        */
-      kind: 'before' | 'move_month' | 'month' | 'start' | 'anytime';
+      kind: 'before' | 'move_month' | 'month' | 'start' | 'job' | 'anytime';
       /**
        * Label
-       * @description '이사 전', '이사한 달', '2026년 12월', '언제든'
+       * @description '이사 전', '이사한 달', '2026년 12월', '입사 3개월 뒤' 등
        */
       label: string;
       /**
@@ -1059,6 +1110,29 @@ export interface components {
       month: string | null;
       /** Items */
       items: components['schemas']['PlanItem'][];
+    };
+    /**
+     * PolicyTerms
+     * @description 정책 하나를 읽은 결과. 인용은 모두 원문에 있는 것만 남는다.
+     */
+    PolicyTerms: {
+      /**
+       * Summary
+       * @description 무엇을 지원하는지 한 줄
+       */
+      summary: string;
+      /**
+       * Caution
+       * @description 접수 중단·예산 소진 마감 같은 주의 (원문 구절)
+       */
+      caution: string | null;
+      /**
+       * Amount
+       * @description 받는 금액 (숫자로 바꾸지 않은 원문 구절)
+       */
+      amount: string | null;
+      /** Conditions */
+      conditions: components['schemas']['Condition'][];
     };
     /**
      * PostingCosts
@@ -1614,6 +1688,32 @@ export interface components {
        * @description 신청·안내 페이지 (https 붙임). 자격은 여기서 확인
        */
       url: string | null;
+    };
+    /**
+     * TermsRequest
+     * @description 플랜에 보이는 정책 번호와 그 근무지 지역 (공개 정보만, 사용자 정보는 받지 않는다).
+     */
+    TermsRequest: {
+      /** Lawd Cds */
+      lawd_cds: string[];
+      /** Ids */
+      ids: string[];
+    };
+    /** TermsResult */
+    TermsResult: {
+      /**
+       * Status
+       * @description off: 이 서버는 정책을 읽지 않는다 (키 없음)
+       * @enum {string}
+       */
+      status: 'ok' | 'off';
+      /**
+       * Terms
+       * @description 정책 번호 → 읽은 결과 (못 읽은 정책은 없다)
+       */
+      terms: {
+        [key: string]: components['schemas']['PolicyTerms'];
+      };
     };
     /** TextCell */
     TextCell: {
@@ -2357,6 +2457,48 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Unprocessable Content */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+      /** @description Internal Server Error */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponse'];
+        };
+      };
+    };
+  };
+  get_policy_terms_plan_policy_terms_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['TermsRequest'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TermsResult'];
         };
       };
       /** @description Unprocessable Content */

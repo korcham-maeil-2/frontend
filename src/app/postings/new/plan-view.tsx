@@ -9,6 +9,7 @@ import type { components } from '@/lib/api/schema';
 import { formatWon, placeName, statusBadge, type Row } from './format';
 import { livesInCompanyHousing } from './profile';
 import { SourceBadge } from './source-badge';
+import { AskBack, PolicyDetail, TermsProvider, usePolicyTerms, type Answers } from './policy-terms';
 
 // 결과 화면의 '1년 정착 플랜' (백엔드 plan.py의 SettlePlan, 이슈 #18).
 //   공고마다: 이사 전 → 이사한 달 → 달마다(신청 마감·시작) → 언제든
@@ -64,6 +65,8 @@ function Item({ item }: { item: PlanItem }) {
         <span>
           <ItemTitle item={item} /> <LocalChip item={item} />
         </span>
+        {/* AI가 원문에서 읽은 지원 내용·주의·신청 조건 (policy-terms.tsx). 못 읽으면 이름만 */}
+        <PolicyDetail id={item.policy_id} />
       </li>
     );
   }
@@ -73,7 +76,8 @@ function Item({ item }: { item: PlanItem }) {
         <ItemTitle item={item} />
         <LocalChip item={item} />
       </p>
-      {item.amount_krw != null && (
+      {/* 공고에서 읽은 날(milestone)은 설명 문장에 금액이 있어 따로 크게 쓰지 않는다 */}
+      {item.amount_krw != null && item.kind !== 'milestone' && (
         <p className="plan-amount">
           <span className="tabular-nums">{formatWon(item.amount_krw)}</span>
           {item.status === 'estimated' && (
@@ -436,6 +440,8 @@ function PostingPanel({
   const moveMonth = itemsOf('move_month');
   const start = itemsOf('start');
   const anytime = itemsOf('anytime');
+  // 공고에서 읽은 날 (입사 N개월 뒤: 수습 끝·주거지원비 끝). 백엔드가 순서대로 보낸다
+  const afterJoin = posting.slots.filter((s) => s.kind === 'job');
   // 사택·기숙사에 들어가면(이사할 집 주거비 0원) 백엔드가 보증금 할 일을 빼서 보낸다 (plan.py).
   // '처음 준비할 돈' 칸이 '모름'이 아니라 '없음'이라고 말하려면 이유를 알아야 해서 여기서도 본다
   const dorm = livesInCompanyHousing(row, scenarioOf(result, id, 'move')?.housing.value);
@@ -653,6 +659,24 @@ function PostingPanel({
           <Rows items={start} twoColumns />
         </section>
       )}
+      {afterJoin.length > 0 && (
+        <section className="plan-section">
+          <SectionHead title="입사한 뒤 바뀌는 것">
+            공고에 적힌 조건으로, 매달 받는 돈이 바뀌는 때예요.
+          </SectionHead>
+          <ol className="plan-steps">
+            {afterJoin.map((slot, i) => (
+              <li key={slot.label}>
+                <span aria-hidden className="plan-step-number">
+                  {i + 1}
+                </span>
+                <h4 className="plan-slot-label">{slot.label}</h4>
+                <Rows items={slot.items} />
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
       {anytime.length > 0 && (
         <details className="plan-fold plan-section">
           <summary>언제든 신청할 수 있는 지원 {anytime.length}개</summary>
@@ -777,6 +801,9 @@ export function PlanView({
 }) {
   const postings = plan.postings;
   const { savings, training } = usePlanExtras(extrasKeys(postings));
+  const { status, terms } = usePolicyTerms(plan);
+  // 되묻기 답: 이 화면에서만 쓴다 (서버·AI에 보내지 않는다)
+  const [answers, setAnswers] = useState<Answers>({});
   if (!postings.length) return null;
   // 처음 여는 탭: 처음 보여 줄 경우에 매달 더 많이 남는 회사 (같으면 첫 공고)
   const best = (p: PostingPlan) =>
@@ -795,30 +822,33 @@ export function PlanView({
     />
   );
   return (
-    <section className="space-y-4" aria-label="1년 정착 플랜">
-      {postings.length === 1 ? (
-        panel(postings[0])
-      ) : (
-        <Tabs defaultValue={first.posting_id} className="min-w-0">
-          <TabsList aria-label="볼 회사" className="posting-tabs">
-            {postings.map((posting, i) => (
-              <TabsTrigger key={posting.posting_id} value={posting.posting_id}>
-                <span className="posting-tab-name">{posting.company || `공고 ${i + 1}`}</span>
-              </TabsTrigger>
+    <TermsProvider value={{ status, terms, answers }}>
+      <section className="space-y-4" aria-label="1년 정착 플랜">
+        {status === 'ok' && <AskBack terms={terms} answers={answers} onAnswer={setAnswers} />}
+        {postings.length === 1 ? (
+          panel(postings[0])
+        ) : (
+          <Tabs defaultValue={first.posting_id} className="min-w-0">
+            <TabsList aria-label="볼 회사" className="posting-tabs">
+              {postings.map((posting, i) => (
+                <TabsTrigger key={posting.posting_id} value={posting.posting_id}>
+                  <span className="posting-tab-name">{posting.company || `공고 ${i + 1}`}</span>
+                </TabsTrigger>
+              ))}
+            </TabsList>
+            {postings.map((posting) => (
+              <TabsContent key={posting.posting_id} value={posting.posting_id} className="pt-3">
+                {panel(posting)}
+              </TabsContent>
             ))}
-          </TabsList>
-          {postings.map((posting) => (
-            <TabsContent key={posting.posting_id} value={posting.posting_id} className="pt-3">
-              {panel(posting)}
-            </TabsContent>
-          ))}
-        </Tabs>
-      )}
-      {plan.notes.map((note) => (
-        <p key={note} className="text-sm text-muted-foreground">
-          {note}
-        </p>
-      ))}
-    </section>
+          </Tabs>
+        )}
+        {plan.notes.map((note) => (
+          <p key={note} className="text-sm text-muted-foreground">
+            {note}
+          </p>
+        ))}
+      </section>
+    </TermsProvider>
   );
 }
