@@ -1,5 +1,21 @@
 # 월급지도 frontend
 
+**시연** https://maeil2-frontend.sunghoyaaa.com (로그인 없음) · **API 문서** https://maeil2-backend.sunghoyaaa.com/docs
+
+저장소: [backend](https://github.com/korcham-maeil-2/backend) · **frontend** (여기) · [docs](https://github.com/korcham-maeil-2/docs)
+
+---
+
+취업·이주를 고민하는 청년이 공고를 넣으면, 일자리마다 **매달 실제로 남는 돈**을 비교하고 1년 정착 플랜까지 만들어 주는 AI 에이전트의 화면입니다. 2026 대한민국 청년 CAREER FAIR AI 해커톤 출품작(첫월급연구소).
+
+**화면 흐름** (`src/app/postings/new`)
+
+1. **공고 넣기**: 공고 글 붙여넣기 또는 PDF·엑셀·CSV·이미지 파일 (여러 개). '예시로 사용법 보기'는 예시 공고로 비용 없이 체험
+2. **조건 확인**: AI가 정리한 비교표를 확인·수정. 값마다 확인 / 추정 / 입력 배지와 원문 출처
+3. **내 생활비**: 지금 집 주거비, 통근·이사 여부와 비용. 계산을 막는 빈 값은 에이전트가 그 칸 위에서 되물음
+4. **남는 돈**: 회사·경우별 매달 남는 돈, 연봉 비공개 공고의 최소 연봉, AI 요약
+5. **정착 플랜**: 통근/이사별 1년 할 일, 청년 지원 신청 조건, 적금·재직자 강의 참고
+
 Next.js 16 + Tailwind CSS 4 + shadcn/ui (Base UI). 패키지 관리는 pnpm.
 
 ## 실행
